@@ -63,7 +63,7 @@ def _import_all_models() -> list[str]:
                 # Distinguish "this context has no models module" from "the
                 # models module exists but failed to import". The latter must be
                 # fatal: continuing would let autogenerate drop real tables.
-                if exc.name == module_path:
+                if exc.name and (module_path == exc.name or module_path.startswith(f"{exc.name}.")):
                     continue
                 raise
             imported.append(module_path)
@@ -80,7 +80,11 @@ def _import_all_models() -> list[str]:
             importlib.import_module(shared_module)
             imported.append(shared_module)
         except ModuleNotFoundError as exc:
-            if exc.name == shared_module:
+            # ``exc.name`` is the *deepest* missing module, so a missing parent
+            # package surfaces as "No module named 'app.shared.db.models'".
+            # Using startswith() covers both that and a missing leaf, while still
+            # re-raising a genuine import error inside a module that does exist.
+            if exc.name and (shared_module == exc.name or shared_module.startswith(f"{exc.name}.")):
                 continue
             raise
     return imported
@@ -89,6 +93,25 @@ def _import_all_models() -> list[str]:
 IMPORTED_MODEL_MODULES = _import_all_models()
 
 target_metadata = metadata
+
+
+def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    """Render our custom column types with the import they need.
+
+    Autogenerate emits a fully-qualified name for any type whose ``__module__``
+    differs from ``sqlalchemy`` - so ``DateTimeMS`` becomes
+    ``app.shared.db.types.DateTimeMS()``. Without this hook that name is written
+    into the migration *without* an import, producing a file that raises
+    ``NameError`` the first time it is applied. Returning the rendered string and
+    registering the import makes the generated migration self-contained.
+    """
+    if type_ != "type":
+        return False
+    module = type(obj).__module__
+    if not module.startswith("app.shared.db.types"):
+        return False
+    autogen_context.imports.add(f"import {module}")  # type: ignore[attr-defined]
+    return f"{module}.{type(obj).__name__}()"
 
 
 def include_object(
@@ -118,6 +141,7 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
         include_object=include_object,
+        render_item=render_item,
         # Render the CHECK constraints that back INV-001/INV-002 so the generated
         # SQL is a complete, reviewable statement of intent.
         render_as_batch=False,
@@ -139,6 +163,7 @@ def run_migrations_online() -> None:
             compare_type=True,
             compare_server_default=True,
             include_object=include_object,
+            render_item=render_item,
             # MySQL DDL is not transactional; batch mode rewrites ALTERs into
             # safer create-copy-swap sequences where supported.
             render_as_batch=False,

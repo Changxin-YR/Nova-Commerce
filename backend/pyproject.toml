@@ -179,6 +179,14 @@ ignore = [
 "app/shared/redis_client.py" = ["BLE001"]
 "app/shared/storage/backends/minio_backend.py" = ["BLE001"]
 "app/main.py" = ["BLE001"]
+# Generated migrations legitimately use sa.text() for server defaults and CHECK
+# constraints (BIGINT UNSIGNED defaults, now(3), the qty >= 0 guards of INV-001/002).
+# They are reviewable artefacts, not application code.
+"migrations/**" = ["TID251"]
+# Integration tests assert on physical database rows (e.g. "the plaintext
+# refresh token appears in no column of auth_sessions"). Going through the ORM
+# would let the model's own view hide the thing under test.
+"tests/integration/**" = ["TID251"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "app.shared.db.session.SessionLocal".msg = "Import get_session()/session_scope() instead - never reach into the global session factory."

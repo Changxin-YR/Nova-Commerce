@@ -150,6 +150,26 @@ export function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
   return typeof v.code === 'number' && typeof v.message === 'string' && 'data' in v
 }
 
+/**
+ * Is this a deliberate cancellation?
+ *
+ * Three shapes must all be recognized, or a user who navigates away mid-request
+ * sees a bogus "network failure" toast:
+ *   - `axios.CanceledError` / `Cancel` (what the axios adapter throws)
+ *   - an `AbortController` abort surfaced by `fetch` (`AbortError`)
+ *   - a raw `{ code: 'ERR_CANCELED' }`-style axios error
+ */
+export function isCancellation(error: unknown): boolean {
+  if (axios.isCancel(error)) return true
+  if (error instanceof DOMException && error.name === 'AbortError') return true
+  if (error && typeof error === 'object') {
+    const v = error as Record<string, unknown>
+    if (v.code === 'ERR_CANCELED') return true
+    if (v.name === 'CanceledError' || v.name === 'AbortError') return true
+  }
+  return false
+}
+
 /** HTTP statuses that are worth retrying. */
 function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 425 || status === 429 || status >= 500
@@ -168,7 +188,7 @@ function build(partial: NormalizedApiError): NormalizedApiError {
 export function normalizeError(error: unknown, traceId = ''): NormalizedApiError {
   if (isAlreadyNormalized(error)) return error
 
-  if (axios.isCancel(error)) {
+  if (isCancellation(error)) {
     return build({
       code: TRANSPORT_CODES.CANCELLED,
       message: messageForTransportCode(TRANSPORT_CODES.CANCELLED),

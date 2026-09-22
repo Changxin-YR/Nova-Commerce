@@ -36,8 +36,7 @@ export default defineConfig({
         api: 'modern-compiler',
       },
     },
-  },
-  server: {
+  },  server: {
     port: 5173,
     strictPort: true,
     proxy: {

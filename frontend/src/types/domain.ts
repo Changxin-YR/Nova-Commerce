@@ -201,6 +201,8 @@ export interface ProductSummary {
   rating?: number
   brand_name?: string
   tags?: string[]
+  /** Console lists need this; the server is still authoritative for legality. */
+  status: ProductStatus
 }
 
 export interface CartItem {

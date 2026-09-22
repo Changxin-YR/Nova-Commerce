@@ -22,11 +22,13 @@
  */
 
 import axios, {
+  AxiosHeaders,
   type AxiosError,
   type AxiosInstance,
   type AxiosRequestConfig,
   type AxiosResponse,
   type InternalAxiosRequestConfig,
+  type RawAxiosRequestHeaders,
 } from 'axios'
 import {
   API_BASE_URL,
@@ -288,7 +290,15 @@ export class NexoraHttpClient {
         this.sessionExpired()
         throw normalizeError(refreshError, responseTrace || (envelope?.trace_id ?? ''))
       }
-      const replay: NexoraRequestConfig = { ...cfg, __retried: true }
+      // CRITICAL: axios merges this config with the request defaults, and the
+      // original config still carries the Authorization header the request
+      // interceptor built from the STALE token. Without overwriting it, the
+      // replay presents the expired token and fails again. Regression-tested in
+      // src/api/__tests__/client.refresh.spec.ts.
+      const headers = AxiosHeaders.from(cfg.headers as RawAxiosRequestHeaders | undefined)
+      const freshToken = getAccessToken()
+      if (freshToken) headers.set('Authorization', `Bearer ${freshToken}`)
+      const replay: NexoraRequestConfig = { ...cfg, headers, __retried: true }
       return this.axios.request(replay)
     }
 

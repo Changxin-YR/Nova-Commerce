@@ -1,0 +1,276 @@
+/**
+ * Design tokens + the small global primitives shared by the consumer store and the
+ * merchant console.
+ *
+ * Token values follow the Amicro design-system palette (dark page #121212, card
+ * #181818, hover #202020, muted text #767676, 24/14px surface radii) adapted to
+ * Element Plus overrides rather than Tailwind, because this app is Vue 3 + Element
+ * Plus with SCSS (REQ-FE-001).
+ *
+ * Everything is a CSS custom property so a component never hard-codes a colour and
+ * dark mode is a token swap rather than a second stylesheet.
+ */
+
+:root {
+  --nx-primary: #2563eb;
+  --nx-primary-hover: #1d4ed8;
+  --nx-primary-soft: rgba(37, 99, 235, 0.1);
+
+  --nx-success: #16a34a;
+  --nx-success-soft: rgba(22, 163, 74, 0.12);
+  --nx-warning: #d97706;
+  --nx-warning-soft: rgba(217, 119, 6, 0.12);
+  --nx-danger: #dc2626;
+  --nx-danger-soft: rgba(220, 38, 38, 0.1);
+  --nx-info: #0ea5e9;
+  --nx-info-soft: rgba(14, 165, 233, 0.12);
+
+  --nx-page-bg: #f8f9fa;
+  --nx-surface: #ffffff;
+  --nx-surface-hover: #ffffff;
+  --nx-surface-stage: #f4f4f6;
+  --nx-surface-sunken: #f1f5f9;
+  --nx-text: #000000;
+  --nx-text-secondary: #4b5563;
+  --nx-text-muted: #6b7280;
+  --nx-border: #e5e7eb;
+  --nx-border-strong: #d1d5db;
+
+  --nx-radius-card: 24px;
+  --nx-radius-stage: 14px;
+  --nx-radius-control: 10px;
+  --nx-radius-pill: 999px;
+
+  --nx-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --nx-shadow-card-hover: 0 6px 24px rgba(0, 0, 0, 0.06);
+  --nx-shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.12);
+
+  --nx-header-height: 64px;
+  --nx-console-sidebar-width: 232px;
+  --nx-console-sidebar-collapsed: 64px;
+
+  --nx-font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+html.dark {
+  --nx-primary: #3b82f6;
+  --nx-primary-hover: #60a5fa;
+  --nx-primary-soft: rgba(59, 130, 246, 0.16);
+
+  --nx-success: #22c55e;
+  --nx-warning: #f59e0b;
+  --nx-danger: #f87171;
+
+  --nx-page-bg: #121212;
+  --nx-surface: #181818;
+  --nx-surface-hover: #202020;
+  --nx-surface-stage: #131313;
+  --nx-surface-sunken: #141414;
+  --nx-text: #ffffff;
+  --nx-text-secondary: #ededed;
+  --nx-text-muted: #767676;
+  --nx-border: #2a2a2a;
+  --nx-border-strong: #3a3a3a;
+
+  --nx-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --nx-shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--nx-font-sans);
+  background: var(--nx-page-bg);
+  color: var(--nx-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* -- container: the standard card geometry ---------------------------------- */
+.nx-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.nx-card {
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius-card);
+  box-shadow: var(--nx-shadow-card);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+
+  &--interactive:hover {
+    background: var(--nx-surface-hover);
+    box-shadow: var(--nx-shadow-card-hover);
+  }
+
+  &__body {
+    padding: 18px 20px;
+  }
+
+  &__stage {
+    margin: 12px 12px 0;
+    background: var(--nx-surface-stage);
+    border-radius: var(--nx-radius-stage);
+  }
+}
+
+/* -- buttons: plain CSS so state components work without Element Plus --------- */
+.nx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--nx-border-strong);
+  border-radius: var(--nx-radius-control);
+  background: var(--nx-surface);
+  color: var(--nx-text);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+
+  &:hover {
+    border-color: var(--nx-primary);
+    color: var(--nx-primary);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: var(--nx-primary);
+    border-color: var(--nx-primary);
+    color: #fff;
+
+    &:hover {
+      background: var(--nx-primary-hover);
+      border-color: var(--nx-primary-hover);
+      color: #fff;
+    }
+  }
+
+  &--danger {
+    background: var(--nx-danger);
+    border-color: var(--nx-danger);
+    color: #fff;
+  }
+
+  &--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--nx-text-muted);
+
+    &:hover {
+      background: var(--nx-primary-soft);
+      color: var(--nx-primary);
+      border-color: transparent;
+    }
+  }
+}
+
+/* -- pill bar (Amicro catalog navigation pattern) ---------------------------- */
+.nx-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--nx-radius-pill);
+  background: var(--nx-surface-sunken);
+  border: 1px solid var(--nx-border);
+}
+
+.nx-pill {
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--nx-radius-pill);
+  background: transparent;
+  color: var(--nx-text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+
+  &:hover {
+    color: var(--nx-text);
+  }
+
+  &--active {
+    background: var(--nx-surface);
+    color: var(--nx-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+}
+
+html.dark .nx-pill--active {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+/* -- typography ------------------------------------------------------------- */
+.nx-page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.019em;
+}
+
+.nx-section-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nx-muted {
+  color: var(--nx-text-muted);
+  font-size: 13px;
+}
+
+.nx-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* -- accessibility ---------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--nx-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* -- Element Plus token bridge --------------------------------------------- */
+:root {
+  --el-color-primary: var(--nx-primary);
+  --el-border-radius-base: var(--nx-radius-control);
+}
+
+html.dark {
+  --el-bg-color: var(--nx-surface);
+  --el-bg-color-page: var(--nx-page-bg);
+  --el-text-color-primary: var(--nx-text);
+  --el-text-color-regular: var(--nx-text-secondary);
+  --el-border-color: var(--nx-border);
+}

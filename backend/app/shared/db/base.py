@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
-from sqlalchemy import MetaData, String, func, text
+from sqlalchemy import ForeignKey, MetaData, String, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 from sqlalchemy.sql.elements import TextClause
 
@@ -119,10 +119,45 @@ class MerchantScopedMixin:
     migration precisely so that multi-merchant support is not a schema
     migration later. ``nullable=True`` because *consumer* users have no
     merchant, while staff and all commercial rows do.
+
+    ``__merchant_fk_target__`` exists because two different needs collide:
+
+    * **Referential integrity.** A ``merchant_id`` that points at a merchant
+      that does not exist is silent data corruption, so by default the column
+      carries a real foreign key.
+    * **Generality.** A table may legitimately be merchant-scoped without a
+      hard FK (for example a high-write table where the constraint cost is not
+      worth it). Such a model sets ``__merchant_fk_target__ = None``.
+
+    The default is the safe one: FK on. It is also what lets SQLAlchemy infer
+    ``Merchant.users`` - without any foreign key, the relationship cannot be
+    configured at all, which is exactly how this was discovered.
     """
+
+    #: Class-level opt-out. Defaults to enforcing the FK.
+    __merchant_fk_target__: ClassVar[str | None] = "merchants.id"
 
     @declared_attr
     def merchant_id(cls) -> Mapped[int | None]:  # noqa: N805
+        target = getattr(cls, "__merchant_fk_target__", "merchants.id")
+        if target:
+            # RESTRICT, not SET NULL, and the reason is a hard MySQL rule rather
+            # than a preference: MySQL 8 rejects (errno 3823) a column that
+            # participates in BOTH a CHECK constraint and a foreign key whose
+            # referential action mutates it. `users.merchant_id` must satisfy
+            # `staff_requires_merchant`, so a mutating action is not available.
+            #
+            # RESTRICT also happens to be the more correct policy here: merchants
+            # are soft-deleted (see SoftDeleteMixin), so a hard delete that would
+            # orphan staff accounts should be refused rather than silently
+            # allowed to null out their tenant.
+            return mapped_column(
+                BigIntUnsigned,
+                ForeignKey(target, ondelete="RESTRICT"),
+                nullable=True,
+                index=True,
+                doc="Owning merchant; NULL for consumer-scoped rows (spec section 24).",
+            )
         return mapped_column(BigIntUnsigned, nullable=True, index=True)
 
 
