@@ -1,0 +1,86 @@
+# =============================================================================
+# Nexora Commerce V1 - repository hygiene
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Secrets - spec section 134. A committed .env is a FINAL GATE FAILURE (FG-24).
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!**/fixtures/**/*.pem
+secrets/
+*.secret
+credentials.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+dist/
+build/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.report.json
+
+# ---------------------------------------------------------------------------
+# Node / frontend
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/*/node_modules/
+frontend/*/dist/
+frontend/*/.vite/
+*.tsbuildinfo
+.eslintcache
+playwright-report/
+test-results/
+blob-report/
+.vitest/
+
+# ---------------------------------------------------------------------------
+# Object storage / runtime mounts (never commit business binaries)
+# ---------------------------------------------------------------------------
+.data/
+ops/data/
+*.dump
+*.sql.gz
+backups/
+
+# ---------------------------------------------------------------------------
+# Evidence: keep the machine-readable summaries + markdown, drop bulk output.
+# Spec section 144: large reports need not be committed, but must be
+# regenerable by scripts/run_evidence.ps1
+# ---------------------------------------------------------------------------
+artifacts/evidence/**/*.stdout.log
+artifacts/evidence/**/*.stderr.log
+artifacts/evidence/**/raw/
+artifacts/evidence/**/*.html
+!artifacts/evidence/**/*.summary.md
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/settings.json
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

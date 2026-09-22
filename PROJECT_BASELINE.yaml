@@ -1,0 +1,976 @@
+# =============================================================================
+# PROJECT_BASELINE.yaml
+# Nexora Commerce V1 - Phase 0 deliverable (spec section 1)
+#
+# This file is the machine-readable contract for the whole project.
+# Everything below was established by EXECUTION against this machine,
+# not from memory. See docs/architecture/PHASE0_AUDIT.md for raw evidence.
+# =============================================================================
+
+meta:
+  project_name: Nexora Commerce
+  project_name_zh: Nexora AI 原生智能商业运营平台
+  project_name_en: AI-Native Commerce Operations Platform
+  spec_version: "1.0.0-FINAL-DESIGN-FREEZE"
+  baseline_version: "1.0.0"
+  generated_at: "2026-09-22"
+  generated_by: "Phase 0 - Audit + Baseline Lock"
+  business_direction: "3C 数码与智能硬件 B2C 电商"
+
+repository:
+  remote: "https://github.com/Changxin-YR/Nova-Commerce.git"
+  base_commit: "ea2410508950abfe86faac1cd470feda93325632"
+  base_commit_subject: "Initial commit"
+  base_tracked_files: 1
+  branch: main
+  # KNOWN DISCREPANCY (must be resolved by product owner, tracked explicitly):
+  #   remote repository name is "Nova-Commerce" ("Nova Commerce|智能电商平台"),
+  #   frozen spec section 2 mandates "Nexora Commerce" and section 86 freezes the
+  #   MCP server id as "nexora-commerce-mcp".
+  #   RESOLUTION APPLIED: the frozen spec wins. Repository name is NOT renamed
+  #   (a repo name is an address, not a product identifier).
+  naming_discrepancy:
+    remote_repo_name: Nova-Commerce
+    spec_product_name: Nexora Commerce
+    applied: spec
+    status: AWAITING_PRODUCT_OWNER_CONFIRMATION
+
+# -----------------------------------------------------------------------------
+# RUNTIME ENVIRONMENT (measured, not assumed)
+# -----------------------------------------------------------------------------
+environment:
+  host_os: Windows
+  wsl_distro: Ubuntu
+  shell: PowerShell
+  python:
+    interpreter: "C:/Users/27363/Desktop/store/.venv/Scripts/python.exe"
+    version: "3.11.16"
+    managed_by: uv
+    # RATIONALE: host default is Python 3.14.4 (msys2/ucrt64 mingw build).
+    # Rejected because (a) uv cannot inspect mingw sysconfig;
+    # (b) onnxruntime 1.30.0 requires >=3.11 and has no cp314 wheels;
+    # (c) the SQLAlchemy/Celery/Qdrant/LangChain wheel matrix is not yet
+    #     published for 3.14 on Windows.
+    rejected_alternatives:
+      - version: "3.14.4"
+        reason: "onnxruntime/local-reranker + mingw sysconfig incompatibility; wheel risk"
+  node:
+    version: "24.15.0"
+    npm: "11.17.0"
+  docker:
+    client: "29.7.2"
+    server: "29.7.2"
+    compose: "v5.4.0"
+    engine_started_by_phase0: true
+  uv:
+    version: "0.12.18"
+    note: installed during Phase 0 via pip
+
+# -----------------------------------------------------------------------------
+# PORT ALLOCATION
+# 3306 is occupied by a pre-existing host-native mysqld (PID 7712).
+# All Nexora services therefore use a private, collision-free port block.
+# -----------------------------------------------------------------------------
+ports:
+  host_conflicts_detected:
+    - port: 3306
+      owner: mysqld
+      resolution: "Nexora MySQL mapped to 13306"
+  allocation:
+    mysql: 13306
+    redis: 16379
+    qdrant_http: 16333
+    qdrant_grpc: 16334
+    minio_api: 19000
+    minio_console: 19001
+    keycloak: 18080
+    nginx_http: 18000
+    api: 18001
+    mcp_http: 18002
+    otel_grpc: 14317
+    prometheus: 19090
+    grafana: 13000
+
+# -----------------------------------------------------------------------------
+# VERSION-SENSITIVE TECHNOLOGY BASELINE (spec section 151)
+# Each entry records: pinned version, how the API surface was VERIFIED,
+# and the concrete finding that constrains implementation.
+# -----------------------------------------------------------------------------
+protocol_baselines:
+
+  mcp:
+    sdk: "mcp==2.2.0 (Python)"
+    verified_by: "live introspection of installed package + official SDK docs"
+    latest_protocol_version: "2026-07-28"        # == spec section 12 baseline
+    default_negotiated_version: "2025-03-26"     # legacy-compatible fallback
+    jsonrpc_version: "2.0"
+    unsupported_protocol_error_code: -32022
+    protocol_version_meta_key: "io.modelcontextprotocol/protocolVersion"
+    compatibility_strategy: |
+      The official SDK natively supports BOTH the 2026-07-28 baseline and
+      2025-era clients (DEFAULT_NEGOTIATED_VERSION=2025-03-26). Per spec
+      section 12 we USE the SDK's native negotiation and do NOT hand-roll
+      wire-protocol version handling or artificially break compatibility.
+    breaking_api_delta_v1_to_v2:
+      - "class renamed: FastMCP -> MCPServer (from mcp.server import MCPServer)"
+      - "import path mcp.server.fastmcp REMOVED (ModuleNotFoundError on v2)"
+    server_surface:
+      class: "mcp.server.MCPServer"
+      constructor_auth_params: ["token_verifier", "auth", "auth_server_provider"]
+      transports: ["stdio", "streamable-http", "sse"]
+      http_app_factory: "streamable_http_app()"
+      run_kwargs: ["transport", "session_idle_timeout", "max_sessions"]
+    auth_surface:                                  # satisfies spec section 87/90
+      AuthSettings: ["issuer_url", "service_documentation_url", "required_scopes",
+                     "resource_server_url", "validate_token_resource",
+                     "client_registration_options", "revocation_options"]
+      AccessToken: ["token", "client_id", "scopes", "expires_at", "resource",
+                    "subject", "claims"]
+      TokenVerifier: "async verify_token(token) -> AccessToken | None"
+      middleware_chain: ["AuthenticationMiddleware(BearerAuthBackend)",
+                         "AuthContextMiddleware", "RequireAuthMiddleware"]
+      conclusion: >
+        OAuth Resource Server semantics required by spec section 87
+        (issuer / audience-resource / scope / expiry) are natively expressible.
+        No custom wire protocol and no token passthrough are needed.
+    transport_security_surface:                    # satisfies spec section 88
+      module: "mcp.server.transport_security"
+      TransportSecuritySettings:
+        enable_dns_rebinding_protection: true
+        allowed_hosts: "list[str]"
+        allowed_origins: "list[str]"
+      applicable_middleware: ["TransportSecurityMiddleware",
+                              "RequestBodyLimitMiddleware"]
+      default_max_request_body_size: "exposed as DEFAULT_MAX_REQUEST_BODY_SIZE"
+    tool_schema_surface:                           # satisfies spec section 93
+      Tool: ["name", "title", "description", "input_schema", "output_schema",
+              "annotations", "meta", "icons", "execution"]
+      ToolAnnotations: ["title", "read_only_hint", "destructive_hint",
+                        "idempotent_hint", "open_world_hint"]
+      CallToolResult: ["content", "structured_content", "is_error", "meta",
+                       "result_type"]
+      conclusion: "structuredContent + explicit input/output schema supported."
+    client_surface:
+      connect: "Client('http://host/mcp') for Streamable HTTP"
+      stdio: "Client(StdioServerParameters(...))"
+      in_memory: "Client(mcp_server_object) - used for compatibility tests"
+      note: "no headers= kwarg; pass a configured httpx AsyncClient"
+
+  langgraph:
+    package: "langgraph==1.2.12"
+    checkpoint_package: "langgraph-checkpoint==4.2.0"
+    verified_by: "live introspection of installed package + official repo source"
+    state_graph:
+      signature: "StateGraph(state_schema, context_schema=None, *, input_schema=None, output_schema=None)"
+      conclusion: >
+        context_schema is the native run-scoped trusted-context mechanism
+        required by spec section 70. Runtime[ContextT] is injected into nodes;
+        it is NOT part of the mutable graph state, so the model cannot write it.
+    runtime_context:
+      class: "langgraph.runtime.Runtime"
+      members: ["context", "store", "stream_writer", "previous", "execution_info",
+                "server_info", "control", "heartbeat"]
+    hitl:
+      interrupt_signature: "interrupt(value: Any, *, response_schema=None) -> Any"
+      command_fields: ["graph", "update", "resume", "goto", "PARENT"]
+      CRITICAL_INVARIANT: >
+        Official docstring: "The graph resumes from the start of the node,
+        re-executing all logic." This is the exact hazard frozen by spec
+        section 77. Therefore any non-idempotent persistence MUST live in a
+        SEPARATE node that precedes the AwaitApproval node; the AwaitApproval
+        node body must be side-effect-free before interrupt().
+      enforced_by: ["FG-15", "FG-25", "tests/architecture/test_no_side_effects_in_await_approval.py"]
+      multi_interrupt_note: >
+        When >1 pending interrupt exists, resume MUST pass an interrupt-id map,
+        else RuntimeError. V1 uses exactly one interrupt per approval point.
+    checkpointer:
+      dev: "langgraph.checkpoint.memory.InMemorySaver"
+      prod: "langgraph-checkpoint-redis (planned 0.5.2)"
+      prod_compat_verified: true
+      prod_requirement: "langgraph-checkpoint>=4.1.1,<5.0.0 -> local 4.2.0 SATISFIED"
+      fail_closed: "spec section 83 - missing checkpoint state must never degrade into execution"
+
+  rag:
+    mode_light: "API embeddings, reranker disabled - no GPU requirement"
+    mode_full: "BGE-M3 dense + Qdrant sparse/BM25 + RRF + reranker"
+    design_rule: "embedding dimension comes from provider metadata/config; never hardcoded"
+    gpu_policy: >
+      Heavy local models (sentence-transformers/onnxruntime/torch) live in the
+      OPTIONAL extra [local-models]. Core install must serve without a GPU.
+    degradation: "Qdrant/reranker down => policy questions return evidence-insufficient; business tools keep working (spec section 60)"
+
+# -----------------------------------------------------------------------------
+# DEPENDENCY VERSIONS  (resolved against live registries on 2026-09-22)
+# -----------------------------------------------------------------------------
+dependency_versions:
+  policy: "exact pins for runtime; the lock file is the source of truth"
+
+  backend_runtime:
+    fastapi: "0.141.1"
+    uvicorn: "0.53.0"
+    pydantic: "2.13.5"
+    pydantic-settings: "2.15.0"
+    email-validator: "2.3.0"
+    sqlalchemy: "2.0.54"
+    alembic: "1.20.0"
+    pymysql: "1.2.3"
+    cryptography: "50.0.1"
+    redis: "8.1.0"
+    celery: "5.6.3"
+    qdrant-client: "1.19.1"
+    minio: "7.2.20"
+    pyjwt: "2.14.0"
+    argon2-cffi: "25.1.0"
+    httpx: "0.28.1"
+    sse-starlette: "3.4.11"
+    python-multipart: "0.0.32"
+    structlog: "26.1.0"
+    python-json-logger: "4.2.0"
+    prometheus-client: "0.26.0"
+    limits: "5.8.0"
+    opentelemetry-api: "1.44.0"
+    opentelemetry-sdk: "1.44.0"
+    opentelemetry-exporter-otlp-proto-http: "1.44.0"
+    opentelemetry-instrumentation-fastapi: "0.65b0"
+
+  backend_ai:
+    langchain: "1.4.2"
+    langchain-core: "1.6.4"
+    langgraph: "1.2.12"
+    langgraph-checkpoint: "4.2.0"
+    langchain-openai: "1.6.4"
+    mcp: "2.2.0"
+
+  backend_dev:
+    pytest: "9.1.1"
+    pytest-asyncio: "1.4.0"
+    ruff: "0.16.8"
+    mypy: "2.3.1"
+    faker: "40.39.0"
+    freezegun: "1.5.5"
+    testcontainers: "4.15.0"
+
+  backend_optional:
+    local-models: ["sentence-transformers==6.1.0", "onnxruntime==1.30.0", "torch>=2.6"]
+    parsers: ["pypdf==6.19.0", "python-docx==1.2.0", "openpyxl==3.1.5", "markdown-it-py==4.2.0"]
+
+  frontend:
+    vue: "3.5.43"
+    vite: "8.3.0"
+    typescript: "7.0.2"
+    vue-tsc: "3.3.11"
+    vue-router: "5.3.1"
+    pinia: "4.0.3"
+    element-plus: "2.14.6"
+    echarts: "6.1.0"
+    axios: "1.20.0"
+    vitest: "5.0.1"
+    "@vue/test-utils": "2.5.1"
+    "@playwright/test": "1.63.0"
+    "@vitejs/plugin-vue": "6.0.9"
+    sass: "1.105.0"
+    openapi-typescript: "7.13.0"
+
+  infrastructure_images:
+    mysql: "mysql:8.4"                    # verified 8.4.11
+    redis: "redis:7.4-alpine"
+    qdrant: "qdrant/qdrant:latest"
+    minio: "quay.io/minio/minio:latest"   # Docker Hub minio/minio pull DENIED - see ADR-011
+    keycloak: "quay.io/keycloak/keycloak:latest"
+    nginx: "nginx:1.27-alpine"
+
+  rejected_images:
+    - image: "minio/minio:latest"
+      error: "pull access denied for minio/minio, repository does not exist or may require 'docker login'"
+      verified: true
+      replacement: "quay.io/minio/minio:latest"
+      replacement_verified_pull: true
+      replacement_verified_run: true
+
+# -----------------------------------------------------------------------------
+# VERIFIED INFRASTRUCTURE SMOKE (Phase 0, real containers, real protocols)
+# -----------------------------------------------------------------------------
+infrastructure_smoke:
+  executed_at: "2026-09-22"
+  verdict: PASS
+  checks:
+    - service: mysql
+      container: nx-mysql
+      image: "mysql:8.4"
+      measured_version: "8.4.11"
+      command: "mysqladmin ping -uroot -p***"
+      result: "mysqld is alive"
+      charset: "utf8mb4"
+      collation: "utf8mb4_0900_ai_ci"
+      finding: >
+        MySQL 8.4 REMOVED the --default-authentication-plugin server variable.
+        Passing it aborts startup with MY-000067. Also aborts with MY-013236
+        (unusable data directory) if the volume was previously half-initialised.
+        V1 must not pass that flag.
+    - service: redis
+      container: nx-redis
+      image: "redis:7.4-alpine"
+      command: "redis-cli ping"
+      result: PONG
+      persistence: "appendonly yes"
+    - service: qdrant
+      container: nx-qdrant
+      image: "qdrant/qdrant:latest"
+      command: "GET /collections"
+      result: '{"result":{"collections":[]},"status":"ok"}'
+    - service: minio
+      container: nx-minio
+      image: "quay.io/minio/minio:latest"
+      command: "GET /minio/health/live"
+      result: "HTTP 200 (empty body by design)"
+    - service: keycloak
+      image: "quay.io/keycloak/keycloak:latest"
+      result: "image pulled successfully (756MB); runtime validation deferred to Phase 1"
+
+# -----------------------------------------------------------------------------
+# FROZEN REQUIREMENT INVENTORY
+# id -> spec section, statement, verification gate(s)
+# "MUST" entries are non-negotiable; dropping one requires an ADR + user sign-off.
+# -----------------------------------------------------------------------------
+requirements:
+
+  scope:
+    REQ-SCOPE-001:
+      spec: "§4"
+      must: "Single-Merchant operation in V1 while reserving merchant_id on commercial data"
+    REQ-SCOPE-002:
+      spec: "§4"
+      must: "One order belongs to exactly one merchant"
+    REQ-SCOPE-003:
+      spec: "§4"
+      must_not: "No marketplace split-order / settlement / platform commission in V1"
+    REQ-SCOPE-004:
+      spec: "§5"
+      must_not: >
+        Must NOT add: Kafka, Kubernetes, microservices, service discovery, complex
+        Saga, multi-merchant settlement, merchant onboarding, real Alipay/WeChat
+        production payment, heavy ERP, heavy WMS, livestream, flash sale, group-buy,
+        recommendation-model training, arbitrary SQL agent, mass autonomous multi-agent.
+
+  architecture:
+    REQ-ARCH-001: { spec: "§13", must: "Modular monolith with explicit bounded contexts" }
+    REQ-ARCH-002:
+      spec: "§14"
+      must: "Strict layering: Controller|Agent|MCP -> Application Service/Workflow -> Repository -> Infrastructure"
+    REQ-ARCH-003:
+      spec: "§14"
+      must_not: "Agent -> Repository / SQLAlchemy Session / MySQL; MCP -> Repository / MySQL; Controller -> SQL or multi-table business transaction"
+    REQ-ARCH-004:
+      spec: "§15"
+      must: "Agent is never the business source of truth; order/payment/refund/inventory facts come from Business Service + Database"
+    REQ-ARCH-005:
+      spec: "§16"
+      must: "Workflows drive deterministic commerce state transitions; LangGraph is NOT forced onto traditional commerce workflows"
+    REQ-ARCH-006:
+      spec: "§17"
+      must_not: "Controller must not contain business logic, price algorithms, state machines, SQL or LLM decisions"
+    REQ-ARCH-007:
+      spec: "§18"
+      must_not: "Repository must not contain Risk / Refund Policy / Promotion Policy / Permission / Workflow logic"
+    REQ-ARCH-008: { spec: "§136", must: "The above boundaries are enforced by automated architecture tests", gate: "FG-25" }
+
+  data:
+    REQ-DATA-001: { spec: "§19", must: "MySQL 8.x, utf8mb4" }
+    REQ-DATA-002: { spec: "§19", must: "Primary keys BIGINT UNSIGNED" }
+    REQ-DATA-003: { spec: "§19", must: "Money is BIGINT minor units (cents); FLOAT/DOUBLE forbidden for transactional money" }
+    REQ-DATA-004: { spec: "§19", must: "Datetime columns are DATETIME(3)" }
+    REQ-DATA-005: { spec: "§19", must: "Statuses are VARCHAR + Python Enum" }
+    REQ-DATA-006: { spec: "§19", must: "JSON only for snapshots, rule config, extension metadata, AI runtime metadata" }
+    REQ-DATA-007: { spec: "§129", must: "Alembic is the only production schema authority; Base.metadata.create_all() forbidden as schema management" }
+    REQ-DATA-008: { spec: "§129", must: "Migration runs as an isolated one-shot service; no auto-migrate on API boot" }
+
+  identity_auth:
+    REQ-AUTH-001: { spec: "§21", must: "Tables: merchants, users, auth_sessions, roles, permissions, user_roles, role_permissions, user_addresses" }
+    REQ-AUTH-002: { spec: "§22", must: "auth_sessions persists refresh token HASH only (plus jti, expires_at, revoked_at, rotated_from, last_used_at)" }
+    REQ-AUTH-003: { spec: "§22", must_not: "Plaintext refresh token must never be stored" }
+    REQ-AUTH-004: { spec: "§23", must: "Short-lived access token; refresh token HttpOnly/Secure/SameSite; rotate on refresh" }
+    REQ-AUTH-005: { spec: "§23", must_not: "Refresh token must not be persisted in localStorage long-term" }
+    REQ-AUTH-006: { spec: "§23", must: "Refresh token rotation has tests", gate: "FG-13" }
+    REQ-AUTH-007: { spec: "§24", must: "Seed merchant 'Nexora Digital'; consumer user.merchant_id may be NULL; staff carry merchant_id" }
+
+  catalog_inventory:
+    REQ-CAT-001: { spec: "§25", must: "Tables: categories, brands, products, product_skus, product_images, product_attributes, sku_attribute_values" }
+    REQ-CAT-002: { spec: "§25", must: "product_images stores object_key, not local filesystem paths" }
+    REQ-INV-001: { spec: "§26", must: "Tables: warehouses, inventories, inventory_movements; one MAIN warehouse in V1" }
+    REQ-INV-002: { spec: "§26", must: "Unique (warehouse_id, sku_id); CHECK available_qty >= 0 and locked_qty >= 0; has version column" }
+    REQ-INV-003: { spec: "§27", must: "CreateOrder locks stock with MySQL SELECT ... FOR UPDATE in a SHORT transaction" }
+    REQ-INV-004: { spec: "§27", must: "Background low-contention edits may use optimistic version locking" }
+    REQ-INV-005: { spec: "§27", must_not: "Redis lock must NOT replace the single-MySQL core inventory transaction", gate: "FG-09" }
+    REQ-INV-006:
+      spec: "§28"
+      must: "InventoryMovement is append-only and supports PURCHASE_IN, ORDER_LOCK, ORDER_RELEASE, ORDER_DEDUCT, RETURN_IN, MANUAL_ADJUST, DAMAGED_OUT"
+    REQ-INV-007:
+      spec: "§28"
+      must: "Movement carries delta/before/after for available and locked, reference_type, reference_id, operator_type, operator_id, idempotency_key"
+
+  commerce:
+    REQ-CART-001: { spec: "§29", must: "Cart price is preview only; cart is not the transactional price source of truth" }
+    REQ-ORD-001: { spec: "§30", must: "orders carries the full frozen column set incl. client_request_id, expires_at, version" }
+    REQ-ORD-002: { spec: "§31", must: "order_status = PENDING_PAYMENT, PROCESSING, COMPLETED, CANCELLED, CLOSED" }
+    REQ-ORD-003: { spec: "§31", must: "Payment success moves PENDING_PAYMENT -> PROCESSING; shipping NEVER changes order_status" }
+    REQ-ORD-004: { spec: "§31", must: "Confirm-receipt moves PROCESSING -> COMPLETED" }
+    REQ-ORD-005: { spec: "§31", must: "order_status must not duplicate payment/fulfillment facts" }
+    REQ-ORD-006: { spec: "§31-§34", must: "Separate order/payment/fulfillment/after-sale status vocabularies exactly as frozen" }
+    REQ-ORD-007: { spec: "§35", must: "OrderItem stores an immutable trade snapshot (product_name, sku_name, image ref, sku_snapshot, unit_price, quantities, allocated discounts)" }
+    REQ-ORD-008: { spec: "§35", must: "Product edits must never mutate historical orders", gate: "FG-10 / mandatory-4" }
+    REQ-ORD-009: { spec: "§36", must: "order_status_logs is append-only and records only top-level order_status transitions" }
+    REQ-PRI-001: { spec: "§37", must: "PricingService is the single price authority: calculate_item_price, calculate_cart_price, apply_promotion, apply_coupon, calculate_shipping, build_price_snapshot" }
+    REQ-PRI-002: { spec: "§38", must: "CreateOrder accepts only sku_id, quantity, coupon_id, address_id style inputs; server recomputes all money" }
+    REQ-PRI-003: { spec: "§38", must_not: "Client-supplied unit_price / discount_amount / payable_amount must never be trusted as the deal basis" }
+    REQ-PRI-004: { spec: "§41", must: "Order-level discount is allocated pro-rata by item original amount, remainder absorbed by the last item" }
+    REQ-PRI-005: { spec: "§41", must: "sum(order_items.payable_amount) == orders.payable_amount (INV-006)" }
+
+  marketing:
+    REQ-MKT-001: { spec: "§39", must: "promotions + promotion_products; types DIRECT_DISCOUNT, PERCENT_DISCOUNT, FULL_REDUCTION; promotion_type + rule_config; Strategy Pattern" }
+    REQ-MKT-002: { spec: "§40", must: "coupon_templates, user_coupons, coupon_usage_records; states UNUSED, LOCKED, USED, EXPIRED" }
+    REQ-MKT-003: { spec: "§40", must: "Order creation LOCKS the coupon; payment confirmation marks USED; cancellation releases; concurrency must be handled" }
+    REQ-MKT-004: { spec: "§47", must: "Promotion creation MUST be previewed first" }
+
+  payment:
+    REQ-PAY-001: { spec: "§42", must: "payments: payment_no UNIQUE, order_id, channel, amount, status, external_transaction_no, idempotency_key" }
+    REQ-PAY-002: { spec: "§43", must: "payment_callbacks: provider, provider_event_id, payment_no, payload_snapshot, signature_valid, process_status, received_at, processed_at; UNIQUE(provider, provider_event_id)" }
+    REQ-PAY-003: { spec: "§43", must: "Callback snapshot must be sensitive-field filtered; secrets never stored" }
+    REQ-PAY-004: { spec: "§44", must: "Duplicate callback produces exactly one business effect: one payment confirm, one inventory effect, one fulfillment, no duplicate outbox side effect", gate: "FG-11" }
+    REQ-PAY-005: { spec: "§97", must: "Mock payment endpoints exist ONLY in DEV/DEMO; providers use a separate auth model; a normal JWT user must never be able to set payment success" }
+    REQ-PAY-006: { spec: "§112", must: "Payment success can never originate from a user or agent assertion (INV-008)" }
+
+  fulfillment:
+    REQ-FUL-001: { spec: "§45", must: "fulfillments + fulfillment_items; one order may ship multiple packages" }
+    REQ-FUL-002: { spec: "§45", must: "fulfillment_items: fulfillment_id, order_item_id, quantity" }
+
+  aftersales:
+    REQ-AFS-001: { spec: "§46", must: "after_sales (business claim) and refunds (money fact) are SEPARATE tables/domains" }
+    REQ-AFS-002: { spec: "§46", must: "Total refunded <= paid amount; item refund <= item payable amount", gate: "FG-12" }
+
+  consistency:
+    REQ-CON-001: { spec: "§48", must: "idempotency_records: scope, idempotency_key, request_hash, status, response_code, response_snapshot, expires_at" }
+    REQ-CON-002: { spec: "§48", must: "response_snapshot stores only non-sensitive summaries; never tokens/secrets/full PII" }
+    REQ-CON-003: { spec: "§49", must: "Transactional outbox: business rows + outbox row commit in ONE transaction; worker publishes afterwards; retry with next_retry_at" }
+    REQ-CON-004: { spec: "§50", must: "Async reconciliation covers expired orders, outbox retry, expired coupons, expired pending actions, knowledge ingestion recovery" }
+    REQ-CON-005: { spec: "§50", must: "A Celery task is never the sole source of business truth" }
+
+  storage:
+    REQ-STO-001: { spec: "§20", must: "MinIO/S3-compatible storage for product images, knowledge originals, downloadable reports, large evidence artifacts" }
+    REQ-STO-002: { spec: "§20", must_not: "MySQL must not store large BLOBs" }
+    REQ-STO-003: { spec: "§20", must: "DB stores object_key, checksum, content_type, size, metadata" }
+    REQ-STO-004: { spec: "§20", must: "Knowledge documents use a private bucket by default; product images via controlled public or signed URL" }
+    REQ-STO-005: { spec: "§20", must_not: "Persistent business files must not rely on container-local filesystem", gate: "FG-19" }
+
+  knowledge_rag:
+    REQ-RAG-001: { spec: "§51", must: "knowledge_bases, knowledge_documents, knowledge_chunks with the frozen column set incl. embedding_model, embedding_version, chunk_strategy_version, failure_reason, indexed_at" }
+    REQ-RAG-002: { spec: "§52", must: "Ingestion pipeline: upload -> MIME/extension/signature validation -> size limit -> object storage -> SHA256 -> duplicate check -> PROCESSING -> outbox -> worker -> safe parse -> clean -> structure-aware chunk -> metadata -> embedding -> Qdrant -> READY" }
+    REQ-RAG-003: { spec: "§52", must: "Parsing must limit file size, page count and runtime; must defend against path traversal" }
+    REQ-RAG-004: { spec: "§53", must: "States UPLOADED, PROCESSING, READY, FAILED, ARCHIVED; archived docs excluded from retrieval and synced to Qdrant payload/active filter" }
+    REQ-RAG-005: { spec: "§54", must: "Chunking is structure-aware per document type; a global fixed 500/50 is forbidden" }
+    REQ-RAG-006: { spec: "§55", must: "RAG metadata carries the full frozen field set incl. merchant_id, version, valid_from/valid_to, checksum, source reference" }
+    REQ-RAG-007: { spec: "§56", must: "Full pipeline: normalize -> rewrite -> entity extraction -> metadata filter -> dense + sparse -> RRF -> candidate set -> rerank -> top evidence -> evidence validation -> citation" }
+    REQ-RAG-008: { spec: "§56/§57", must: "All TopK / candidate / rerank parameters are configuration, never scattered literals" }
+    REQ-RAG-009: { spec: "§57", must: "Provider abstraction for embedding/reranker; system must run without GPU (RAG_MODE=light)" }
+    REQ-RAG-010: { spec: "§58", must: "LLM may only cite Evidence IDs; CitationBuilder resolves Evidence ID -> document/section/page/version" }
+    REQ-RAG-011: { spec: "§59", must: "Visibility PUBLIC/CUSTOMER/STAFF/ADMIN enforced by retriever as permission + metadata filter" }
+    REQ-RAG-012: { spec: "§60", must: "Retriever outage => refuse to guess for policy questions; business tools keep working", gates: "FG-16, FG-17" }
+    REQ-RAG-013: { spec: "§120", must: "evals/rag/rag_eval_v1.jsonl with >= 50 cases; metrics Recall@5, MRR, nDCG@10, No-answer Accuracy, Citation Accuracy; compare dense / sparse / hybrid / hybrid+rerank", gate: "FG-16" }
+
+  agent:
+    REQ-AGT-001: { spec: "§61", must: "agent_threads, agent_messages, agent_runs, agent_tool_calls, agent_memories" }
+    REQ-AGT-002: { spec: "§62", must: "Thread=conversation, Run=execution, Message=real chat; checkpoint store is NOT the permanent chat database; delete-thread is Archive/Hide; run facts are never deleted" }
+    REQ-AGT-003: { spec: "§63", must: "agent_runs carries the full frozen field set incl. graph_version, prompt_version, tool_registry_version, rag_pipeline_version, tokens, latency" }
+    REQ-AGT-004: { spec: "§64", must: "agent_tool_calls snapshots are redacted before persistence (no token/secret/password/unnecessary PII)" }
+    REQ-AGT-005: { spec: "§65", must: "ai_tools table + code registry as canonical security metadata; risk_level, required_permission, is_write, enabled, mcp_exposed" }
+    REQ-AGT-006: { spec: "§65", must_not: "A normal console user must not be able to downgrade a CRITICAL write tool to READ" }
+    REQ-AGT-007: { spec: "§66", must: "Tool pipeline order: Resolve Trusted Context -> Exists -> Enabled -> Agent Allowlist -> Permission -> DataScope -> Pydantic Input -> Risk -> HITL -> Service/Workflow -> Output Validation -> Redaction -> Audit -> Agent" }
+    REQ-AGT-008: { spec: "§67", must: "The 27 frozen internal tool names must exist" }
+    REQ-AGT-009: { spec: "§68", must_not: "No execute_sql / raw_sql / run_query / shell_exec / arbitrary_http / write_any_table / arbitrary Python execution tool" }
+    REQ-AGT-010: { spec: "§69", must: "Effective tools = Agent Allowlist INTERSECT User Permission INTERSECT Runtime Enabled" }
+    REQ-AGT-011: { spec: "§69", must: "Analytics agent NEVER has write tools", gates: "FG-14, mandatory-6" }
+    REQ-AGT-012: { spec: "§70", must: "Trusted run-scoped context (trace_id, request_id, user_id, merchant_id, roles, permissions, data_scope, source, agent_run_id) originates from the backend and cannot be modified by the model" }
+    REQ-AGT-013: { spec: "§71", must: "Commerce Agent state carries the frozen field set" }
+    REQ-AGT-014: { spec: "§72", must: "Supervisor only does Initialize, InputGuard, Memory Load, Intent, Route, Subgraph, ResponseGuard, Persist - not a universal super-agent" }
+    REQ-AGT-015: { spec: "§73/§74/§75", must: "Service / Operations / Analytics graphs expose the frozen node sets; Analytics is strictly read-only" }
+    REQ-AGT-016: { spec: "§76", must: "Budget is configuration: plan steps <= 6, tool calls <= 12, replan <= 2, param repair <= 2, same-tool consecutive failure <= 3; budget exhaustion stops the run" }
+    REQ-AGT-017: { spec: "§77", must: "CreatePendingAction is a SEPARATE node from AwaitApproval; the AwaitApproval node must have no non-idempotent side effect before interrupt()", gate: "FG-15" }
+    REQ-AGT-018: { spec: "§78", must: "pending_actions carries the frozen field set and the 7-state lifecycle" }
+    REQ-AGT-019: { spec: "§79", must: "All agent write tools in V1 require human approval: Preview -> Proposal -> Risk -> CreatePendingAction -> interrupt -> Resume -> Revalidate -> Execute" }
+    REQ-AGT-020: { spec: "§80", must: "After approval, re-read real business facts (order status, price, cost, stock, permission, data scope, refund amount, promotion conflict) - never blind-execute the old proposal" }
+    REQ-AGT-021: { spec: "§81", must: "Risk engine is deterministic with READ/LOW/MEDIUM/HIGH/CRITICAL; CRITICAL agent actions are BLOCKED; the LLM is never the final risk authority", gates: "FG-26, mandatory-13" }
+    REQ-AGT-022: { spec: "§82", must: "Any success claim requires an ExecutionReceipt (success, action_type, resource_type, resource_id, workflow_id, executed_at, trace_id)" }
+    REQ-AGT-023: { spec: "§83", must: "MemorySaver in dev, Redis checkpointer in prod (with persistence + volume); MySQL PendingAction/business state remains the key fact; missing checkpoint => fail closed" }
+    REQ-AGT-024: { spec: "§84", must_not: "Memory must never store live inventory, order status, price, permissions or payment facts" }
+    REQ-AGT-025: { spec: "§85", must: "SSE streaming with the 12 allowed event names and no hidden chain-of-thought emission" }
+
+  mcp:
+    REQ-MCP-001: { spec: "§86", must: "Server id nexora-commerce-mcp; stdio + Streamable HTTP; remote path /mcp; implemented on the official SDK" }
+    REQ-MCP-002: { spec: "§87", must: "OAuth Resource Server mode; verify issuer, signature, expiry, audience/resource, scope; NO token passthrough", gate: "FG-18" }
+    REQ-MCP-003: { spec: "§88", must: "Origin validation, Host/allowed-host protection, TLS, rate limit, timeout; no insecure local dev binding in production" }
+    REQ-MCP-004: { spec: "§89", must: "MCP context only from verified identity (client_id, user_id, merchant_id, scope, roles, permissions, data_scope, source=MCP); tool parameters must NOT accept user_id/merchant_id/is_admin/permissions" }
+    REQ-MCP-005: { spec: "§90", must: "Effective permission = OAuth scope INTERSECT RBAC INTERSECT DataScope INTERSECT tool policy; tools/list filtered by authorization; tools/call re-authorized" }
+    REQ-MCP-006: { spec: "§91", must: "The 16 frozen MCP tool names must exist" }
+    REQ-MCP-007: { spec: "§92", must_not: "External MCP exposes no refund.execute / inventory.adjust / order.force_update / promotion.create / RBAC update / DataScope update" }
+    REQ-MCP-008: { spec: "§92", must: "nexora.promotion.propose only creates a PendingAction and never creates a Promotion directly", gate: "FG-18" }
+    REQ-MCP-009: { spec: "§93", must: "Every tool declares explicit input schema, output schema, description and read/write semantics; prefer structuredContent" }
+    REQ-MCP-010: { spec: "§12", must: "Do not hand-write the MCP wire protocol; use the official SDK; record SDK version, supported protocol revisions, Streamable HTTP lifecycle, stdio behaviour, auth behaviour, legacy-client strategy" }
+    REQ-MCP-011: { spec: "§12", must: "A protocol baseline change requires an ADR + compatibility test" }
+
+  security:
+    REQ-SEC-001: { spec: "§94", must: "Purpose-based minimisation before LLM/MCP/trace/audit snapshot; mask phone/email/address by default" }
+    REQ-SEC-002: { spec: "§94/§132", must_not: "Never log or persist passwords, access tokens, refresh tokens, API keys, client secrets, DB passwords, hidden chain-of-thought" }
+    REQ-SEC-003: { spec: "§109", must: "Address JWT tampering, expired token, refresh reuse, CSRF, CORS, SQL injection, XSS, path traversal, upload spoofing, oversized upload, IDOR, mass assignment, rate limit, brute force, prompt injection, MCP privilege escalation" }
+    REQ-SEC-004: { spec: "§110", must: "Pydantic request schemas explicitly declare mutable fields; ORM(**request.dict()) mass assignment is forbidden" }
+    REQ-SEC-005: { spec: "§134", must: ".env never committed; .env.example provided; a secret scan is part of the final gate (FAIL on finding)", gate: "FG-24" }
+    REQ-SEC-006: { spec: "§125/§147", must: "Critical-risk injection demo must be BLOCKED with an audit record and no dangerous DB change", gate: "FG-26" }
+
+  api:
+    REQ-API-001: { spec: "§95", must: "Uniform envelope under /api/v1 returning code, message, data, trace_id with stable business error codes" }
+    REQ-API-002: { spec: "§96", must: "Order endpoints: POST /orders/preview, POST /orders, GET /orders, GET /orders/{order_no}, POST /orders/{order_no}/cancel, POST /orders/{order_no}/confirm-receipt; create uses Idempotency-Key + client_request_id" }
+    REQ-API-003: { spec: "§98", must: "Admin API covers products, SKU, inventory, inventory movements, orders, fulfillment, after-sales, refund, promotion, coupon, analytics, knowledge, AI runs, pending actions, audit" }
+    REQ-API-004: { spec: "§99", must: "Task-based endpoints (/publish, /unpublish, /cancel, /ship, /approve, /reject, /confirm-receipt); avoid arbitrary PATCH status" }
+    REQ-API-005: { spec: "§141", must: "OpenAPI is generatable and persisted as a build artifact; frontend types generated or validated from it" }
+
+  frontend:
+    REQ-FE-001: { spec: "§6", must: "Vue 3 + TypeScript + Vite + Vue Router + Pinia + Element Plus + ECharts + Axios + SSE; <script setup lang=\"ts\"> everywhere" }
+    REQ-FE-002: { spec: "§100", must: "Consumer routes (Home, Search, Product, Cart, Checkout, MockPay, Orders, OrderDetail, AfterSales, Profile, Addresses, AI Assistant) and Console routes (Dashboard, Products, Inventory, Orders, AfterSales, Marketing, Analytics, AI, Knowledge, System)" }
+    REQ-FE-003: { spec: "§101", must: "AI Workspace: Assistant, Operations, Analytics, Pending Actions, Agent Runs; message blocks Text/Metric/Table/Chart/Citation/ToolProgress/ActionProposal/Error" }
+    REQ-FE-004: { spec: "§102", must: "Agent emits a ChartSpec; the frontend renderer converts it to ECharts; agent must never emit executable JavaScript" }
+    REQ-FE-005: { spec: "§103", must: "Knowledge Center: bases, documents, retrieval debug (rewrite, filter, dense, sparse, fusion, rerank, final evidence), RAG evaluation" }
+    REQ-FE-006: { spec: "§104", must: "Route/menu/button permission is UX only; real authorization is always server-side" }
+    REQ-FE-007: { spec: "§105", must: "Pinia holds only genuinely cross-page state: auth, permission, cart, app, aiThread, notification" }
+    REQ-FE-008: { spec: "§106", must: "Unified src/api/ layer over one HTTP client handling auth, refresh, trace, timeout, error mapping" }
+    REQ-FE-009: { spec: "§107", must: "Money/status/request/response types stay consistent with the backend contract" }
+    REQ-FE-010: { spec: "§108", must: "Core pages implement Loading/Success/Empty/Error/PermissionDenied; agent adds Streaming/WaitingApproval/Failed/Cancelled; knowledge adds Processing/Failed" }
+
+  ops:
+    REQ-OPS-001: { spec: "§128", must: "Compose services: nginx, api, worker, scheduler, mcp, mysql, redis, qdrant, minio, oauth-provider; optional observability profile; observability is never a hard startup dependency" }
+    REQ-OPS-002: { spec: "§130", must: "/health/live and /health/ready; MySQL critical, Redis important, Qdrant/LLM/reranker/MCP degradable" }
+    REQ-OPS-003: { spec: "§131", must: "Structured JSON logs, OTel traces/metrics, business audit, agent trace; trace_id propagates across HTTP, workflow, agent, tool, Celery, MCP, audit" }
+    REQ-OPS-004: { spec: "§133", must: "Audit is separate from logs, append-only, with the frozen field set incl. masked before/after snapshots" }
+    REQ-OPS-005: { spec: "§135", must: "Backend: import/startup check, Ruff, pytest, migration. Frontend: vue-tsc, Vitest, Vite build, Playwright. Dependency scan with pip-audit/npm audit; unaddressed critical vulns need documented blocking evidence" }
+    REQ-OPS-006: { spec: "§8", must: "OAuth/OIDC provider: Keycloak preferred for the demo; any replacement requires a documented reason" }
+
+  delivery:
+    REQ-DOC-001: { spec: "§137", must: "README.md plus docs/architecture/{SYSTEM_ARCHITECTURE,DOMAIN_MODEL,DATABASE,ORDER_WORKFLOW,AGENT_RUNTIME,RAG_ARCHITECTURE,MCP_SECURITY,SECURITY_MODEL,STORAGE,OBSERVABILITY}.md, docs/DEPLOYMENT.md, docs/demo/, docs/adr/" }
+    REQ-DOC-002: { spec: "§138", must: "ADR-001 .. ADR-014 as frozen" }
+    REQ-DOC-003: { spec: "§139", must: "README first screen explains the problem solved - commerce system + controlled agent operations - not a framework list" }
+    REQ-DOC-004: { spec: "§140", must: "docs/demo/DEMO_01_COMMERCE.md .. DEMO_05_SECURITY.md" }
+    REQ-EVD-001: { spec: "§144", must: "artifacts/evidence/ covering build, migration, unit, integration, concurrency, auth, agent, rag, mcp, security, storage, e2e, docker, final; each with command, timestamp, exit_code, stdout/stderr, machine-readable report, summary; regenerable by script; no secrets" }
+    REQ-EVD-002: { spec: "§145", must: "FINAL_GATE.md is an evidence INDEX only and is never itself evidence" }
+    REQ-DEF-001: { spec: "§143", must: "Per phase: Implement -> Static Check -> Migration -> Test -> Run -> Fix -> Evidence -> Docs -> commit-ready, before advancing" }
+    REQ-DEF-002: { spec: "§149", must: "No theoretical completion; status must be backed by real execution results" }
+
+# -----------------------------------------------------------------------------
+# ARCHITECTURE INVARIANT INVENTORY (spec section 112) - verbatim and frozen
+# Each invariant maps to the automated check that proves it.
+# -----------------------------------------------------------------------------
+architecture_invariants:
+  - id: INV-001
+    statement: "available_qty >= 0 at all times"
+    enforced_by: ["DB CHECK constraint", "FK9 inventory concurrency gate", "pytest tests/concurrency"]
+  - id: INV-002
+    statement: "locked_qty >= 0 at all times"
+    enforced_by: ["DB CHECK constraint", "tests/concurrency"]
+  - id: INV-003
+    statement: "The same stock cannot be deducted twice"
+    enforced_by: ["inventory_movements.idempotency_key UNIQUE", "FK-11"]
+  - id: INV-004
+    statement: "The same payment event produces exactly one business effect"
+    enforced_by: ["UNIQUE(provider, provider_event_id)", "payments.idempotency_key", "FK-11"]
+  - id: INV-005
+    statement: "refunded_amount <= paid_amount"
+    enforced_by: ["RefundService guard", "DB CHECK", "FK-12"]
+  - id: INV-006
+    statement: "Order.payable_amount == sum(OrderItem.payable_amount)"
+    enforced_by: ["allocation algorithm", "FK-10", "tests/integration/test_order_amount_invariant.py"]
+  - id: INV-007
+    statement: "InventoryMovement fully explains every stock change"
+    enforced_by: ["before/after columns", "reconciliation job", "FK-09"]
+  - id: INV-008
+    statement: "Payment success can never come from a user or agent assertion"
+    enforced_by: ["callback signature verification", "mock pay dev-only", "FK-14"]
+  - id: INV-009
+    statement: "An unapproved PendingAction can never write business data"
+    enforced_by: ["tool gateway", "pending_actions state machine", "FK-15"]
+  - id: INV-010
+    statement: "Agent effective permission is always a subset of the current user's permission"
+    enforced_by: ["ToolGateway authorization intersection", "FK-14"]
+  - id: INV-011
+    statement: "The Analytics agent can never write"
+    enforced_by: ["per-agent allowlist", "architecture test asserting no write tool in analytics registry", "FK-14/FG-25"]
+  - id: INV-012
+    statement: "MCP scope can never bypass RBAC or DataScope"
+    enforced_by: ["MCP ToolGateway intersection", "FK-18"]
+  - id: INV-013
+    statement: "Retrieved RAG content can never trigger a business write"
+    enforced_by: ["evidence is data-not-instruction", "no write tool reachable from knowledge path", "FK-17"]
+  - id: INV-014
+    statement: "Historical order snapshots are unaffected by later product changes"
+    enforced_by: ["OrderItem snapshot columns", "FK-10"]
+  - id: INV-015
+    statement: "The same Idempotency-Key never produces a duplicate result"
+    enforced_by: ["idempotency_records UNIQUE(scope, idempotency_key)", "FK-08/FG-11"]
+  - id: INV-016
+    statement: "After refresh rotation the previous refresh token is no longer valid"
+    enforced_by: ["auth_sessions.rotated_from + revoked_at", "FK-13"]
+  - id: INV-017
+    statement: "If the object does not exist in storage, the database must never pretend READY"
+    enforced_by: ["ingestion existence re-check", "FK-19"]
+  - id: INV-018
+    statement: "A LangGraph resume never repeats a business side effect"
+    enforced_by: ["CreatePendingAction / AwaitApproval split", "idempotent node bodies", "FK-15", "FG-25"]
+
+# -----------------------------------------------------------------------------
+# WORKFLOW INVENTORY (spec section 16)
+# -----------------------------------------------------------------------------
+workflows:
+  deterministic:
+    - name: CreateOrderWorkflow
+      trigger: "POST /api/v1/orders"
+      steps: ["idempotency guard", "recompute price via PricingService", "lock coupon", "SELECT FOR UPDATE on inventories", "reserve stock + ORDER_LOCK movement", "persist order + items + snapshot", "emit outbox"]
+    - name: CancelOrderWorkflow
+      steps: ["state guard", "release coupon", "release stock + ORDER_RELEASE movement", "order_status=CANCELLED", "outbox"]
+    - name: PaymentSuccessWorkflow
+      trigger: "verified provider callback"
+      steps: ["callback idempotency", "payment=SUCCESS", "order PENDING_PAYMENT->PROCESSING", "ORDER_DEDUCT movement", "create fulfillment shell", "outbox"]
+    - name: ShipWorkflow
+      steps: ["fulfillment create", "fulfillment_status transitions", "order_status UNCHANGED"]
+    - name: ConfirmReceiptWorkflow
+      steps: ["PROCESSING -> COMPLETED"]
+    - name: AfterSaleWorkflow
+      steps: ["eligibility", "after_sales record", "refund preview"]
+    - name: RefundWorkflow
+      steps: ["revalidate paid/refunded", "refund row", "payment_status transition", "after_sale_status transition", "outbox"]
+    - name: InventoryAdjustWorkflow
+      steps: ["optimistic version check", "movement append", "metrics refresh"]
+    - name: CreatePromotionWorkflow
+      steps: ["preview", "risk", "pending action approval", "promotion + promotion_products"]
+  agentic:
+    - name: SupervisorGraph
+      nodes: ["Initialize", "InputGuard", "Memory Load", "Intent", "Route", "Subgraph", "ResponseGuard", "Persist"]
+    - name: ServiceGraph
+      nodes: ["UnderstandRequest", "ResolveEntity", "ClassifyTask", "Knowledge/Business Tool", "Merge Evidence", "Preview", "Proposal", "Risk", "PendingAction", "AwaitApproval", "Revalidate", "ExecuteWorkflow", "Verify", "Audit", "Compose", "GroundingCheck"]
+    - name: OperationsGraph
+      nodes: ["UnderstandGoal", "BuildPlan", "ValidatePlan", "ExecutePlan", "Parallel Tools", "CollectEvidence", "EvaluateEvidence", "Replan", "GenerateInsight", "ActionRequested", "GenerateProposal", "Preview", "RiskCheck", "PendingAction", "AwaitApproval", "Revalidate", "Execute", "Verify", "Audit", "Answer"]
+    - name: AnalyticsGraph
+      nodes: ["UnderstandQuestion", "BuildMetricPlan", "ValidatePlan", "FanOut", "AggregateEvidence", "ValidateEvidence", "Replan", "AnalyzeDrivers", "GenerateInsight", "BuildChartSpec", "GroundingCheck"]
+      read_only: true
+
+# -----------------------------------------------------------------------------
+# TOOL INVENTORY
+# -----------------------------------------------------------------------------
+tools:
+  internal:                               # spec section 67 - exactly 27
+    read:
+      - product_search
+      - product_get
+      - product_get_internal
+      - sku_get
+      - inventory_get
+      - inventory_metrics
+      - order_get
+      - order_search
+      - fulfillment_get
+      - after_sale_get
+      - after_sale_eligibility
+      - sales_metrics
+      - product_performance
+      - refund_metrics
+      - business_anomaly_scan
+      - knowledge_search
+      - memory_get
+    write_preview:
+      - inventory_adjust_preview
+      - order_cancel_preview
+      - refund_preview
+      - promotion_preview
+    write:
+      - inventory_adjust
+      - order_cancel
+      - refund_execute
+      - promotion_create
+      - memory_propose
+  forbidden:                              # spec section 68
+    - execute_sql
+    - raw_sql
+    - run_query
+    - shell_exec
+    - arbitrary_http
+    - write_any_table
+    - "any arbitrary Python execution tool"
+  mcp_external:                           # spec section 91 - exactly 16
+    - nexora.product.search
+    - nexora.product.get
+    - nexora.sku.get
+    - nexora.order.get
+    - nexora.order.search
+    - nexora.fulfillment.get
+    - nexora.after_sale.get
+    - nexora.inventory.get
+    - nexora.analytics.sales
+    - nexora.analytics.inventory
+    - nexora.analytics.product_performance
+    - nexora.analytics.refunds
+    - nexora.analytics.anomalies
+    - nexora.knowledge.search
+    - nexora.promotion.preview
+    - nexora.promotion.propose
+
+# -----------------------------------------------------------------------------
+# TASK-BASED API SURFACE (spec section 99)
+# -----------------------------------------------------------------------------
+task_endpoints:
+  - "POST /api/v1/products/{id}/publish"
+  - "POST /api/v1/products/{id}/unpublish"
+  - "POST /api/v1/orders/{order_no}/cancel"
+  - "POST /api/v1/orders/{order_no}/confirm-receipt"
+  - "POST /api/v1/fulfillments/{id}/ship"
+  - "POST /api/v1/pending-actions/{id}/approve"
+  - "POST /api/v1/pending-actions/{id}/reject"
+
+# -----------------------------------------------------------------------------
+# TEST INVENTORY (spec section 111)
+# -----------------------------------------------------------------------------
+tests:
+  backend: ["pytest", "pytest-asyncio", "httpx ASGITransport"]
+  frontend: ["Vitest", "Vue Test Utils", "Playwright"]
+  integration_requires_real: ["MySQL", "Redis", "Qdrant", "MinIO"]
+  ai_unit: "Fake/Mock LLM for deterministic CI"
+  ai_real: "manual/scheduled only, never a hard PR dependency"
+  suites:
+    - path: tests/unit
+      marker: unit
+    - path: tests/integration
+      marker: integration
+      requires: [mysql, redis]
+    - path: tests/concurrency
+      marker: concurrency
+      requires: [mysql]
+    - path: tests/security
+      marker: security
+    - path: tests/architecture
+      marker: architecture
+      gate: FG-25
+    - path: tests/e2e
+      marker: e2e
+      requires: [all]
+  eval_sets:
+    - path: evals/rag/rag_eval_v1.jsonl
+      min_cases: 50
+      gate: FG-16
+    - path: evals/agent/agent_eval_v1.jsonl
+      gate: FG-22
+
+# -----------------------------------------------------------------------------
+# FINAL GATE INVENTORY (spec section 146) - 26 gates
+# -----------------------------------------------------------------------------
+final_gates:
+  - id: FG-01
+    name: Repository State Audit
+    proof: "artifacts/evidence/final/fg01_repo_state.json"
+  - id: FG-02
+    name: Backend Static / Startup Check
+    proof: "artifacts/evidence/build/fg02_backend_static.txt"
+  - id: FG-03
+    name: Frontend Typecheck + Build
+    proof: "artifacts/evidence/build/fg03_frontend_build.txt"
+  - id: FG-04
+    name: Docker Build
+    proof: "artifacts/evidence/docker/fg04_docker_build.txt"
+  - id: FG-05
+    name: Alembic Migration
+    proof: "artifacts/evidence/migration/fg05_alembic.txt"
+  - id: FG-06
+    name: Seed Idempotency
+    proof: "artifacts/evidence/migration/fg06_seed_idempotency.json"
+  - id: FG-07
+    name: Unit Tests
+    proof: "artifacts/evidence/unit/fg07_pytest_unit.xml"
+  - id: FG-08
+    name: Integration Tests
+    proof: "artifacts/evidence/integration/fg08_pytest_integration.xml"
+  - id: FG-09
+    name: Inventory Concurrency
+    proof: "artifacts/evidence/concurrency/fg09_inventory_over_sell.json"
+    mandatory: true
+  - id: FG-10
+    name: Workflow Tests
+    proof: "artifacts/evidence/integration/fg10_workflow.xml"
+  - id: FG-11
+    name: Payment Idempotency
+    proof: "artifacts/evidence/concurrency/fg11_payment_idempotency.json"
+    mandatory: true
+  - id: FG-12
+    name: Refund Invariants
+    proof: "artifacts/evidence/integration/fg12_refund_invariants.json"
+    mandatory: true
+  - id: FG-13
+    name: Auth Session / Refresh Rotation
+    proof: "artifacts/evidence/auth/fg13_refresh_rotation.json"
+    mandatory: true
+  - id: FG-14
+    name: Agent Authorization
+    proof: "artifacts/evidence/agent/fg14_agent_authorization.json"
+    mandatory: true
+  - id: FG-15
+    name: LangGraph HITL Resume / No Duplicate Side Effect
+    proof: "artifacts/evidence/agent/fg15_hitl_resume.json"
+    mandatory: true
+  - id: FG-16
+    name: RAG Eval
+    proof: "artifacts/evidence/rag/fg16_rag_eval.json"
+  - id: FG-17
+    name: RAG Prompt Injection
+    proof: "artifacts/evidence/rag/fg17_rag_injection.json"
+    mandatory: true
+  - id: FG-18
+    name: MCP Authorization / Compatibility
+    proof: "artifacts/evidence/mcp/fg18_mcp.json"
+    mandatory: true
+  - id: FG-19
+    name: Object Storage
+    proof: "artifacts/evidence/storage/fg19_storage.json"
+  - id: FG-20
+    name: Vitest
+    proof: "artifacts/evidence/unit/fg20_vitest.xml"
+  - id: FG-21
+    name: Playwright
+    proof: "artifacts/evidence/e2e/fg21_playwright.json"
+  - id: FG-22
+    name: Flagship E2E
+    proof: "artifacts/evidence/agent/fg22_flagship_e2e.json"
+    mandatory: true
+  - id: FG-23
+    name: Health Checks
+    proof: "artifacts/evidence/docker/fg23_health.json"
+  - id: FG-24
+    name: Secret Scan
+    proof: "artifacts/evidence/security/fg24_secret_scan.json"
+  - id: FG-25
+    name: Architecture Constraint Check
+    proof: "artifacts/evidence/architecture/fg25_architecture.json"
+  - id: FG-26
+    name: Critical Security Demo
+    proof: "artifacts/evidence/security/fg26_critical_block.json"
+    mandatory: true
+
+# Spec section 147: any single failure here means PROJECT STATUS = FAIL.
+non_waivable:
+  - { id: 1,  statement: "Inventory concurrency never oversells",              gate: FG-09 }
+  - { id: 2,  statement: "Payment callback is idempotent",                    gate: FG-11 }
+  - { id: 3,  statement: "Refund never exceeds amount actually paid",         gate: FG-12 }
+  - { id: 4,  statement: "Order snapshot correctness",                        gate: FG-10 }
+  - { id: 5,  statement: "Agent cannot exceed user authority",                gate: FG-14 }
+  - { id: 6,  statement: "Analytics agent cannot write",                      gate: FG-14 }
+  - { id: 7,  statement: "Unapproved PendingAction cannot execute",           gate: FG-15 }
+  - { id: 8,  statement: "LangGraph resume does not repeat side effects",     gate: FG-15 }
+  - { id: 9,  statement: "RAG injection cannot trigger a business write",     gate: FG-17 }
+  - { id: 10, statement: "MCP cannot bypass DataScope",                       gate: FG-18 }
+  - { id: 11, statement: "Refresh token rotation is correct",                 gate: FG-13 }
+  - { id: 12, statement: "Flagship agent E2E passes",                         gate: FG-22 }
+  - { id: 13, statement: "Critical-risk action is blocked",                   gate: FG-26 }
+
+# -----------------------------------------------------------------------------
+# IMPLEMENTATION PLAN (spec section 142) - 17 phases
+# -----------------------------------------------------------------------------
+implementation_plan:
+  - phase: 0
+    name: Audit + Baseline Lock
+    status: COMPLETE
+    deliverables: ["PROJECT_BASELINE.yaml", "docs/architecture/PHASE0_AUDIT.md", "docs/architecture/ARCHITECTURE_INVARIANTS.md", "docs/architecture/FINAL_GATE_INVENTORY.md", "docs/architecture/IMPLEMENTATION_PLAN.md", "ADR-013"]
+  - phase: 1
+    name: Skeleton + Infrastructure + MinIO
+    status: PENDING
+    deliverables: ["docker compose", "settings", "logging", "db session", "storage adapter", "alembic bootstrap", ".env.example", "health endpoints"]
+  - phase: 2
+    name: Identity + Auth Session + RBAC + DataScope
+    status: PENDING
+  - phase: 3
+    name: Catalog + SKU + Inventory
+    status: PENDING
+  - phase: 4
+    name: Cart + Pricing + Order
+    status: PENDING
+  - phase: 5
+    name: Payment + Fulfillment + AfterSales + Refund
+    status: PENDING
+  - phase: 6
+    name: Marketing + Analytics + Outbox
+    status: PENDING
+  - phase: 7
+    name: Consumer Vue
+    status: PENDING
+  - phase: 8
+    name: Merchant Console
+    status: PENDING
+  - phase: 9
+    name: Tool Gateway
+    status: PENDING
+  - phase: 10
+    name: LangChain / LangGraph
+    status: PENDING
+  - phase: 11
+    name: Knowledge / RAG
+    status: PENDING
+  - phase: 12
+    name: MCP
+    status: PENDING
+  - phase: 13
+    name: AI Workspace / Governance UI
+    status: PENDING
+  - phase: 14
+    name: Security / Tests / Eval
+    status: PENDING
+  - phase: 15
+    name: Docker / Observability / Deployment
+    status: PENDING
+  - phase: 16
+    name: Documentation / Demo / Final Gate
+    status: PENDING
+
+  exit_criteria_per_phase:
+    - Implement
+    - Static Check
+    - Migration (if schema changed)
+    - Test
+    - Run
+    - Fix
+    - Evidence
+    - Update Docs
+    - Commit-ready
+
+# -----------------------------------------------------------------------------
+# OPEN RISKS / DECISIONS REQUIRED
+# -----------------------------------------------------------------------------
+open_items:
+  - id: RISK-001
+    severity: INFO
+    title: "Product name conflict"
+    detail: "Remote repo is Nova-Commerce; frozen spec says Nexora Commerce (and freezes MCP id nexora-commerce-mcp)."
+    action_taken: "Implement per frozen spec; awaiting product-owner confirmation."
+  - id: RISK-002
+    severity: HIGH
+    title: "Python 3.14 host default is unusable for this stack"
+    detail: "mingw sysconfig + missing cp314 wheels (onnxruntime etc.)."
+    action_taken: "Pin venv to uv-managed CPython 3.11.16; record in baseline."
+  - id: RISK-003
+    severity: RESOLVED
+    title: "MinIO official Docker Hub image is not pullable"
+    detail: "docker.io/minio/minio returns pull access denied."
+    action_taken: "Use quay.io/minio/minio. Verified pull + run. Recorded in ADR-011."
+  - id: RISK-004
+    severity: RESOLVED
+    title: "MySQL 8.4 removed --default-authentication-plugin"
+    detail: "Passing the legacy flag aborts startup (MY-000067)."
+    action_taken: "Omit the flag; use utf8mb4 server defaults. Recorded in baseline smoke evidence."
+  - id: RISK-005
+    severity: MEDIUM
+    title: "Frontend toolchain is far newer than common references"
+    detail: "TypeScript 7.x, Vite 8.x, Pinia 4.x, vue-router 5.x, ECharts 6.x, vitest 5.x."
+    action_taken: "Build against installed versions; verify with vue-tsc + vite build before adding features."
+  - id: RISK-006
+    severity: INFO
+    title: "Git push credentials unverified"
+    detail: "origin is configured; no credential helper is present on this host."
+    action_taken: "Attempt push after the first commit; if rejected, deliver the commit locally and hand off."

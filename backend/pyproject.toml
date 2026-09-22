@@ -1,0 +1,215 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nexora-commerce-backend"
+version = "1.0.0"
+description = "Nexora Commerce V1 - AI-Native Commerce Operations Platform (backend modular monolith)"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+
+# ---------------------------------------------------------------------------
+# Runtime dependencies (web / domain / persistence / infra clients)
+# ---------------------------------------------------------------------------
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.53.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "email-validator==2.3.0",
+
+    # persistence
+    "sqlalchemy==2.0.54",
+    "alembic==1.20.0",
+    "pymysql==1.2.3",
+    "cryptography==50.0.1",
+
+    # async infrastructure clients
+    "redis==8.1.0",
+    "celery==5.6.3",
+
+    # vector + object storage
+    "qdrant-client==1.19.1",
+    "minio==7.2.20",
+
+    # auth / crypto
+    "pyjwt[crypto]==2.14.0",
+    "argon2-cffi==25.1.0",
+
+    # http / sse
+    "httpx==0.28.1",
+    "sse-starlette==3.4.11",
+    "python-multipart==0.0.32",
+
+    # observability
+    "structlog==26.1.0",
+    "python-json-logger==4.2.0",
+    "prometheus-client==0.26.0",
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-exporter-otlp-proto-http==1.44.0",
+    "opentelemetry-instrumentation-fastapi==0.65b0",
+    "opentelemetry-instrumentation-sqlalchemy==0.65b0",
+    "opentelemetry-instrumentation-httpx==0.65b0",
+    "opentelemetry-instrumentation-redis==0.65b0",
+    "opentelemetry-instrumentation-celery==0.65b0",
+
+    # rate limiting
+    "limits==5.8.0",
+
+    # AI / agent runtime
+    "langchain==1.4.2",
+    "langchain-core==1.6.4",
+    "langgraph==1.2.12",
+    "langchain-openai==1.6.4",
+    "mcp==2.2.0",
+]
+
+[project.optional-dependencies]
+# -------------------------------------------------------------------------
+# Local embedding/rerank (BGE-M3 dense + bge-reranker).  Deliberately OPTIONAL:
+# the platform must start and serve traffic without a GPU or these heavy
+# wheels.  RAG_MODE=light uses API embedding providers instead.
+# -------------------------------------------------------------------------
+local-models = [
+    "sentence-transformers==6.1.0",
+    "onnxruntime==1.30.0",
+    "numpy>=2.1,<2.4",
+    "torch>=2.6",
+]
+
+# -------------------------------------------------------------------------
+# Knowledge ingestion parsers
+# -------------------------------------------------------------------------
+parsers = [
+    "pypdf==6.19.0",
+    "python-docx==1.2.0",
+    "openpyxl==3.1.5",
+    "markdown-it-py==4.2.0",
+]
+
+# -------------------------------------------------------------------------
+# Local development / test / quality tooling
+# -------------------------------------------------------------------------
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "faker==40.39.0",
+    "freezegun==1.5.5",
+    "ruff==0.16.8",
+    "mypy==2.3.1",
+    "types-pyyaml",
+    "pytest-timeout",
+    "psutil",
+]
+
+# -------------------------------------------------------------------------
+# Integration testing against REAL infrastructure (MySQL/Redis/Qdrant/MinIO).
+# Used by the Final Gates - never mocked for the mandatory gates.
+# -------------------------------------------------------------------------
+integration = [
+    "testcontainers[mysql,redis]==4.15.0",
+    "pymysql==1.2.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# ---------------------------------------------------------------------------
+# Ruff - static analysis / import hygiene / architecture linting support
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["app", "tests"]
+exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # flake8-bugbear
+    "C4",       # comprehensions
+    "SIM",      # simplify
+    "TID",      # tidy imports (banned-api goes here)
+    "RUF",      # ruff-specific
+    "ASYNC",    # async correctness
+    "S",        # bandit security rules
+    "T20",      # no print()
+    "PTH",      # use pathlib
+    "DTZ",      # timezone-aware datetimes
+    "A",        # builtin shadowing
+    "BLE",      # blind except
+    "RET",      # return semantics
+    "ARG",      # unused arguments
+]
+ignore = [
+    "E501",    # line length handled by formatter
+    "S101",    # asserts are fine in tests
+    "B008",    # FastAPI Depends() in defaults is idiomatic
+    "RUF012",
+    "SIM108",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "ARG", "T20", "A"]
+"app/seeds/**" = ["T20", "S311"]
+"scripts/**" = ["T20"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"app.shared.db.session.SessionLocal".msg = "Import get_session()/session_scope() instead - never reach into the global session factory."
+"sqlalchemy.text".msg = "Raw SQL is only allowed in app/shared/db/* and repository modules that are explicitly whitelisted by the architecture test."
+"os.system".msg = "Never shell out from application code."
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = false
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = ["migrations/", "app/seeds/"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "unit: pure logic, no external process",
+    "integration: requires real MySQL/Redis/Qdrant/MinIO",
+    "concurrency: real parallel load against real MySQL",
+    "security: adversarial / authorization tests",
+    "architecture: automated layering + invariant enforcement",
+    "e2e: full user journey",
+    "slow: excluded from the fast feedback loop",
+    "requires_local_models: needs sentence-transformers / onnxruntime",
+]
+filterwarnings = [
+    "error::DeprecationWarning:app.*",
+]
+timeout = 300
