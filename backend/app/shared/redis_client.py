@@ -156,7 +156,7 @@ def distributed_lock(
     """
     client = get_redis()
     token = uuid.uuid4().hex
-    key = f"nexora:lock:{name}"
+    key = f"nova:lock:{name}"
     acquired = False
 
     try:

@@ -21,7 +21,10 @@ describe('money (integer minor units)', () => {
   it('formats with symbol, grouping and sign', () => {
     expect(formatMoney(123456)).toBe('¥1,234.56')
     expect(formatMoney(123456, { grouping: false })).toBe('¥1234.56')
-    expect(formatMoney(123456, { withMinor: false })).toBe('¥1,235')
+    // `withMinor: false` TRUNCATES rather than rounds: a checkout button must never
+    // display an amount higher than what the server will charge.
+    expect(formatMoney(123456, { withMinor: false })).toBe('¥1,234')
+    expect(formatMoney(123499, { withMinor: false })).toBe('¥1,234')
     expect(formatMoney(123456, { withSymbol: false })).toBe('1,234.56')
     expect(formatMoney(-2500)).toBe('-¥25.00')
   })

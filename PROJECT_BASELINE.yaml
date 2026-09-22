@@ -1,6 +1,6 @@
 # =============================================================================
 # PROJECT_BASELINE.yaml
-# Nexora Commerce V1 - Phase 0 deliverable (spec section 1)
+# Nova Commerce V1 - Phase 0 deliverable (spec section 1)
 #
 # This file is the machine-readable contract for the whole project.
 # Everything below was established by EXECUTION against this machine,
@@ -8,8 +8,8 @@
 # =============================================================================
 
 meta:
-  project_name: Nexora Commerce
-  project_name_zh: Nexora AI 原生智能商业运营平台
+  project_name: Nova Commerce
+  project_name_zh: Nova AI 原生智能商业运营平台
   project_name_en: AI-Native Commerce Operations Platform
   spec_version: "1.0.0-FINAL-DESIGN-FREEZE"
   baseline_version: "1.0.0"
@@ -25,16 +25,16 @@ repository:
   branch: main
   # KNOWN DISCREPANCY (must be resolved by product owner, tracked explicitly):
   #   remote repository name is "Nova-Commerce" ("Nova Commerce|智能电商平台"),
-  #   frozen spec section 2 mandates "Nexora Commerce" and section 86 freezes the
-  #   MCP server id as "nexora-commerce-mcp".
+  #   frozen spec section 2 mandates "Nova Commerce" and section 86 freezes the
+  #   MCP server id as "nova-commerce-mcp".
   #   RESOLUTION APPLIED: the frozen spec wins. Repository name is NOT renamed
   #   (a repo name is an address, not a product identifier).
-  naming_discrepancy:
-    remote_repo_name: Nova-Commerce
-    spec_product_name: Nexora Commerce
-    applied: spec
-    status: AWAITING_PRODUCT_OWNER_CONFIRMATION
-
+  # RESOLVED. At audit time the remote repo said "Nova-Commerce" while the
+  # frozen spec said "Nexora Commerce" and froze the MCP id as
+  # "nexora-commerce-mcp". Raised as RISK-001 rather than silently picked
+  # (spec section 150). The product owner chose **Nova**, so the conflict is
+  # gone and the repository name was already correct. See POD-001 below.
+  naming_status: RESOLVED_BY_PRODUCT_OWNER_TO_NOVA
 # -----------------------------------------------------------------------------
 # RUNTIME ENVIRONMENT (measured, not assumed)
 # -----------------------------------------------------------------------------
@@ -69,13 +69,13 @@ environment:
 # -----------------------------------------------------------------------------
 # PORT ALLOCATION
 # 3306 is occupied by a pre-existing host-native mysqld (PID 7712).
-# All Nexora services therefore use a private, collision-free port block.
+# All Nova services therefore use a private, collision-free port block.
 # -----------------------------------------------------------------------------
 ports:
   host_conflicts_detected:
     - port: 3306
       owner: mysqld
-      resolution: "Nexora MySQL mapped to 13306"
+      resolution: "Nova MySQL mapped to 13306"
   allocation:
     mysql: 13306
     redis: 16379
@@ -391,7 +391,7 @@ requirements:
     REQ-AUTH-004: { spec: "§23", must: "Short-lived access token; refresh token HttpOnly/Secure/SameSite; rotate on refresh" }
     REQ-AUTH-005: { spec: "§23", must_not: "Refresh token must not be persisted in localStorage long-term" }
     REQ-AUTH-006: { spec: "§23", must: "Refresh token rotation has tests", gate: "FG-13" }
-    REQ-AUTH-007: { spec: "§24", must: "Seed merchant 'Nexora Digital'; consumer user.merchant_id may be NULL; staff carry merchant_id" }
+    REQ-AUTH-007: { spec: "§24", must: "Seed merchant 'Nova Digital'; consumer user.merchant_id may be NULL; staff carry merchant_id" }
 
   catalog_inventory:
     REQ-CAT-001: { spec: "§25", must: "Tables: categories, brands, products, product_skus, product_images, product_attributes, sku_attribute_values" }
@@ -504,14 +504,14 @@ requirements:
     REQ-AGT-025: { spec: "§85", must: "SSE streaming with the 12 allowed event names and no hidden chain-of-thought emission" }
 
   mcp:
-    REQ-MCP-001: { spec: "§86", must: "Server id nexora-commerce-mcp; stdio + Streamable HTTP; remote path /mcp; implemented on the official SDK" }
+    REQ-MCP-001: { spec: "§86", must: "Server id nova-commerce-mcp; stdio + Streamable HTTP; remote path /mcp; implemented on the official SDK" }
     REQ-MCP-002: { spec: "§87", must: "OAuth Resource Server mode; verify issuer, signature, expiry, audience/resource, scope; NO token passthrough", gate: "FG-18" }
     REQ-MCP-003: { spec: "§88", must: "Origin validation, Host/allowed-host protection, TLS, rate limit, timeout; no insecure local dev binding in production" }
     REQ-MCP-004: { spec: "§89", must: "MCP context only from verified identity (client_id, user_id, merchant_id, scope, roles, permissions, data_scope, source=MCP); tool parameters must NOT accept user_id/merchant_id/is_admin/permissions" }
     REQ-MCP-005: { spec: "§90", must: "Effective permission = OAuth scope INTERSECT RBAC INTERSECT DataScope INTERSECT tool policy; tools/list filtered by authorization; tools/call re-authorized" }
     REQ-MCP-006: { spec: "§91", must: "The 16 frozen MCP tool names must exist" }
     REQ-MCP-007: { spec: "§92", must_not: "External MCP exposes no refund.execute / inventory.adjust / order.force_update / promotion.create / RBAC update / DataScope update" }
-    REQ-MCP-008: { spec: "§92", must: "nexora.promotion.propose only creates a PendingAction and never creates a Promotion directly", gate: "FG-18" }
+    REQ-MCP-008: { spec: "§92", must: "nova.promotion.propose only creates a PendingAction and never creates a Promotion directly", gate: "FG-18" }
     REQ-MCP-009: { spec: "§93", must: "Every tool declares explicit input schema, output schema, description and read/write semantics; prefer structuredContent" }
     REQ-MCP-010: { spec: "§12", must: "Do not hand-write the MCP wire protocol; use the official SDK; record SDK version, supported protocol revisions, Streamable HTTP lifecycle, stdio behaviour, auth behaviour, legacy-client strategy" }
     REQ-MCP-011: { spec: "§12", must: "A protocol baseline change requires an ADR + compatibility test" }
@@ -700,22 +700,22 @@ tools:
     - write_any_table
     - "any arbitrary Python execution tool"
   mcp_external:                           # spec section 91 - exactly 16
-    - nexora.product.search
-    - nexora.product.get
-    - nexora.sku.get
-    - nexora.order.get
-    - nexora.order.search
-    - nexora.fulfillment.get
-    - nexora.after_sale.get
-    - nexora.inventory.get
-    - nexora.analytics.sales
-    - nexora.analytics.inventory
-    - nexora.analytics.product_performance
-    - nexora.analytics.refunds
-    - nexora.analytics.anomalies
-    - nexora.knowledge.search
-    - nexora.promotion.preview
-    - nexora.promotion.propose
+    - nova.product.search
+    - nova.product.get
+    - nova.sku.get
+    - nova.order.get
+    - nova.order.search
+    - nova.fulfillment.get
+    - nova.after_sale.get
+    - nova.inventory.get
+    - nova.analytics.sales
+    - nova.analytics.inventory
+    - nova.analytics.product_performance
+    - nova.analytics.refunds
+    - nova.analytics.anomalies
+    - nova.knowledge.search
+    - nova.promotion.preview
+    - nova.promotion.propose
 
 # -----------------------------------------------------------------------------
 # TASK-BASED API SURFACE (spec section 99)
@@ -875,59 +875,63 @@ non_waivable:
 # IMPLEMENTATION PLAN (spec section 142) - 17 phases
 # -----------------------------------------------------------------------------
 implementation_plan:
-  - phase: 0
-    name: Audit + Baseline Lock
-    status: COMPLETE
-    deliverables: ["PROJECT_BASELINE.yaml", "docs/architecture/PHASE0_AUDIT.md", "docs/architecture/ARCHITECTURE_INVARIANTS.md", "docs/architecture/FINAL_GATE_INVENTORY.md", "docs/architecture/IMPLEMENTATION_PLAN.md", "ADR-013"]
-  - phase: 1
-    name: Skeleton + Infrastructure + MinIO
-    status: PENDING
-    deliverables: ["docker compose", "settings", "logging", "db session", "storage adapter", "alembic bootstrap", ".env.example", "health endpoints"]
-  - phase: 2
-    name: Identity + Auth Session + RBAC + DataScope
-    status: PENDING
-  - phase: 3
-    name: Catalog + SKU + Inventory
-    status: PENDING
-  - phase: 4
-    name: Cart + Pricing + Order
-    status: PENDING
-  - phase: 5
-    name: Payment + Fulfillment + AfterSales + Refund
-    status: PENDING
-  - phase: 6
-    name: Marketing + Analytics + Outbox
-    status: PENDING
-  - phase: 7
-    name: Consumer Vue
-    status: PENDING
-  - phase: 8
-    name: Merchant Console
-    status: PENDING
-  - phase: 9
-    name: Tool Gateway
-    status: PENDING
-  - phase: 10
-    name: LangChain / LangGraph
-    status: PENDING
-  - phase: 11
-    name: Knowledge / RAG
-    status: PENDING
-  - phase: 12
-    name: MCP
-    status: PENDING
-  - phase: 13
-    name: AI Workspace / Governance UI
-    status: PENDING
-  - phase: 14
-    name: Security / Tests / Eval
-    status: PENDING
-  - phase: 15
-    name: Docker / Observability / Deployment
-    status: PENDING
-  - phase: 16
-    name: Documentation / Demo / Final Gate
-    status: PENDING
+  # Phase list. Deliberately a list under a named key rather than a bare
+  # sequence: it must coexist with `exit_criteria_per_phase` below, and YAML
+  # forbids mixing a sequence and a mapping at the same level.
+  phases:
+    - phase: 0
+      name: Audit + Baseline Lock
+      status: COMPLETE
+      deliverables: ["PROJECT_BASELINE.yaml", "docs/architecture/PHASE0_AUDIT.md", "docs/architecture/ARCHITECTURE_INVARIANTS.md", "docs/architecture/FINAL_GATE_INVENTORY.md", "docs/architecture/IMPLEMENTATION_PLAN.md", "ADR-013"]
+    - phase: 1
+      name: Skeleton + Infrastructure + MinIO
+      status: PENDING
+      deliverables: ["docker compose", "settings", "logging", "db session", "storage adapter", "alembic bootstrap", ".env.example", "health endpoints"]
+    - phase: 2
+      name: Identity + Auth Session + RBAC + DataScope
+      status: PENDING
+    - phase: 3
+      name: Catalog + SKU + Inventory
+      status: PENDING
+    - phase: 4
+      name: Cart + Pricing + Order
+      status: PENDING
+    - phase: 5
+      name: Payment + Fulfillment + AfterSales + Refund
+      status: PENDING
+    - phase: 6
+      name: Marketing + Analytics + Outbox
+      status: PENDING
+    - phase: 7
+      name: Consumer Vue
+      status: PENDING
+    - phase: 8
+      name: Merchant Console
+      status: PENDING
+    - phase: 9
+      name: Tool Gateway
+      status: PENDING
+    - phase: 10
+      name: LangChain / LangGraph
+      status: PENDING
+    - phase: 11
+      name: Knowledge / RAG
+      status: PENDING
+    - phase: 12
+      name: MCP
+      status: PENDING
+    - phase: 13
+      name: AI Workspace / Governance UI
+      status: PENDING
+    - phase: 14
+      name: Security / Tests / Eval
+      status: PENDING
+    - phase: 15
+      name: Docker / Observability / Deployment
+      status: PENDING
+    - phase: 16
+      name: Documentation / Demo / Final Gate
+      status: PENDING
 
   exit_criteria_per_phase:
     - Implement
@@ -943,12 +947,28 @@ implementation_plan:
 # -----------------------------------------------------------------------------
 # OPEN RISKS / DECISIONS REQUIRED
 # -----------------------------------------------------------------------------
+product_owner_decisions:
+  - id: POD-001
+    date: "2026-09-22"
+    decision: "The product is named Nova."
+    supersedes:
+      - "Frozen spec section 2 (product name)"
+      - "Frozen spec section 86 (MCP server id)"
+    impact: >
+      Product name, MCP server id, database name, bucket names, refresh-cookie
+      name, Keycloak realm, Qdrant collection prefix and Redis key namespace all
+      move to Nova. No architectural or behavioural change.
+    recorded_because: >
+      Section 86 *froze* an identifier. Overriding a frozen value is legitimate when
+      the product owner directs it, but the override must be visible in the
+      baseline rather than discovered later by diffing.
+
 open_items:
   - id: RISK-001
-    severity: INFO
+    severity: RESOLVED
     title: "Product name conflict"
-    detail: "Remote repo is Nova-Commerce; frozen spec says Nexora Commerce (and freezes MCP id nexora-commerce-mcp)."
-    action_taken: "Implement per frozen spec; awaiting product-owner confirmation."
+    detail: "Remote repo was Nova-Commerce; the frozen spec said Nexora Commerce."
+    action_taken: "Product owner chose Nova; applied repo-wide. See POD-001."
   - id: RISK-002
     severity: HIGH
     title: "Python 3.14 host default is unusable for this stack"

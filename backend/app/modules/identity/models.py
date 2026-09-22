@@ -61,7 +61,7 @@ MAX_ROTATION_CHAIN_DEPTH = 50
 class Merchant(Base, PkMixin, TimestampMixin, SoftDeleteMixin):
     """A commercial tenant.
 
-    V1 runs a single merchant (``Nexora Digital``), but every commercial row
+    V1 runs a single merchant (``Nova Digital``), but every commercial row
     carries ``merchant_id`` from the first migration so that multi-merchant
     support is a feature, not a data migration (spec §4).
     """

@@ -171,7 +171,7 @@ def ready(response: Response) -> dict[str, Any]:
         code=ErrorCode.OK if overall != "unhealthy" else ErrorCode.DEPENDENCY_UNAVAILABLE,
         message="healthy" if overall == "ok" else overall,
     )
-    response.headers["X-Nexora-Health"] = overall
+    response.headers["X-Nova-Health"] = overall
     return payload
 
 

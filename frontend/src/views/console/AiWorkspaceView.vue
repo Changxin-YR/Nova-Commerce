@@ -22,7 +22,6 @@ import { AGENT_TABS, type AgentName } from '@/config/app'
 import StateView from '@/components/ui/StateView.vue'
 import StatusChip from '@/components/ui/StatusChip.vue'
 import MessageBlocks from '@/components/agent/MessageBlocks.vue'
-import ApexChart from '@/components/charts/ApexChart.vue'
 
 type Tab = 'assistant' | 'operations' | 'analytics' | 'pending' | 'runs'
 

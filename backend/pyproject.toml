@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nexora-commerce-backend"
+name = "nova-commerce-backend"
 version = "1.0.0"
-description = "Nexora Commerce V1 - AI-Native Commerce Operations Platform (backend modular monolith)"
+description = "Nova Commerce V1 - AI-Native Commerce Operations Platform (backend modular monolith)"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 

@@ -1,6 +1,6 @@
-# Nexora Commerce
+# Nova Commerce
 
-**Nexora AI 原生智能商业运营平台** · AI-Native Commerce Operations Platform
+**Nova AI 原生智能商业运营平台** · AI-Native Commerce Operations Platform
 
 ---
 
@@ -10,7 +10,7 @@
 
 一边是一个能下单、能支付、能退款的传统商城；另一边挂着一个聊天窗口，它对真实业务一无所知，或者更糟——它能"看到"数据，却没人能保证它不会把库存改错、不会把不该退的钱退出去。
 
-Nexora Commerce V1 要解决的是这两者之间的**可信连接**问题：
+Nova Commerce V1 要解决的是这两者之间的**可信连接**问题：
 
 > 让 AI 真正参与商业运营，同时让每一个由 AI 触发的业务动作，都受真实数据、真实权限、真实风控和真实审计的约束。
 

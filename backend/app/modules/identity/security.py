@@ -79,8 +79,8 @@ _COMMON_PASSWORDS: Final[frozenset[str]] = frozenset(
         "admin12345",
         "welcome123",
         "iloveyou123",
-        "nexora1234",
-        "nexora",
+        "nova1234",
+        "nova",
     }
 )
 

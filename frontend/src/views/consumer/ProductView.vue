@@ -69,9 +69,10 @@ async function addToCart(): Promise<void> {
 
 async function buyNow(): Promise<void> {
   // Buy-now still goes through the server-side cart/order preview: the client never
-  // invents a price or an order.
+  // invents a price or an order. `cart.error` is store state (already unwrapped by
+  // Pinia), not a ref.
   await addToCart()
-  if (!cart.error.value) await router.push({ name: 'cart' })
+  if (!cart.error) await router.push({ name: 'cart' })
 }
 </script>
 

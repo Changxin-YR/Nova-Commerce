@@ -158,7 +158,7 @@ four pipeline comparisons (§120).
 
 ### Phase 12 — MCP
 
-`nexora-commerce-mcp` on `MCPServer` (mcp 2.2.0), stdio + Streamable HTTP at
+`nova-commerce-mcp` on `MCPServer` (mcp 2.2.0), stdio + Streamable HTTP at
 `/mcp` (§86). OAuth Resource Server verification of issuer / signature /
 expiry / audience-resource / scope with **no token passthrough** (§87).
 Transport security settings (§88). Context derived only from verified identity;

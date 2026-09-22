@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Application
     # ------------------------------------------------------------------
-    APP_NAME: str = "Nexora Commerce"
+    APP_NAME: str = "Nova Commerce"
     APP_ENV: AppEnv = "dev"
     APP_DEBUG: bool = True
     APP_TIMEZONE: str = "Asia/Shanghai"
@@ -91,11 +91,11 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     JWT_ALGORITHM: str = "HS256"
     JWT_SECRET_KEY: SecretStr = SecretStr("")
-    JWT_ISSUER: str = "nexora-commerce"
-    JWT_AUDIENCE: str = "nexora-commerce-api"
+    JWT_ISSUER: str = "nova-commerce"
+    JWT_AUDIENCE: str = "nova-commerce-api"
     ACCESS_TOKEN_TTL_SECONDS: int = Field(default=900, ge=60)
     REFRESH_TOKEN_TTL_SECONDS: int = Field(default=1_209_600, ge=300)
-    REFRESH_COOKIE_NAME: str = "nexora_rt"
+    REFRESH_COOKIE_NAME: str = "nova_rt"
     REFRESH_COOKIE_SECURE: bool = False
     REFRESH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
     REFRESH_COOKIE_PATH: str = "/api/v1/auth"
@@ -107,8 +107,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     MYSQL_HOST: str = "127.0.0.1"
     MYSQL_PORT: int = 13306
-    MYSQL_DATABASE: str = "nexora"
-    MYSQL_USER: str = "nexora"
+    MYSQL_DATABASE: str = "nova"
+    MYSQL_USER: str = "nova"
     MYSQL_PASSWORD: SecretStr = SecretStr("")
     MYSQL_ROOT_PASSWORD: SecretStr = SecretStr("")
     DATABASE_URL: str = ""
@@ -155,10 +155,10 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: SecretStr = SecretStr("")
     S3_USE_SSL: bool = False
     S3_FORCE_PATH_STYLE: bool = True
-    S3_BUCKET_PRODUCT_IMAGES: str = "nexora-product-images"
-    S3_BUCKET_KNOWLEDGE: str = "nexora-knowledge-private"
-    S3_BUCKET_REPORTS: str = "nexora-reports"
-    S3_BUCKET_EVIDENCE: str = "nexora-evidence"
+    S3_BUCKET_PRODUCT_IMAGES: str = "nova-product-images"
+    S3_BUCKET_KNOWLEDGE: str = "nova-knowledge-private"
+    S3_BUCKET_REPORTS: str = "nova-reports"
+    S3_BUCKET_EVIDENCE: str = "nova-evidence"
     S3_SIGNED_URL_TTL_SECONDS: int = Field(default=900, ge=1)
     S3_MAX_UPLOAD_BYTES: int = Field(default=26_214_400, ge=1)
     S3_CONNECT_TIMEOUT_SECONDS: float = 5.0
@@ -169,7 +169,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     QDRANT_URL: str = "http://127.0.0.1:16333"
     QDRANT_API_KEY: SecretStr = SecretStr("")
-    QDRANT_COLLECTION_PREFIX: str = "nexora"
+    QDRANT_COLLECTION_PREFIX: str = "nova"
     QDRANT_TIMEOUT_SECONDS: float = 10.0
     RAG_MODE: RagMode = "light"
     RAG_TOP_K_DENSE: int = Field(default=30, ge=1)
@@ -245,7 +245,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     OTEL_ENABLED: bool = False
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://127.0.0.1:14317"
-    OTEL_SERVICE_NAME: str = "nexora-commerce-api"
+    OTEL_SERVICE_NAME: str = "nova-commerce-api"
     OTEL_TRACES_SAMPLER_ARG: float = 1.0
 
     # ------------------------------------------------------------------
@@ -261,14 +261,14 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # MCP server (§86-§93) - baseline verified in ADR-013
     # ------------------------------------------------------------------
-    MCP_SERVER_NAME: str = "nexora-commerce-mcp"
+    MCP_SERVER_NAME: str = "nova-commerce-mcp"
     MCP_HTTP_PATH: str = "/mcp"
     MCP_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     MCP_ALLOWED_HOSTS: list[str] = Field(
-        default_factory=lambda: ["localhost", "127.0.0.1", "nexora.local"]
+        default_factory=lambda: ["localhost", "127.0.0.1", "nova.local"]
     )
     MCP_ENABLE_DNS_REBINDING_PROTECTION: bool = True
-    MCP_REQUIRED_SCOPES: list[str] = Field(default_factory=lambda: ["nexora.read"])
+    MCP_REQUIRED_SCOPES: list[str] = Field(default_factory=lambda: ["nova.read"])
     MCP_REQUEST_TIMEOUT_SECONDS: int = Field(default=30, ge=1)
     MCP_MAX_REQUEST_BODY_BYTES: int = 1_048_576
     MCP_SESSION_IDLE_TIMEOUT_SECONDS: int = 1800
@@ -282,14 +282,14 @@ class Settings(BaseSettings):
 
     KEYCLOAK_ADMIN: str = "admin"
     KEYCLOAK_ADMIN_PASSWORD: SecretStr = SecretStr("")
-    KEYCLOAK_REALM: str = "nexora"
-    KEYCLOAK_CLIENT_ID: str = "nexora-web"
-    KEYCLOAK_MCP_CLIENT_ID: str = "nexora-mcp-client"
+    KEYCLOAK_REALM: str = "nova"
+    KEYCLOAK_CLIENT_ID: str = "nova-web"
+    KEYCLOAK_MCP_CLIENT_ID: str = "nova-mcp-client"
 
     # ------------------------------------------------------------------
     # Seed (§126)
     # ------------------------------------------------------------------
-    SEED_MERCHANT_NAME: str = "Nexora Digital"
+    SEED_MERCHANT_NAME: str = "Nova Digital"
     SEED_HISTORY_DAYS: int = Field(default=75, ge=1)
     SEED_PRODUCT_COUNT: int = Field(default=26, ge=1)
     SEED_SKU_COUNT: int = Field(default=68, ge=1)

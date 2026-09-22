@@ -32,7 +32,6 @@ registerPermissionDirectives(app)
 // A global error boundary: an unexpected render/lifecycle error must be visible
 // rather than leaving a blank page (and must not leak a stack trace to the user).
 app.config.errorHandler = (error, _instance, info) => {
-  // eslint-disable-next-line no-console
   console.error('[nexora] unhandled error', info, error)
 }
 

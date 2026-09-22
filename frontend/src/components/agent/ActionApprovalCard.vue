@@ -66,8 +66,6 @@ async function decide(approved: boolean): Promise<void> {
       notifications.warning(
         '审批内容已变化',
         '该操作的内容在审批期间被修改，请重新查看后再决定。',
-        normalized.code,
-        normalized.traceId,
       )
     } else {
       notifications.error('审批失败', normalized.message, normalized.code, normalized.traceId)

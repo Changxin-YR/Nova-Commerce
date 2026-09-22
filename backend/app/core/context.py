@@ -154,7 +154,7 @@ _ANONYMOUS: RequestContext = RequestContext(
 )
 _ANONYMOUS = replace(_ANONYMOUS, trace_id="0" * 16, request_id="0" * 16)
 
-_context: ContextVar[RequestContext] = ContextVar("nexora_request_context", default=_ANONYMOUS)
+_context: ContextVar[RequestContext] = ContextVar("nova_request_context", default=_ANONYMOUS)
 
 
 def get_context() -> RequestContext:

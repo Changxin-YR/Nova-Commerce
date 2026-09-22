@@ -11,7 +11,13 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActionApprovalCard: typeof import('./../components/agent/ActionApprovalCard.vue')['default']
+    ApexChart: typeof import('./../components/charts/ApexChart.vue')['default']
+    MessageBlocks: typeof import('./../components/agent/MessageBlocks.vue')['default']
+    ProductCard: typeof import('./../components/ui/ProductCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    StateView: typeof import('./../components/ui/StateView.vue')['default']
+    StatusChip: typeof import('./../components/ui/StatusChip.vue')['default']
   }
 }

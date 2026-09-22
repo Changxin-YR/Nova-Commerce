@@ -62,10 +62,10 @@ design. Keeping MinIO also preserves every documented operator workflow.
 
 | Bucket | Default access | Contents |
 |---|---|---|
-| `nexora-product-images` | controlled public / signed GET | Product and SKU images |
-| `nexora-knowledge-private` | **private** (signed URL only) | Knowledge source documents |
-| `nexora-reports` | private | Generated reports/exports |
-| `nexora-evidence` | private | Large gate evidence artifacts |
+| `nova-product-images` | controlled public / signed GET | Product and SKU images |
+| `nova-knowledge-private` | **private** (signed URL only) | Knowledge source documents |
+| `nova-reports` | private | Generated reports/exports |
+| `nova-evidence` | private | Large gate evidence artifacts |
 
 ### Storage port
 

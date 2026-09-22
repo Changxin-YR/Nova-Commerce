@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Project | Nexora Commerce V1 |
+| Project | Nova Commerce V1 |
 | Spec version | `1.0.0-FINAL-DESIGN-FREEZE` |
 | Baseline | `PROJECT_BASELINE.yaml` v1.0.0 |
 | Base commit | `ea2410508950abfe86faac1cd470feda93325632` |

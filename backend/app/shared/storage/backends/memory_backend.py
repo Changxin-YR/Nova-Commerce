@@ -42,10 +42,10 @@ class InMemoryObjectStorage(ObjectStorage):
     backend_name = "memory"
 
     def __init__(self, settings: Settings | None = None) -> None:
-        self.bucket_product_images = "nexora-product-images"
-        self.bucket_knowledge = "nexora-knowledge-private"
-        self.bucket_reports = "nexora-reports"
-        self.bucket_evidence = "nexora-evidence"
+        self.bucket_product_images = "nova-product-images"
+        self.bucket_knowledge = "nova-knowledge-private"
+        self.bucket_reports = "nova-reports"
+        self.bucket_evidence = "nova-evidence"
         self._max_bytes = getattr(settings, "S3_MAX_UPLOAD_BYTES", 26_214_400) if settings else 26_214_400
         self._default_ttl = getattr(settings, "S3_SIGNED_URL_TTL_SECONDS", 900) if settings else 900
 

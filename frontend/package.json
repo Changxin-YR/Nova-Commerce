@@ -17,7 +17,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "lint": "eslint .",
-    "gen:api": "npx --yes openapi-typescript@7.13.0 http://127.0.0.1:8000/openapi.json -o src/types/generated/api.d.ts"
+    "gen:api": "node scripts/gen-api.mjs"
   },
   "dependencies": {
     "axios": "1.20.0",
@@ -29,14 +29,17 @@
     "vue-router": "5.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
+    "@typescript-eslint/parser": "8.70.1",
     "@vitejs/plugin-vue": "6.0.9",
     "@vitest/coverage-v8": "5.0.1",
     "@vue/compiler-sfc": "3.5.43",
     "@vue/test-utils": "2.5.1",
     "eslint": "10.11.0",
     "eslint-plugin-vue": "10.11.0",
+    "globals": "17.12.0",
     "jsdom": "30.1.1",
     "sass": "1.105.0",
     "typescript": "6.0.3",
@@ -44,6 +47,7 @@
     "unplugin-vue-components": "32.1.0",
     "vite": "8.3.0",
     "vitest": "5.0.1",
+    "vue-eslint-parser": "10.4.1",
     "vue-tsc": "3.3.11"
   }
 }

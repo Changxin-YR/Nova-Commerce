@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Test output
+coverage/
+e2e/.artifacts/
+playwright-report/
+test-results/
+
+# Local env (never commit; .env.example is the template)
+.env
+.env.local
+.env.*.local
+
+# Generated API types. Regenerate with `npm run gen:api` against a running backend.
+src/types/generated/*.d.ts
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

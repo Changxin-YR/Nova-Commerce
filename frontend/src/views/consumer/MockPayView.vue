@@ -10,7 +10,7 @@
  */
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { orderApi, paymentApi } from '@/api'
+import { paymentApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
 import { formatMoney } from '@/utils/money'

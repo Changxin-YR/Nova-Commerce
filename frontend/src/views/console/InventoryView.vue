@@ -71,8 +71,6 @@ async function submitAdjust(): Promise<void> {
       notifications.warning(
         '库存已被其他人修改',
         '本行数据已过期，请刷新后基于最新版本重新调整（不会自动重试，以免覆盖他人改动）。',
-        normalized.code,
-        normalized.traceId,
       )
       editing.value = null
       await execute()

@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Nexora Commerce API",
-    "description": "**Nexora Commerce V1** - AI-Native Commerce Operations Platform.\n\nThis API is the transactional backbone of the platform. Two properties are\nworth stating explicitly, because they shape every endpoint:\n\n1. **The server is the only price and stock authority.** Client-supplied money\n   is never trusted; ``CreateOrder`` accepts business inputs (SKU, quantity,\n   coupon, address) and recomputes everything.\n2. **AI is never a source of business truth.** Order, payment, refund and\n   inventory facts originate here. Agent and MCP traffic reaches these services\n   only through an audited tool gateway that re-authorises every call.\n\nEvery response uses the envelope ``{code, message, data, trace_id}``. Quote\n``trace_id`` in a bug report; it correlates the request across the workflow,\nagent, task queue and audit log.",
+    "title": "Nova Commerce API",
+    "description": "**Nova Commerce V1** - AI-Native Commerce Operations Platform.\n\nThis API is the transactional backbone of the platform. Two properties are\nworth stating explicitly, because they shape every endpoint:\n\n1. **The server is the only price and stock authority.** Client-supplied money\n   is never trusted; ``CreateOrder`` accepts business inputs (SKU, quantity,\n   coupon, address) and recomputes everything.\n2. **AI is never a source of business truth.** Order, payment, refund and\n   inventory facts originate here. Agent and MCP traffic reaches these services\n   only through an audited tool gateway that re-authorises every call.\n\nEvery response uses the envelope ``{code, message, data, trace_id}``. Quote\n``trace_id`` in a bug report; it correlates the request across the workflow,\nagent, task queue and audit log.",
     "version": "1.0.0"
   },
   "paths": {

@@ -35,31 +35,37 @@ enumerates requirement → implementation gaps, not migration steps.
 | Remote branches | `main` only |
 | Credential helper | **None configured** |
 
-### 2.1 Naming discrepancy (raised, not silently resolved)
+### 2.1 Naming conflict - raised, then resolved by the product owner
 
-The remote README reads:
+At audit time the two names disagreed:
 
-```
-# Nova-Commerce
-Nova Commerce|智能电商平台
-```
+| Source | Name it used |
+|---|---|
+| Remote repository (`README.md`, commit `ea24105`) | `Nova-Commerce` / "Nova Commerce|智能电商平台" |
+| Frozen spec section 2 | `Nexora Commerce`, with the MCP server id frozen as `nexora-commerce-mcp` |
 
-The frozen spec §2 mandates the project name **Nexora Commerce**, and §86
-freezes the MCP server identifier as **`nexora-commerce-mcp`**.
+Two names for one product. Spec §150 forbids silently modifying the design, and
+spec §86 had *frozen* an identifier that the other source contradicted, so this
+was raised rather than guessed at. It was tracked as `RISK-001` with status
+`AWAITING_PRODUCT_OWNER_CONFIRMATION`, and implementation proceeded under the
+spec's name in the meantime so that no work was blocked.
 
-Two names now exist for one product. Silently picking one would violate
-spec §150 ("do not silently modify the design").
+**Product-owner decision: the product is `Nova`.**
 
-**Resolution applied and recorded:**
+The conflict is therefore gone, and the resolution is applied as follows:
 
-- The frozen spec wins → the platform is implemented as **Nexora Commerce**.
-- The *repository* is **not** renamed. A repository name is an address, not a
-  product identifier, and renaming it would break the URL the product owner
-  supplied.
-- Status: `AWAITING_PRODUCT_OWNER_CONFIRMATION` (tracked as `RISK-001` in
-  `PROJECT_BASELINE.yaml`). If the owner confirms "Nova Commerce", the change
-  is a bounded string-level rename of branding constants; no architectural
-  impact.
+* `Nexora Commerce` -> **`Nova Commerce`** everywhere (product name, docs, README,
+  UI copy).
+* `nexora-commerce-mcp` -> **`nova-commerce-mcp`**. This deliberately overrides a
+  frozen identifier; the override is recorded in `PROJECT_BASELINE.yaml` under
+  `product_owner_decisions` rather than left implicit, because a frozen value
+  that quietly changes is worse than one that changes with a reason attached.
+* Lowercase infrastructure identifiers moved with it (`nova` database, `nova-*`
+  buckets, `nova_rt` refresh cookie, `nova` Keycloak realm, `nova_` Qdrant
+  collection prefix, `nova:` Redis key namespace). Leaving these behind would
+  have produced a codebase that says Nova in the UI and nexora in the logs.
+
+The repository name already matched and was not changed.
 
 ---
 

@@ -37,7 +37,7 @@ from app.core.middleware import (
 logger = get_logger(__name__)
 
 DESCRIPTION = """
-**Nexora Commerce V1** - AI-Native Commerce Operations Platform.
+**Nova Commerce V1** - AI-Native Commerce Operations Platform.
 
 This API is the transactional backbone of the platform. Two properties are
 worth stating explicitly, because they shape every endpoint:
@@ -169,7 +169,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or get_settings()
 
     app = FastAPI(
-        title="Nexora Commerce API",
+        title="Nova Commerce API",
         description=DESCRIPTION,
         version="1.0.0",
         docs_url="/api/docs",

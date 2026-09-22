@@ -35,7 +35,11 @@ export interface FormatMoneyOptions {
   symbol?: string
   /** Show the symbol. Defaults to true. */
   withSymbol?: boolean
-  /** Always print the minor part (`¥12` vs `¥12.00`). Defaults to true. */
+  /**
+   * Print the minor part (`¥12.34` vs `¥12`). Defaults to true.
+   * When false the minor units are TRUNCATED, never rounded: a price the user is about
+   * to pay must not appear higher than the amount the server will charge.
+   */
   withMinor?: boolean
   /** Thousands separators. Defaults to true. */
   grouping?: boolean

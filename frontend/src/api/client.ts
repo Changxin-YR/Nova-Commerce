@@ -28,7 +28,6 @@ import axios, {
   type AxiosRequestConfig,
   type AxiosResponse,
   type InternalAxiosRequestConfig,
-  type RawAxiosRequestHeaders,
 } from 'axios'
 import {
   API_BASE_URL,
@@ -295,7 +294,9 @@ export class NexoraHttpClient {
       // interceptor built from the STALE token. Without overwriting it, the
       // replay presents the expired token and fails again. Regression-tested in
       // src/api/__tests__/client.refresh.spec.ts.
-      const headers = AxiosHeaders.from(cfg.headers as RawAxiosRequestHeaders | undefined)
+      // error.config.headers is normally a concrete AxiosHeaders instance; the plain-object
+      // branch of the cast only exists for hand-built configs in tests.
+      const headers = AxiosHeaders.from(cfg.headers as AxiosHeaders)
       const freshToken = getAccessToken()
       if (freshToken) headers.set('Authorization', `Bearer ${freshToken}`)
       const replay: NexoraRequestConfig = { ...cfg, headers, __retried: true }
