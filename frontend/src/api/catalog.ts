@@ -1,0 +1,64 @@
+/**
+ * Catalog module: consumer reads + merchant writes (§98, §99).
+ *
+ * Merchant writes are TASK-BASED: `publish` / `unpublish` are explicit intents,
+ * never a bare status patch.
+ */
+
+import { httpClient } from '@/api/client'
+import { API } from '@/api/endpoints'
+import type {
+  ProductPayload,
+  ProductQuery,
+  SkuPayload,
+} from '@/types/api-contract'
+import type { Brand, Category, Paged, Product, ProductSummary, Sku } from '@/types/domain'
+
+export const catalogApi = {
+  async searchProducts(query: ProductQuery = {}): Promise<ProductSummary[]> {
+    return httpClient.get<ProductSummary[]>(API.catalog.products, { params: query })
+  },
+
+  async product(id: string): Promise<Product> {
+    return httpClient.get<Product>(API.catalog.productDetail(id))
+  },
+
+  async categories(): Promise<Category[]> {
+    return httpClient.get<Category[]>(API.catalog.categories)
+  },
+
+  async brands(): Promise<Brand[]> {
+    return httpClient.get<Brand[]>(API.catalog.brands)
+  },
+}
+
+export const catalogAdminApi = {
+  async products(query: ProductQuery = {}): Promise<Paged<ProductSummary>> {
+    return httpClient.get<Paged<ProductSummary>>(API.catalog.adminProducts, { params: query })
+  },
+
+  async product(id: string): Promise<Product> {
+    return httpClient.get<Product>(API.catalog.adminProduct(id))
+  },
+
+  async create(payload: ProductPayload): Promise<Product> {
+    return httpClient.post<Product>(API.catalog.adminProducts, payload)
+  },
+
+  async update(id: string, payload: Partial<ProductPayload>): Promise<Product> {
+    return httpClient.put<Product>(API.catalog.adminProduct(id), payload)
+  },
+
+  /** Task endpoint (§99): publishing is an intent, not a `PATCH {status}`. */
+  async publish(id: string): Promise<Product> {
+    return httpClient.post<Product>(API.catalog.publish(id), {})
+  },
+
+  async unpublish(id: string): Promise<Product> {
+    return httpClient.post<Product>(API.catalog.unpublish(id), {})
+  },
+
+  async upsertSku(productId: string, payload: SkuPayload): Promise<Sku> {
+    return httpClient.post<Sku>(API.catalog.skus(productId), payload)
+  },
+}

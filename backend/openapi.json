@@ -1,0 +1,220 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nexora Commerce API",
+    "description": "**Nexora Commerce V1** - AI-Native Commerce Operations Platform.\n\nThis API is the transactional backbone of the platform. Two properties are\nworth stating explicitly, because they shape every endpoint:\n\n1. **The server is the only price and stock authority.** Client-supplied money\n   is never trusted; ``CreateOrder`` accepts business inputs (SKU, quantity,\n   coupon, address) and recomputes everything.\n2. **AI is never a source of business truth.** Order, payment, refund and\n   inventory facts originate here. Agent and MCP traffic reaches these services\n   only through an audited tool gateway that re-authorises every call.\n\nEvery response uses the envelope ``{code, message, data, trace_id}``. Quote\n``trace_id`` in a bug report; it correlates the request across the workflow,\nagent, task queue and audit log.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "health",
+          "health"
+        ],
+        "summary": "Liveness probe",
+        "description": "Returns 200 whenever the process can serve HTTP. Never touches dependencies.",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "health",
+          "health"
+        ],
+        "summary": "Readiness probe",
+        "description": "Critical dependencies gate the HTTP status. Important and degradable dependencies are reported but do not fail the probe (spec §130).",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A critical dependency (MySQL) is unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness probe",
+        "description": "Returns 200 whenever the process can serve HTTP. Never touches dependencies.",
+        "operationId": "live_api_v1_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness probe",
+        "description": "Critical dependencies gate the HTTP status. Important and degradable dependencies are reported but do not fail the probe (spec §130).",
+        "operationId": "ready_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A critical dependency (MySQL) is unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiEnvelope": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "Stable business code; 0 means success.",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable, non-sensitive summary.",
+            "default": "OK"
+          },
+          "data": {
+            "title": "Data",
+            "description": "Payload; null when the call had no payload."
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id",
+            "description": "Correlation id for support and log lookup.",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ApiEnvelope",
+        "description": "The one and only response shape for ``/api/v1`` (§95)."
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Short-lived access token (spec §23)."
+      },
+      "IdempotencyKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Idempotency-Key",
+        "description": "Required on order creation. Replaying the same key with the same body returns the original result instead of creating a duplicate."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness and readiness probes."
+    },
+    {
+      "name": "auth",
+      "description": "Login, refresh rotation, logout, sessions."
+    },
+    {
+      "name": "users",
+      "description": "Account and address management."
+    },
+    {
+      "name": "catalog",
+      "description": "Products, SKUs, categories, brands, images."
+    },
+    {
+      "name": "inventory",
+      "description": "Stock levels, movements and adjustments."
+    },
+    {
+      "name": "cart",
+      "description": "Server-authoritative cart pricing preview."
+    },
+    {
+      "name": "orders",
+      "description": "Order preview, creation, lifecycle."
+    },
+    {
+      "name": "payments",
+      "description": "Payment intent, provider callbacks, mock pay."
+    },
+    {
+      "name": "fulfillments",
+      "description": "Packages, shipping and delivery."
+    },
+    {
+      "name": "after-sales",
+      "description": "After-sale claims and refunds."
+    },
+    {
+      "name": "marketing",
+      "description": "Promotions and coupons."
+    },
+    {
+      "name": "analytics",
+      "description": "Read-only business metrics."
+    },
+    {
+      "name": "knowledge",
+      "description": "Knowledge bases, ingestion and retrieval."
+    },
+    {
+      "name": "agent",
+      "description": "Agent threads, runs and SSE streaming."
+    },
+    {
+      "name": "governance",
+      "description": "Pending actions, tool registry, policies."
+    },
+    {
+      "name": "audit",
+      "description": "Append-only audit trail."
+    }
+  ]
+}

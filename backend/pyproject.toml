@@ -160,6 +160,25 @@ ignore = [
 "tests/**" = ["S", "ARG", "T20", "A"]
 "app/seeds/**" = ["T20", "S311"]
 "scripts/**" = ["T20"]
+# Raw SQL is legitimate inside the persistence primitives (health probes, DDL
+# helpers) - the banned-api message on `sqlalchemy.text` names this package as
+# the whitelisted home for it.
+"app/shared/db/**" = ["TID251"]
+# SQLAlchemy TypeDecorator dictates these signatures; `dialect` is part of the
+# interface even where the implementation does not branch on it.
+"app/shared/db/types.py" = ["TID251", "ARG002"]
+# Repositories are the single layer permitted to talk to the database.
+"app/**/repository.py" = ["TID251"]
+"app/**/repositories/*.py" = ["TID251"]
+# Health and capability probes must never raise, by definition: a probe that
+# can take down the endpoint it protects is worse than having no probe.
+"app/api/v1/health.py" = ["BLE001"]
+"app/shared/storage/factory.py" = ["BLE001"]
+"app/shared/vector_store.py" = ["BLE001"]
+"app/shared/db/session.py" = ["BLE001"]
+"app/shared/redis_client.py" = ["BLE001"]
+"app/shared/storage/backends/minio_backend.py" = ["BLE001"]
+"app/main.py" = ["BLE001"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "app.shared.db.session.SessionLocal".msg = "Import get_session()/session_scope() instead - never reach into the global session factory."

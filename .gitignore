@@ -84,3 +84,9 @@ artifacts/evidence/**/*.html
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ---------------------------------------------------------------------------
+# Agent-team runtime state. Coordination scratch between agent sessions, not
+# project source - it changes on every message and would flood the history.
+# ---------------------------------------------------------------------------
+.agent-teams/

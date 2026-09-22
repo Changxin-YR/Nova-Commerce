@@ -1,0 +1,269 @@
+# =============================================================================
+# Nexora Commerce V1 - infrastructure compose
+#
+# Verified against this host during Phase 0. Three findings are baked in:
+#
+#  1. Host port 3306 is already occupied by an unrelated native mysqld, so every
+#     service uses the collision-free block from PROJECT_BASELINE.yaml.
+#  2. MySQL 8.4 REMOVED the --default-authentication-plugin server variable.
+#     Passing it aborts startup with MY-000067, and a half-initialised data
+#     directory then fails with MY-013236. The flag is therefore absent, and
+#     charset/collation are set explicitly instead.
+#  3. docker.io/minio/minio is NOT pullable from this environment
+#     ("pull access denied"). MinIO is retained but sourced from its own
+#     registry: quay.io/minio/minio. See ADR-011.
+#
+# Observability is behind the `observability` profile so that spec section 128
+# holds: it is never a hard startup dependency.
+#
+# Usage:
+#   docker compose -f ops/docker-compose.yml --env-file .env up -d
+#   docker compose -f ops/docker-compose.yml --profile observability up -d
+# =============================================================================
+
+name: nexora
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 30s
+
+services:
+  # ---------------------------------------------------------------------------
+  # MySQL - CRITICAL (spec section 130). The inventory lock of section 27 and
+  # every mandatory concurrency gate (FG-09/11/12) require real MySQL.
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: nx-mysql
+    restart: unless-stopped
+    command:
+      # NOTE: do NOT add --default-authentication-plugin here (removed in 8.4).
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --innodb-flush-log-at-trx-commit=1
+      - --max-connections=200
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nexora}
+      MYSQL_USER: ${MYSQL_USER:-nexora}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      TZ: UTC
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - nx-mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      start_period: 60s
+    networks: [nexora-net]
+
+  # ---------------------------------------------------------------------------
+  # Redis - IMPORTANT. Backs cache, rate limiting, Celery, and the LangGraph
+  # checkpointer. Spec section 83 requires an explicit persistence strategy and
+  # a volume, because losing the checkpointer must not silently degrade into
+  # re-executing a business action.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: nx-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - noeviction
+      # noeviction is deliberate: silently evicting a pending-action or
+      # checkpointer key would be a correctness bug, not a cache miss.
+      - --save
+      - "60 1000"
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - nx-redis-data:/data
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "ping"]
+      start_period: 10s
+    networks: [nexora-net]
+
+  # ---------------------------------------------------------------------------
+  # Qdrant - DEGRADABLE. Powers hybrid retrieval only. Commerce traffic holds no
+  # Qdrant dependency, so its loss degrades RAG answers and nothing else
+  # (spec sections 60, 130).
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: nx-qdrant
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__LOG_LEVEL: INFO
+    ports:
+      - "${QDRANT_HTTP_PORT:-16333}:6333"
+      - "${QDRANT_GRPC_PORT:-16334}:6334"
+    volumes:
+      - nx-qdrant-data:/qdrant/storage
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The image ships no curl/wget, so the probe uses bash's /dev/tcp.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333' || exit 1"]
+      start_period: 20s
+    networks: [nexora-net]
+
+  # ---------------------------------------------------------------------------
+  # MinIO - DEGRADABLE. Object storage for product images, knowledge originals,
+  # reports and evidence (spec section 20).
+  #
+  # IMPORTANT: two endpoints are exposed on purpose. Server-side code talks to
+  # S3_ENDPOINT, while presigned URLs are minted against S3_PUBLIC_ENDPOINT,
+  # because a browser cannot resolve the compose-internal hostname `minio`.
+  # ---------------------------------------------------------------------------
+  minio:
+    image: quay.io/minio/minio:latest  # docker.io/minio/minio is unpullable - ADR-011
+    container_name: nx-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-http://localhost:19001}
+    ports:
+      - "${MINIO_API_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - nx-minio-data:/data
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "mc", "ready", "local"]
+      start_period: 15s
+    networks: [nexora-net]
+
+  # ---------------------------------------------------------------------------
+  # Keycloak - OAuth/OIDC provider (spec section 8).
+  #
+  # Why Keycloak and not a lighter alternative: spec section 8 prefers it for the
+  # demo, and Phase 0 verified the one thing that would have justified replacing
+  # it - the official MCP SDK expresses OAuth Resource Server semantics
+  # (issuer_url / resource_server_url / validate_token_resource / required_scopes)
+  # natively, so Keycloak only has to do standard OIDC. No deviation needed.
+  #
+  # Started with `start-dev` for the demo profile only; `start --optimized` with
+  # a pre-built image is the production path (documented in docs/DEPLOYMENT.md).
+  # ---------------------------------------------------------------------------
+  oauth-provider:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: nx-keycloak
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --http-port=8080
+      - --hostname-strict=false
+      - --http-enabled=true
+      - --import-realm
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+      KC_DB: dev-mem
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_LOG_LEVEL: INFO
+    ports:
+      - "${KEYCLOAK_PORT:-18080}:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Keycloak's management port is 9000 inside the image.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 || exit 1"]
+      start_period: 90s
+    networks: [nexora-net]
+
+  # ---------------------------------------------------------------------------
+  # Migration - a one-shot service (spec section 129). Schema changes are applied
+  # by exactly one process, never by an API instance at boot, so running several
+  # replicas cannot race each other on the same migration.
+  #
+  #   docker compose run --rm migrate
+  # ---------------------------------------------------------------------------
+  migrate:
+    build:
+      context: ..
+      dockerfile: ops/docker/Dockerfile.api
+    container_name: nx-migrate
+    profiles: ["tools"]
+    command: ["alembic", "upgrade", "head"]
+    env_file: ["../.env"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+    networks: [nexora-net]
+
+  # ---------------------------------------------------------------------------
+  # Optional observability profile (spec section 128). Never required to start
+  # the shop; enabling it points the API's OTLP exporter here.
+  # ---------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: nx-otel
+    profiles: ["observability"]
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel/otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-14317}:4317"
+      - "14318:4318"
+    networks: [nexora-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nx-prometheus
+    profiles: ["observability"]
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - nx-prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-19090}:9090"
+    networks: [nexora-net]
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nx-grafana
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-nexora}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - nx-grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-13000}:3000"
+    networks: [nexora-net]
+
+volumes:
+  nx-mysql-data:
+  nx-redis-data:
+  nx-qdrant-data:
+  nx-minio-data:
+  nx-prometheus-data:
+  nx-grafana-data:
+
+networks:
+  nexora-net:
+    driver: bridge
