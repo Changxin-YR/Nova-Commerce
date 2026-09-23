@@ -702,10 +702,21 @@ def purge_shop(created: dict[str, object], *, marker: str) -> None:
                 text("DELETE FROM user_roles WHERE role_id = :id"), {"id": created["role_id"]}
             )
             session.execute(text("DELETE FROM roles WHERE id = :id"), {"id": created["role_id"]})
-        if created.get("permission_id"):
-            session.execute(
-                text("DELETE FROM permissions WHERE id = :id"), {"id": created["permission_id"]}
-            )
+        # ``permissions`` is a GLOBAL vocabulary (``uq_permissions_code``), not
+        # fixture data, so it is deliberately NOT deleted here. Deleting it made the
+        # seed non-repeatable in two different ways, both measured:
+        #
+        #   * if the table was empty at seed time, the next run inserted a SECOND row
+        #     for the same code -> ``(1062, Duplicate entry 'order:read')``;
+        #   * if any ``role_permissions`` row still referenced it, the delete itself
+        #     failed -> ``(1452, Cannot add or update a child row)``.
+        #
+        # Either way the NEXT run's fixture failed, so the symptom looked random - it
+        # depended on how many roles happened to reference the permission at that
+        # moment - and it hit every suite using the seed rather than only the one that
+        # ran first. A global vocabulary row created on demand and never removed is
+        # the same choice the catalog and identity fixtures already make for their
+        # lookup rows.
         for key in ("consumer_id", "staff_id"):
             if created.get(key):
                 session.execute(text("DELETE FROM users WHERE id = :id"), {"id": created[key]})
