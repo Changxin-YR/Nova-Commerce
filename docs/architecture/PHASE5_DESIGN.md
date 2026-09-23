@@ -641,6 +641,29 @@ Every one cost a turn to disprove, and the disproof always had the same shape:
 "this passes on HEAD". Include `git rev-parse --short HEAD` in the report. If the
 report says an older commit, the first response is to re-run at HEAD.
 
+### 13.2a The prophylaxis, because five reports were filed against one stale snapshot
+
+Five separate reports were filed against the same pre-`a785744` state - two of them
+about a `NameError` that had been removed before that commit, one claiming an
+`ImportError` for a file that had been tracked for hours, one claiming `alembic`
+failed outright while it was clean, and one claiming tests were skipped for missing
+tables while all seven existed and `0 skipped`.
+
+Worse than the wasted turns: **the reports began contradicting each other**, which
+means that in that window nobody could tell a real defect from an observer's stale
+cache - and FG-11/FG-12 readings taken in such a window could pass or fail on the
+observer's state rather than on the code.
+
+So before filing a defect, run these three and paste the output into the report:
+
+    git rev-parse --short HEAD
+    git status --short <the path you are reporting on>
+    ..\.venv\Scripts\python.exe -m alembic current
+
+A stale `.pyc` and a stale editor buffer are the two plausible causes. If the file on
+disk disagrees with `git ls-files` in the same repo, that is a working-tree divergence
+and is worth escalating loudly rather than explaining away as a cache.
+
 ### 13.3 Re-run at HEAD before escalating
 
 Before telling another owner their file is broken: re-run your repro at HEAD. If it
