@@ -589,3 +589,58 @@ the page is unnecessary.** Five gaps were found this way; none was found by revi
 Phase 4 notes: promotion lifecycle (DRAFT/ACTIVE/ENDED) and the `AgentRun` /
 `PendingAction` shapes are still assumptions, marked in code and in
 `frontend/REDESIGN_STATUS.md`. Freezing them is Phase 6 and Phase 10/13 work.
+
+---
+
+## 14. Handoff addendum — Phase 8 closed (frontend)
+
+Ten console views done, 292 frontend tests, four gates green. The frontend owner also
+wrote a standalone handoff into `frontend/REDESIGN_STATUS.md` — **a frontend successor
+should read that first and this file second.**
+
+### 14.1 A live duplication trap — fix it in ONE commit
+
+`frontend/src/api/marketing.ts` still holds a **locally invented `Promotion`**
+(`type` / `rule: Record<string, unknown>` / `start_at` / `end_at`) that now **coexists**
+with the real frozen `Promotion` from contract section 13.2. `MarketingView.vue` reads
+the old field names, so it looks up `type` where the server sends `promotion_type`.
+
+**This is the exact defect this codebase already cleared once for `Order`** — two shapes
+for one resource. Delete the invented type and migrate the view **in the same commit**:
+leaving both in place for even one commit is how the second shape becomes load-bearing.
+
+### 14.2 What the frontend validation actually covers
+
+**Types and API-module mocks only. No end-to-end evidence exists anywhere in the
+frontend.** The twelve `app/modules/*` backends are incomplete, so against a real server
+every list currently renders Empty or Error. Stated plainly because "292 tests pass" and
+"the UI works" are different claims, and only the first has been demonstrated.
+
+Playwright still covers only the five t1 specs — none of AfterSales, Knowledge,
+Marketing, System or AiWorkspace has been touched by an e2e test.
+
+### 14.3 A cheap audit that found a frozen endpoint with no caller
+
+`POST /agent/runs/<run_id>/cancel` was frozen by section 4 and **had no call site
+anywhere**. It surfaced by auditing `src/api` exports against every view and store
+reference. A missing caller produces no error, no warning and no test failure — exactly
+like the missing marketing publish path before it.
+
+**Run that audit again after each module lands.** It is the cheapest known way to find
+"frozen but unreachable". Six more are currently unwired and listed in
+`frontend/REDESIGN_STATUS.md`.
+
+### 14.4 The four "looks right but is wrong" defects
+
+None of these was catchable by a build:
+
+1. Nested `snapshot.{items_amount,...}` where the contract sends flat fields.
+2. `order.status` is `undefined`, so every `includes()` returns false and the console
+   **silently hides every action** — no exception, no test failure.
+3. `SalesTrend.money: boolean` made the unit of a number a guess.
+4. A client-derived `refundable_amount` where `undefined > 0` is `false`, which would
+   have silently disabled **every refund control**.
+
+The common shape: **a wrong field name reads as `undefined`, and `undefined` fails quietly
+in exactly the direction that hides capability.** That is why the contract now carries
+shapes rather than only paths.
