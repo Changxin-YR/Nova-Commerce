@@ -1,4 +1,4 @@
-﻿"""Test-residue report and sweep - read-only unless you ask otherwise.
+"""Test-residue report and sweep - read-only unless you ask otherwise.
 
 Design section 13.5. Run this **before** a measurement and paste its first line into the
 evidence: a test count is only meaningful together with the state of the database it was
@@ -20,7 +20,11 @@ from __future__ import annotations
 import argparse
 import sys
 
-from tests.integration.commerce.residue import purge_test_residue, report_residue
+from tests.integration.commerce.residue import (
+    purge_orphaned_fixture_callbacks,
+    purge_test_residue,
+    report_residue,
+)
 
 from app.core.config import get_settings
 from app.shared.db.session import configure_database, get_session_factory
@@ -37,6 +41,11 @@ def main(argv: list[str] | None = None) -> int:
         "--yes",
         action="store_true",
         help="skip the confirmation prompt for --purge",
+    )
+    parser.add_argument(
+        "--purge-orphans",
+        action="store_true",
+        help="also delete fixture-shaped callbacks whose order no longer exists",
     )
     args = parser.parse_args(argv)
 
@@ -71,6 +80,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
 
         purge_test_residue(session, dry_run=False)
+        if args.purge_orphans:
+            removed = purge_orphaned_fixture_callbacks(session, dry_run=False)
+            print(f"removed {removed} orphaned fixture callback(s)")
         after = report_residue(session)
         print("\nafter purge:")
         print(after.render())

@@ -85,6 +85,10 @@ class ResidueReport:
     #: they are inert because each run generates a fresh random marker and therefore
     #: never reuses a leftover event id.
     unattributable_callbacks: int = 0
+    #: Event-id-shaped callbacks whose named order no longer exists - pre-existing
+    #: accumulation reachable only by the explicit opt-in sweep, never by a
+    #: marker-scoped purge, because their markers are gone.
+    orphaned_callbacks: int = 0
 
     @property
     def total_residue(self) -> int:
@@ -96,11 +100,14 @@ class ResidueReport:
 
     def line(self) -> str:
         """One line, for embedding in a measurement record."""
-        extra = (
-            f"; unattributable event-shaped callbacks: {self.unattributable_callbacks} (inert)"
-            if self.unattributable_callbacks
-            else ""
-        )
+        bits = []
+        if self.unattributable_callbacks:
+            bits.append(
+                f"unattributable event-shaped callbacks: {self.unattributable_callbacks} (inert)"
+            )
+        if self.orphaned_callbacks:
+            bits.append(f"orphaned fixture callbacks (order gone): {self.orphaned_callbacks}")
+        extra = ("; " + "; ".join(bits)) if bits else ""
         if self.is_clean:
             return f"residue: 0 (no rows attributable to a fixture marker){extra}"
         parts = ", ".join(f"{t}={n}" for t, n in sorted(self.counts.items()))
@@ -177,11 +184,36 @@ def _scoped_ids(session: Session, merchant_ids: list[int], user_ids: list[int]) 
     return ids
 
 
+def _orphaned_callback_rows(session: Session) -> list[tuple[str, str]]:
+    """Fixture-shaped callbacks whose named order no longer exists."""
+    rows = list(
+        session.execute(
+            select(PaymentCallback.provider_event_id, PaymentCallback.order_no).where(
+                or_(*[PaymentCallback.provider_event_id.like(pat) for pat in _EVENT_ID_PATTERNS]),
+                PaymentCallback.order_no.is_not(None),
+            )
+        ).all()
+    )
+    if not rows:
+        return []
+    named = {str(r[1]) for r in rows}
+    live = {
+        str(r[0])
+        for r in session.execute(select(Order.order_no).where(Order.order_no.in_(named))).all()
+    }
+    return [(str(r[0]), str(r[1])) for r in rows if str(r[1]) not in live]
+
+
+def _count_orphaned_callbacks(session: Session) -> int:
+    return len(_orphaned_callback_rows(session))
+
+
 def report_residue(session: Session) -> ResidueReport:
     """Count residue. Read-only - safe to call against any database."""
     report = ResidueReport()
     report.merchants, report.users = _roots(session)
     if not report.merchants and not report.users:
+        report.orphaned_callbacks = _count_orphaned_callbacks(session)
         return report
 
     merchant_ids = [mid for mid, _ in report.merchants]
@@ -251,6 +283,13 @@ def report_residue(session: Session) -> ResidueReport:
             IdempotencyRecord,
             or_(*[IdempotencyRecord.idempotency_key.like(p) for p in patterns]),
         )
+
+    # Orphaned fixture callbacks: event-id shaped, and the order they name no longer
+    # exists. This is the accumulation `purge_shop` could not reach while its LIKE
+    # pattern failed to match its own event ids, so their markers are long gone and no
+    # live fixture can attribute them. Counted separately, and swept only on request.
+    if _orphaned_callback_rows(session):
+        report.orphaned_callbacks = len(_orphaned_callback_rows(session))
 
     report.counts = {k: v for k, v in report.counts.items() if v}
     return report
@@ -350,3 +389,46 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
 
     session.commit()
     return report
+
+
+def purge_orphaned_fixture_callbacks(session: Session, *, dry_run: bool = True) -> int:
+    """Delete fixture-shaped callbacks whose named order no longer exists.
+
+    Deliberately **separate** from :func:`purge_test_residue`, and opt-in, because its
+    attribution is weaker: it relies on the order being gone rather than on a live marker.
+
+    Two conditions must hold together - the event id has a fixture shape, **and** the row's
+    ``order_no`` matches no ``orders`` row.
+
+    Why that is safe enough to offer: a ``payment_callbacks`` row is *kept* when its
+    delivery cannot be resolved (design 5.2, which is why ``order_no`` may be NULL), so
+    absence of a payment proves nothing and is deliberately not part of the test. Absence
+    of the **order** is the stronger signal - these rows were left by test runs whose whole
+    fixture graph has been tidied, and an incident review reading them would otherwise be
+    reading test fixtures instead of real deliveries.
+
+    Returns the number of rows deleted.
+    """
+    report = report_residue(session)
+    if dry_run or report.orphaned_callbacks == 0:
+        return 0
+
+    rows = list(
+        session.execute(
+            select(PaymentCallback.provider_event_id, PaymentCallback.order_no).where(
+                or_(*[PaymentCallback.provider_event_id.like(pat) for pat in _EVENT_ID_PATTERNS]),
+                PaymentCallback.order_no.is_not(None),
+            )
+        ).all()
+    )
+    named = {str(r[1]) for r in rows}
+    live = {
+        str(r[0])
+        for r in session.execute(select(Order.order_no).where(Order.order_no.in_(named))).all()
+    }
+    doomed = [str(r[0]) for r in rows if str(r[1]) not in live]
+    if not doomed:
+        return 0
+    session.execute(delete(PaymentCallback).where(PaymentCallback.provider_event_id.in_(doomed)))
+    session.commit()
+    return len(doomed)
