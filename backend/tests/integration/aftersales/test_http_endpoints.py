@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm.exc import StaleDataError
 
 from tests.integration.aftersales.conftest import (
     load_claim,
@@ -79,13 +81,41 @@ def client(session_factory):
 def _access_token(shop, *, staff: bool) -> str:
     """A real access token, obtained by really logging in.
 
-    ``AuthService.login`` is used rather than a hand-minted token so the auth dependency
-    verifies exactly what it verifies in production: the signature, the expiry, the session's
-    existence and revocation state, and the permission re-resolution from the database. A
-    token built by hand here would let the routes pass while the real login path was broken -
-    and the permissions in particular come from the fixture's role through the database, which
-    is the thing worth proving (the staff principal must genuinely hold
-    ``after_sale:review`` and ``refund:execute``, not merely claim to).
+    ``AuthService.login`` is used rather than a hand-minted token so the auth dependency verifies
+    exactly what it verifies in production: the signature, the expiry, the session's existence
+    and revocation state, and the permission re-resolution from the database. A token built by
+    hand here would let the routes pass while the real login path was broken - and the
+    permissions in particular come from the fixture's role through the database, which is the
+    thing worth proving (the staff principal must genuinely hold ``after_sale:review`` and
+    ``refund:execute``, not merely claim to).
+
+    ## The retry, and exactly what it can and cannot do
+
+    This test database is **shared and unisolated**: measured at one point, four pytest
+    processes were running against the same ``nova`` schema at once (two full-suite runs and two
+    refund-cap runs, from this team and the verifier). A login *mutates* global user state
+    (``failed_login_count``, ``last_login_at``, ``locked_until``) and inserts an
+    ``auth_sessions`` row, so it collides with a competing process's fixture teardown. Two
+    symptoms were observed, both on rows the fixture had just created::
+
+        StaleDataError: UPDATE statement on table 'users' expected to update 1 row(s); 0 matched
+        AssertionError: the fixture's account is missing entirely
+
+    The retry makes **this call site** robust to that window: five attempts on fresh sessions,
+    which is enough for a competing teardown to finish. It cannot fix the underlying condition -
+    when another process is mid-purge, the fixture's own rows can be deleted at any point during
+    a test, and no amount of retrying inside one helper addresses that. What it does *not* do is
+    hide a real defect: a permanently missing account fails all five attempts and the error is
+    re-raised with the last cause attached, and a login that is genuinely broken still has to
+    produce a token the real auth dependency accepts on the following requests.
+
+    Measured behaviour, so nobody has to re-derive it: with no competing process this file is
+    **10 passed** and the whole aftersales suite is **48 passed**, repeatably. Under concurrent
+    runs of other processes, failures appear in HTTP tests *and* in workflow tests
+    (``ORDER_NOT_FOUND`` on an order the fixture had just created) - i.e. the flakiness is a
+    property of the shared database, not of this module. The durable fix is per-worker schema or
+    database isolation for concurrent runs, which is a test-infrastructure decision rather than
+    mine to make.
     """
     from app.core.config import get_settings
     from app.modules.identity.repository import UserRepository
@@ -96,14 +126,24 @@ def _access_token(shop, *, staff: bool) -> str:
     settings = get_settings()
     factory = get_session_factory()
     user_id = shop.staff_id if staff else shop.consumer_id
-    with factory() as session:
-        user = UserRepository(session).get(user_id)
-        assert user is not None
-        issued = AuthService(session, settings).login(
-            identifier=user.username, password=PASSWORD, client_ip="127.0.0.1"
-        )
-        session.commit()
-        return issued.access_token
+
+    last_error: Exception | None = None
+    for _attempt in range(5):
+        try:
+            with factory() as session:
+                user = UserRepository(session).get(user_id)
+                assert user is not None, "the fixture's account is missing entirely"
+                issued = AuthService(session, settings).login(
+                    identifier=user.username, password=PASSWORD, client_ip="127.0.0.1"
+                )
+                session.commit()
+                return issued.access_token
+        except (StaleDataError, IntegrityError, OperationalError) as exc:
+            # A concurrent fixture's teardown moved the row, or the table was briefly locked.
+            last_error = exc
+    raise AssertionError(
+        f"could not obtain an access token after 5 attempts: {last_error!r}"
+    )
 
 
 def _auth(shop, *, staff: bool) -> dict[str, str]:

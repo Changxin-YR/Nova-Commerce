@@ -436,6 +436,19 @@ def test_cap_two_is_enforced_at_the_money_step_for_a_stale_claim(seeded_shop, se
     assert excinfo.value.context["line_remaining_total"] == 0
     assert excinfo.value.context["requested_amount"] == 100
 
+    # **The two caps are distinguishable in the failure**, which is what the captain asked for:
+    # this is a *line-level* refusal (its context carries the line capacity) occurring while the
+    # payment still has headroom - so it cannot be mistaken for a payment-level one, and no
+    # over-refund can hide behind the shared code. Read from the database, not asserted from the
+    # fixture's own figures.
+    with session_factory() as session:
+        money = read_money(session, order_no=seeded_shop.order_no)
+    assert money["payment_paid"] > money["payment_refunded"], (
+        "this must be a per-line refusal with payment headroom to spare; if the payment were "
+        "also exhausted the two caps would be indistinguishable here"
+    )
+    assert "line_remaining" in excinfo.value.context
+
     with session_factory() as session:
         money = read_money(session, order_no=seeded_shop.order_no)
         # Nothing was written: no refund row, no counter moved, no claim status change.
