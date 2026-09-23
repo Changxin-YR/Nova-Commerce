@@ -15,11 +15,13 @@ import {
   validateRefundAmount,
 } from '@/domain/afterSales/availability'
 import {
+  asInventoryRow,
   canAdjustInventory,
   isLowStock,
   isOverReserved,
   sellableQuantity,
   validateAdjustment,
+  type InventoryRowLike,
 } from '@/domain/inventory/availability'
 import {
   canDecidePendingAction,
@@ -31,6 +33,7 @@ import type {
   AfterSaleStatus,
   PendingActionStatus,
 } from '@/types/domain'
+import type { Inventory } from '@/types/frozen-contract'
 
 function afterSale(overrides: {
   status: AfterSaleStatus
@@ -135,38 +138,88 @@ describe('validateRefundAmount — rejects before the server has to', () => {
 })
 
 describe('inventory adjustment', () => {
+  /**
+   * Row builder for the FROZEN inventory shape (API_CONTRACT.md §7).
+   *
+   * `sellable_qty` is server-computed and deliberately INDEPENDENT of `on_hand_qty - locked_qty`
+   * in these fixtures, so the tests fail if any predicate starts recomputing it.
+   */
+  function row(overrides: Partial<InventoryRowLike> = {}): InventoryRowLike {
+    return { on_hand_qty: 10, locked_qty: 0, sellable_qty: 10, version: 1, ...overrides }
+  }
+
   it('requires a usable optimistic-lock version', () => {
-    expect(canAdjustInventory({ on_hand: 10, reserved: 0, version: 0 })).toBe(true)
-    expect(canAdjustInventory({ on_hand: 10, reserved: 0, version: 7 })).toBe(true)
-    expect(canAdjustInventory({ on_hand: 10, reserved: 0, version: null })).toBe(false)
-    expect(canAdjustInventory({ on_hand: 10, reserved: 0 })).toBe(false)
-    expect(canAdjustInventory({ on_hand: 10, reserved: 0, version: 1.5 })).toBe(false)
-    expect(canAdjustInventory({ on_hand: 10, reserved: 0, version: -1 })).toBe(false)
+    expect(canAdjustInventory(row({ version: 0 }))).toBe(true)
+    expect(canAdjustInventory(row({ version: 7 }))).toBe(true)
+    expect(canAdjustInventory(row({ version: null }))).toBe(false)
+    expect(canAdjustInventory(row({ version: undefined }))).toBe(false)
+    expect(canAdjustInventory(row({ version: 1.5 }))).toBe(false)
+    expect(canAdjustInventory(row({ version: -1 }))).toBe(false)
   })
 
-  it('computes sellable stock as on-hand minus reservations', () => {
-    expect(sellableQuantity({ on_hand: 100, reserved: 30 })).toBe(70)
-    expect(sellableQuantity({ on_hand: 10, reserved: 0 })).toBe(10)
+  it('reads sellable stock from the SERVER field and never recomputes it', () => {
+    // The whole point of the migration: the server's number is the number.
+    expect(sellableQuantity(row({ on_hand_qty: 100, locked_qty: 30, sellable_qty: 70 }))).toBe(70)
+    // Now the case that a client-side `on_hand - locked` would get WRONG: a safety stock of 60
+    // is already deducted on the wire, so recomputing would claim 70 sellable units the server
+    // would refuse to sell.
+    expect(sellableQuantity(row({ on_hand_qty: 100, locked_qty: 30, sellable_qty: 10 }))).toBe(10)
+    // A negative sellable (over-reserved and safety-stock-limited) is reported, not clamped away.
+    expect(sellableQuantity(row({ on_hand_qty: 5, locked_qty: 9, sellable_qty: 0 }))).toBe(0)
   })
 
   it('flags over-reserved rows, which are an integrity problem not a display quirk', () => {
-    expect(isOverReserved({ on_hand: 10, reserved: 12 })).toBe(true)
-    expect(isOverReserved({ on_hand: 10, reserved: 10 })).toBe(false)
+    expect(isOverReserved(row({ on_hand_qty: 10, locked_qty: 12 }))).toBe(true)
+    expect(isOverReserved(row({ on_hand_qty: 10, locked_qty: 10 }))).toBe(false)
   })
 
   it('flags low stock by sellable quantity, not raw on-hand', () => {
-    // 100 on hand but 95 reserved leaves 5 sellable, which is low.
-    expect(isLowStock({ on_hand: 100, reserved: 95 }, 10)).toBe(true)
-    expect(isLowStock({ on_hand: 100, reserved: 50 }, 10)).toBe(false)
+    // 100 on hand but the server reports only 5 sellable, which is low.
+    expect(isLowStock(row({ on_hand_qty: 100, locked_qty: 95, sellable_qty: 5 }), 10)).toBe(true)
+    expect(isLowStock(row({ on_hand_qty: 100, locked_qty: 50, sellable_qty: 50 }), 10)).toBe(false)
+    // Boundary: exactly at the threshold counts as low.
+    expect(isLowStock(row({ sellable_qty: 10 }), 10)).toBe(true)
   })
 
   it('rejects a no-op or negative-resulting adjustment', () => {
-    expect(validateAdjustment({ on_hand: 10, reserved: 2 }, 5)).toBeNull()
-    expect(validateAdjustment({ on_hand: 10, reserved: 2 }, -5)).toBeNull()
-    expect(validateAdjustment({ on_hand: 10, reserved: 2 }, 0)).toContain('不能为 0')
-    expect(validateAdjustment({ on_hand: 10, reserved: 2 }, 1.5)).toContain('整数')
+    expect(validateAdjustment(row({ sellable_qty: 8 }), 5)).toBeNull()
+    expect(validateAdjustment(row({ sellable_qty: 8 }), -8)).toBeNull()
+    expect(validateAdjustment(row({ sellable_qty: 8 }), 0)).toContain('不能为 0')
+    expect(validateAdjustment(row({ sellable_qty: 8 }), 1.5)).toContain('整数')
     // sellable is 8, so -9 would go negative.
-    expect(validateAdjustment({ on_hand: 10, reserved: 2 }, -9)).toContain('不能为负')
+    expect(validateAdjustment(row({ sellable_qty: 8 }), -9)).toContain('不能为负')
+  })
+
+  it('validates against the server number, not on_hand_qty - locked_qty', () => {
+    // `on_hand_qty - locked_qty` here is 70, but only 10 units are actually sellable. A
+    // recomputing implementation would allow -30 and let the operator drive stock negative.
+    const constrained = row({ on_hand_qty: 100, locked_qty: 30, sellable_qty: 10 })
+    expect(validateAdjustment(constrained, -30)).toContain('不能为负')
+    expect(validateAdjustment(constrained, -10)).toBeNull()
+  })
+
+  it('narrows a frozen Inventory row without inventing fields', () => {
+    const inventory: Inventory = {
+      id: 11,
+      warehouse_id: 1,
+      sku_id: 3,
+      sku_no: 'NV-SKU-0003',
+      product_name: 'Nova Phone 15 Pro',
+      sku_name: '原色钛金属 256GB',
+      available_qty: 42,
+      locked_qty: 3,
+      safety_stock: 0,
+      sellable_qty: 42,
+      on_hand_qty: 45,
+      version: 7,
+      updated_at: '2026-09-22T23:31:07.507Z',
+    }
+    expect(asInventoryRow(inventory)).toEqual({
+      on_hand_qty: 45,
+      locked_qty: 3,
+      sellable_qty: 42,
+      version: 7,
+    })
   })
 })
 
