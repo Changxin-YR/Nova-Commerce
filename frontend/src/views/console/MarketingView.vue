@@ -21,9 +21,15 @@
  * answers `PROMOTION_CONFLICT` (90001) / `COUPON_ALREADY_LOCKED` (90008).
  */
 import { computed, reactive, ref } from 'vue'
-import { marketingAdminApi, type CouponPreviewResult } from '@/api'
+import {
+  marketingAdminApi,
+  type CouponPreviewResult,
+  type PromotionDraft,
+  type PromotionPreview,
+} from '@/api'
 
 import { useAsyncState } from '@/composables/useAsyncState'
+import type { PromotionType } from '@/types/frozen-contract'
 import {
   canPublishPromotion,
   canUnpublishPromotion,
@@ -226,6 +232,177 @@ function stamp(iso: string): string {
 
 /** Template hint: shows the minor-unit convention instead of a bare example. */
 const sampleDiscount = toMajorString(1000)
+
+const PROMOTION_TYPE_LABELS: Record<PromotionType, string> = {
+  DIRECT_DISCOUNT: '直降',
+  PERCENT_DISCOUNT: '折扣',
+  FULL_REDUCTION: '满减',
+}
+
+/* -- promotion creation: preview -> confirm (§47, §13.2) -------------------- */
+
+const promoFormOpen = ref(false)
+const promoStep = ref<'form' | 'preview'>('form')
+const promoBusy = ref(false)
+/** The SERVER's preview, including the `preview_token` the create call must echo. */
+const promoPreview = ref<PromotionPreview | null>(null)
+
+const promoForm = reactive({
+  name: '',
+  description: '',
+  promotionType: 'FULL_REDUCTION' as PromotionType,
+  priority: 100,
+  stackable: false,
+  totalQuota: 1000,
+  startsAt: '',
+  endsAt: '',
+  // DIRECT_DISCOUNT
+  discountYuan: '',
+  // PERCENT_DISCOUNT (basis points — never a float, §13.1)
+  discountBps: '',
+  // FULL_REDUCTION
+  thresholdYuan: '',
+  reductionYuan: '',
+  // shared cap
+  maxDiscountYuan: '',
+  // scope is EXPLICIT: `all_products: true` rather than "empty arrays means everything"
+  allProducts: true,
+  productIds: '',
+  brandIds: '',
+})
+
+/** Split a comma-separated id list, ignoring blanks. */
+function parseIds(raw: string): number[] {
+  return raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((value) => Number.isInteger(value) && value > 0)
+}
+
+/**
+ * The exact body the create call would send, assembled once so the preview and the submit cannot
+ * diverge. `rule_config` is built as the DISCRIMINATED variant the chosen `promotion_type` implies,
+ * because §13.1 defines one variant per type rather than a bag of nullable keys.
+ */
+const promotionDraft = computed<PromotionDraft | null>(() => {
+  const maxDiscountAmountMinor = promoForm.maxDiscountYuan ? fromMajorString(promoForm.maxDiscountYuan) : null
+
+  let rule_config: PromotionDraft['rule_config'] | null = null
+  if (promoForm.promotionType === 'DIRECT_DISCOUNT') {
+    const amount = fromMajorString(promoForm.discountYuan)
+    if (amount !== null) rule_config = { discount_amount: amount }
+  } else if (promoForm.promotionType === 'PERCENT_DISCOUNT') {
+    const bps = Number(promoForm.discountBps.trim())
+    // BASIS POINTS, not a percentage or a float: 12.5% is exactly 1250.
+    if (Number.isInteger(bps) && bps > 0) {
+      rule_config = { discount_bps: bps, max_discount_amount: maxDiscountAmountMinor }
+    }
+  } else {
+    const threshold = fromMajorString(promoForm.thresholdYuan)
+    const reduction = fromMajorString(promoForm.reductionYuan)
+    if (threshold !== null && reduction !== null) {
+      rule_config = {
+        threshold_amount: threshold,
+        reduction_amount: reduction,
+        max_discount_amount: maxDiscountAmountMinor,
+      }
+    }
+  }
+
+  if (!rule_config) return null
+  if (!promoForm.name.trim() || !promoForm.startsAt || !promoForm.endsAt) return null
+
+  return {
+    name: promoForm.name.trim(),
+    description: promoForm.description.trim() || undefined,
+    promotion_type: promoForm.promotionType,
+    priority: Number(promoForm.priority) || 0,
+    stackable: promoForm.stackable,
+    rule_config,
+    scope: {
+      all_products: promoForm.allProducts,
+      product_ids: promoForm.allProducts ? [] : parseIds(promoForm.productIds),
+      category_ids: [],
+      brand_ids: promoForm.allProducts ? [] : parseIds(promoForm.brandIds),
+    },
+    starts_at: new Date(promoForm.startsAt).toISOString(),
+    ends_at: new Date(promoForm.endsAt).toISOString(),
+    total_quota: Number(promoForm.totalQuota) || 0,
+  }
+})
+
+const promoProblem = computed(() => {
+  if (!promoForm.name.trim()) return '请填写活动名称'
+  if (!promoForm.startsAt) return '请选择开始时间'
+  if (!promoForm.endsAt) return '请选择结束时间'
+  if (new Date(promoForm.endsAt) <= new Date(promoForm.startsAt)) return '结束时间必须晚于开始时间'
+  if (promoForm.allProducts) return null
+  if (parseIds(promoForm.productIds).length === 0 && parseIds(promoForm.brandIds).length === 0) {
+    return '未勾选全场时，至少填写一个商品或品牌范围'
+  }
+  return null
+})
+
+function openPromoForm(): void {
+  promoFormOpen.value = !promoFormOpen.value
+  promoStep.value = 'form'
+  promoPreview.value = null
+}
+
+/** Step 1 of 2: previews on the server. NEVER writes. */
+async function previewPromotion(): Promise<void> {
+  const payload = promotionDraft.value
+  if (!payload || promoProblem.value) {
+    notifications.warning('请先修正表单', promoProblem.value ?? '表单不完整')
+    return
+  }
+  promoBusy.value = true
+  try {
+    promoPreview.value = await marketingAdminApi.previewPromotion(payload)
+    promoStep.value = 'preview'
+  } catch (e) {
+    const normalized = normalizeError(e)
+    notifications.error('预览失败', normalized.message, normalized.code, normalized.traceId)
+  } finally {
+    promoBusy.value = false
+  }
+}
+
+function backToPromoForm(): void {
+  promoStep.value = 'form'
+  // Editing invalidates the approval: the token covers the values the operator SAW.
+  promoPreview.value = null
+}
+
+/** Step 2 of 2: the ONLY place a promotion is written. */
+async function confirmCreatePromotion(): Promise<void> {
+  const payload = promotionDraft.value
+  const token = promoPreview.value?.preview_token
+  if (!payload || !token) {
+    notifications.warning('请先预览', '创建需要预览返回的 token，确保写入内容与审核内容一致')
+    promoStep.value = 'form'
+    return
+  }
+  promoBusy.value = true
+  try {
+    await marketingAdminApi.createPromotion({ ...payload, preview_token: token })
+    notifications.success('促销活动已创建')
+    promoFormOpen.value = false
+    promoStep.value = 'form'
+    promoPreview.value = null
+    await loadPromotions()
+  } catch (e) {
+    const normalized = normalizeError(e)
+    if (normalized.code === 90_003) {
+      notifications.warning('需要重新预览', '服务端要求携带有效的预览 token，请重新预览后提交。')
+      promoStep.value = 'form'
+    } else {
+      notifications.error('创建失败', normalized.message, normalized.code, normalized.traceId)
+    }
+  } finally {
+    promoBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -378,9 +555,160 @@ const sampleDiscount = toMajorString(1000)
 
       <!-- ============ promotions ============ -->
       <template v-else>
-        <p class="nx-muted marketing__hint marketing__hint--block">
-          活动创建需要先预览（§47），但预览与创建端点均未冻结，故此页只提供状态流转，不提供创建表单。
-        </p>
+        <div class="marketing__toolbar">
+          <button type="button" class="nx-btn nx-btn--primary nx-btn--sm" @click="openPromoForm()">
+            {{ promoFormOpen ? '收起' : '新建促销活动' }}
+          </button>
+          <span class="nx-muted">创建需先预览（§47）：预览结果含 preview_token，确认后才写入。</span>
+        </div>
+
+        <div v-if="promoFormOpen" class="marketing__form nx-block">
+          <div class="nx-block__head">
+            <h3 class="nx-block__title">
+              {{ promoStep === 'form' ? '新建促销活动' : '确认提交（服务端预览）' }}
+            </h3>
+          </div>
+          <div class="nx-block__body">
+            <template v-if="promoStep === 'form'">
+              <div class="marketing__fields">
+                <label>
+                  活动名称
+                  <input v-model="promoForm.name" class="nx-input" maxlength="60" />
+                </label>
+                <label>
+                  促销类型
+                  <select v-model="promoForm.promotionType" class="nx-input">
+                    <option value="FULL_REDUCTION">满减</option>
+                    <option value="DIRECT_DISCOUNT">直降</option>
+                    <option value="PERCENT_DISCOUNT">折扣</option>
+                  </select>
+                </label>
+                <label>
+                  开始时间
+                  <input v-model="promoForm.startsAt" class="nx-input" type="datetime-local" />
+                </label>
+                <label>
+                  结束时间
+                  <input v-model="promoForm.endsAt" class="nx-input" type="datetime-local" />
+                </label>
+                <label>
+                  优先级
+                  <input v-model.number="promoForm.priority" class="nx-input" type="number" min="0" />
+                </label>
+                <label>
+                  总名额
+                  <input v-model.number="promoForm.totalQuota" class="nx-input" type="number" min="0" />
+                </label>
+
+                <!--
+                  `rule_config` is DISCRIMINATED by promotion_type (§13.1): the fields shown depend on
+                  the type, because the server defines one variant per type rather than a bag of
+                  nullable keys.
+                -->
+                <template v-if="promoForm.promotionType === 'FULL_REDUCTION'">
+                  <label>
+                    门槛（元）
+                    <input v-model="promoForm.thresholdYuan" class="nx-input" inputmode="decimal" />
+                  </label>
+                  <label>
+                    减免（元）
+                    <input v-model="promoForm.reductionYuan" class="nx-input" inputmode="decimal" />
+                  </label>
+                </template>
+                <label v-else-if="promoForm.promotionType === 'DIRECT_DISCOUNT'">
+                  直降（元/件）
+                  <input v-model="promoForm.discountYuan" class="nx-input" inputmode="decimal" />
+                </label>
+                <label v-else>
+                  折扣（基点 bps，1250 = 12.5%）
+                  <input v-model="promoForm.discountBps" class="nx-input" inputmode="numeric" />
+                </label>
+
+                <label>
+                  折扣上限（元，可空）
+                  <input v-model="promoForm.maxDiscountYuan" class="nx-input" inputmode="decimal" />
+                </label>
+                <label>
+                  冲突时是否叠加
+                  <input v-model="promoForm.stackable" type="checkbox" />
+                </label>
+              </div>
+
+              <!--
+                `scope` is EXPLICIT rather than inferred from empty arrays (§13.1): "no scope means
+                everything" is how a promotion accidentally covers the whole catalogue.
+              -->
+              <div class="marketing__scope">
+                <label>
+                  <input v-model="promoForm.allProducts" type="checkbox" />
+                  全场商品
+                </label>
+                <template v-if="!promoForm.allProducts">
+                  <label>
+                    商品 ID（逗号分隔）
+                    <input v-model="promoForm.productIds" class="nx-input" placeholder="3,7,11" />
+                  </label>
+                  <label>
+                    品牌 ID（逗号分隔）
+                    <input v-model="promoForm.brandIds" class="nx-input" placeholder="2" />
+                  </label>
+                </template>
+              </div>
+
+              <p v-if="promoProblem" class="marketing__problem">{{ promoProblem }}</p>
+              <div class="marketing__actions">
+                <button type="button" class="nx-btn nx-btn--primary nx-btn--sm" :disabled="promoBusy" @click="previewPromotion()">
+                  {{ promoBusy ? '预览中…' : '预览' }}
+                </button>
+              </div>
+            </template>
+
+            <template v-else>
+              <p class="nx-muted marketing__hint">
+                以下为服务端预览结果（含 preview_token），确认前不会写入。
+              </p>
+              <dl v-if="promoPreview" class="marketing__preview">
+                <div><dt>令牌</dt><dd><code>{{ promoPreview.preview_token }}</code></dd></div>
+                <div><dt>过期</dt><dd>{{ stamp(promoPreview.expires_at) }}</dd></div>
+                <div>
+                  <dt>预计影响 SKU</dt>
+                  <dd>{{ promoPreview.estimated_impact.affected_sku_count }}</dd>
+                </div>
+                <div>
+                  <dt>预计 30 天折扣</dt>
+                  <dd>
+                    <PriceText :amount="promoPreview.estimated_impact.estimated_discount_amount_30d" size="sm" />
+                  </dd>
+                </div>
+              </dl>
+              <!--
+                `conflicts` is a POPULATED LIST rather than a 409 (§13.2): a conflict is information the
+                operator needs in order to decide, not an error that stops them looking.
+              -->
+              <ul v-if="promoPreview?.conflicts?.length" class="marketing__conflicts">
+                <li v-for="conflict in promoPreview.conflicts" :key="conflict.promotion_no">
+                  与 <code>{{ conflict.promotion_no }}</code> 冲突（{{ conflict.reason }}）
+                </li>
+              </ul>
+              <ul v-if="promoPreview?.warnings?.length" class="marketing__warnings">
+                <li v-for="(warning, index) in promoPreview.warnings" :key="index">{{ warning }}</li>
+              </ul>
+              <div class="marketing__actions">
+                <button
+                  type="button"
+                  class="nx-btn nx-btn--primary nx-btn--sm"
+                  :disabled="promoBusy || !promoPreview"
+                  @click="confirmCreatePromotion()"
+                >
+                  确认提交
+                </button>
+                <button type="button" class="nx-btn nx-btn--sm" :disabled="promoBusy" @click="backToPromoForm()">
+                  返回修改
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
         <StateView :state="promotionStatus" :error="promotionError" @retry="loadPromotions()">
           <table class="nx-table">
             <thead>
@@ -396,10 +724,10 @@ const sampleDiscount = toMajorString(1000)
             <tbody>
               <tr v-for="promotion in promotions" :key="promotion.id">
                 <td>{{ promotion.name }}</td>
-                <td>{{ promotion.type }}</td>
+                <td>{{ PROMOTION_TYPE_LABELS[promotion.promotion_type] }}</td>
                 <td><StatusChip :status="promotion.status" kind="doc" dot /></td>
                 <td style="text-align: right">{{ promotion.priority }}</td>
-                <td class="nx-muted">{{ stamp(promotion.start_at) }} ~ {{ stamp(promotion.end_at) }}</td>
+                <td class="nx-muted">{{ stamp(promotion.starts_at) }} ~ {{ stamp(promotion.ends_at) }}</td>
                 <td>
                   <div class="marketing__row-actions">
                     <button
@@ -502,6 +830,40 @@ const sampleDiscount = toMajorString(1000)
       display: block;
       margin: 10px;
     }
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  &__scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 12px;
+
+    label {
+      display: block;
+      color: var(--nx-text-muted);
+
+      input[type='text'],
+      input:not([type]) {
+        width: 100%;
+        margin-top: 4px;
+      }
+    }
+  }
+
+  &__conflicts {
+    margin: 0 0 10px;
+    padding-left: 18px;
+    color: var(--nx-price);
+    font-size: 12px;
   }
 
   &__warnings {

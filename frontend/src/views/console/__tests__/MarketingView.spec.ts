@@ -23,13 +23,18 @@ import { useNotificationStore } from '@/stores/notification'
 const couponsMock = vi.fn()
 const previewCouponMock = vi.fn()
 const createCouponMock = vi.fn()
+const promotionsMock = vi.fn()
+const previewPromotionMock = vi.fn()
+const createPromotionMock = vi.fn()
 
 vi.mock('@/api', () => ({
   marketingAdminApi: {
     coupons: (...args: unknown[]) => couponsMock(...args),
-    promotions: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, page_size: 20, total: 0, total_pages: 0 } }),
+    promotions: (...args: unknown[]) => promotionsMock(...args),
     previewCoupon: (...args: unknown[]) => previewCouponMock(...args),
     createCoupon: (...args: unknown[]) => createCouponMock(...args),
+    previewPromotion: (...args: unknown[]) => previewPromotionMock(...args),
+    createPromotion: (...args: unknown[]) => createPromotionMock(...args),
     publishPromotion: vi.fn(),
     unpublishPromotion: vi.fn(),
   },
@@ -62,6 +67,7 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
   beforeEach(() => {
     vi.clearAllMocks()
     couponsMock.mockResolvedValue(emptyPage())
+    promotionsMock.mockResolvedValue(emptyPage())
   })
 
   it('opens the form without writing anything', async () => {
@@ -185,5 +191,127 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
     // The confirm button is gone because the server preview was invalidated with the edit.
     expect(wrapper.text()).not.toContain('确认提交')
     expect(createCouponMock).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('console Marketing — promotion creation is preview then confirm (§47, §13.2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    couponsMock.mockResolvedValue(emptyPage())
+    promotionsMock.mockResolvedValue(emptyPage())
+  })
+
+  /** Switch to the promotions tab and open the create form. */
+  async function openPromoForm(wrapper: ReturnType<typeof mountView>): Promise<void> {
+    ;(await findButton(wrapper, '促销活动'))?.trigger('click')
+    await flushPromises()
+    ;(await findButton(wrapper, '新建促销活动'))?.trigger('click')
+    await flushPromises()
+  }
+
+  async function fillPromoForm(wrapper: ReturnType<typeof mountView>): Promise<void> {
+    await wrapper.find('.marketing__fields input').setValue('秋季焕新')
+    const selects = wrapper.findAll('.marketing__fields select')
+    await selects.at(0)?.setValue('FULL_REDUCTION')
+    const dateInputs = wrapper.findAll('input[type="datetime-local"]')
+    await dateInputs.at(0)?.setValue('2026-09-25T00:00')
+    await dateInputs.at(1)?.setValue('2026-10-08T23:59')
+    // The two FULL_REDUCTION rule fields are the ones rendered for this type.
+    const moneyInputs = wrapper.findAll('.marketing__fields input[inputmode="decimal"]')
+    await moneyInputs.at(0)?.setValue('3000')
+    await moneyInputs.at(1)?.setValue('300')
+  }
+
+  it('PREVIEW builds the payload; nothing is written from the form step', async () => {
+    previewPromotionMock.mockResolvedValue({
+      preview_token: 'pv-1',
+      expires_at: '2026-09-23T04:15:00.000Z',
+      estimated_impact: {
+        affected_sku_count: 3,
+        affected_order_count_30d: 142,
+        estimated_discount_amount_30d: 4260000,
+      },
+      conflicts: [],
+      warnings: [],
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+    await openPromoForm(wrapper)
+    await fillPromoForm(wrapper)
+
+    expect(createPromotionMock).not.toHaveBeenCalled()
+
+    ;(await findButton(wrapper, '预览'))?.trigger('click')
+    await flushPromises()
+
+    expect(previewPromotionMock).toHaveBeenCalledTimes(1)
+    expect(createPromotionMock).not.toHaveBeenCalled()
+    // The payload must be DISCRIMINATED by promotion_type (§13.1), not a nullable bag.
+    const payload = previewPromotionMock.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.promotion_type).toBe('FULL_REDUCTION')
+    expect(payload.rule_config).toEqual({
+      threshold_amount: 300000,
+      reduction_amount: 30000,
+      max_discount_amount: null,
+    })
+    // `scope` is EXPLICIT: all_products is stated rather than inferred from empty arrays.
+    expect(payload.scope).toMatchObject({ all_products: true })
+  })
+
+  it('confirm carries the preview_token, binding the write to what was approved', async () => {
+    previewPromotionMock.mockResolvedValue({
+      preview_token: 'pv-abc',
+      expires_at: '2026-09-23T04:15:00.000Z',
+      estimated_impact: {
+        affected_sku_count: 1,
+        affected_order_count_30d: 2,
+        estimated_discount_amount_30d: 100,
+      },
+      conflicts: [],
+      warnings: [],
+    })
+    createPromotionMock.mockResolvedValue({ id: 12, promotion_no: 'NVP1' })
+
+    const wrapper = mountView()
+    await flushPromises()
+    await openPromoForm(wrapper)
+    await fillPromoForm(wrapper)
+    ;(await findButton(wrapper, '预览'))?.trigger('click')
+    await flushPromises()
+    ;(await findButton(wrapper, '确认提交'))?.trigger('click')
+    await flushPromises()
+
+    expect(createPromotionMock).toHaveBeenCalledTimes(1)
+    const payload = createPromotionMock.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.preview_token).toBe('pv-abc')
+  })
+
+  it('renders server CONFLICTS instead of treating them as an error (§13.2)', async () => {
+    // A conflict is information to decide with, not a 409 that stops the operator looking.
+    previewPromotionMock.mockResolvedValue({
+      preview_token: 'pv-2',
+      expires_at: '2026-09-23T04:15:00.000Z',
+      estimated_impact: {
+        affected_sku_count: 1,
+        affected_order_count_30d: 1,
+        estimated_discount_amount_30d: 1,
+      },
+      conflicts: [
+        { promotion_id: 9, promotion_no: 'NVP2026080100007', reason: 'OVERLAPPING_WINDOW_AND_SCOPE' },
+      ],
+      warnings: [],
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+    await openPromoForm(wrapper)
+    await fillPromoForm(wrapper)
+    ;(await findButton(wrapper, '预览'))?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('NVP2026080100007')
+    expect(wrapper.text()).toContain('OVERLAPPING_WINDOW_AND_SCOPE')
   })
 })

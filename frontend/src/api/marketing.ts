@@ -11,6 +11,7 @@ import { API } from '@/api/endpoints'
 import type { Paged } from '@/types/domain'
 import type { Coupon } from '@/types/domain'
 import type { PageQuery } from '@/types/api'
+import type { Promotion, PromotionPreview } from '@/types/frozen-contract'
 
 export interface CouponPayload {
   code: string
@@ -24,16 +25,35 @@ export interface CouponPayload {
   total_quantity?: number
 }
 
-export interface Promotion {
-  id: string
-  name: string
-  type: 'DISCOUNT' | 'FULL_REDUCTION' | 'BUNDLE'
-  rule: Record<string, unknown>
-  status: 'DRAFT' | 'ACTIVE' | 'ENDED'
-  priority: number
-  start_at: string
-  end_at: string
-}
+/**
+ * §13.1 froze the real promotion shape, which REPLACES the local invented one that used to live here
+ * (`type: 'DISCOUNT' | 'FULL_REDUCTION' | 'BUNDLE'`, `rule: Record<string, unknown>`,
+ * `start_at`/`end_at`, string id).
+ *
+ * The local version is DELETED rather than kept alongside. Two shapes for one resource is exactly the
+ * defect this codebase already removed once for `Order`, and keeping both is how half the app ends up
+ * compiling against the wrong one. Consumers importing `Promotion` from here still work — this is now
+ * a re-export, so there is exactly ONE definition.
+ *
+ * Field renames the view had to absorb: `type` -> `promotion_type`, `start_at` -> `starts_at`,
+ * `end_at` -> `ends_at`, and the opaque `rule` bag -> the discriminated `rule_config`.
+ */
+export type { Promotion, PromotionPreview } from '@/types/frozen-contract'
+
+/** The create body: everything the server owns is omitted, so a form cannot send it by accident. */
+export type PromotionDraft = Omit<
+  Promotion,
+  'id' | 'promotion_no' | 'merchant_id' | 'status' | 'used_quota' | 'created_at' | 'updated_at'
+>
+
+/**
+ * A promotion create MUST carry the preview token (§13.2), exactly like the coupon equivalent.
+ *
+ * Required in the TYPE on purpose: it makes "preview first" (section 47) a compile-time property
+ * rather than a convention somebody has to remember, so a single-submit create flow cannot be written
+ * against this signature.
+ */
+export type PromotionCreatePayload = PromotionDraft & { preview_token: string }
 
 export const marketingApi = {
   async myCoupons(status?: string): Promise<Coupon[]> {
@@ -107,6 +127,25 @@ export const marketingAdminApi = {
 
   async coupons(query: PageQuery = {}): Promise<Paged<Coupon>> {
     return httpClient.get<Paged<Coupon>>(API.marketing.adminCoupons, { params: query })
+  },
+
+  /**
+   * PREVIEW a promotion (§13.2). Returns the exact promotion payload the create call accepts, plus a
+   * `preview_token`, an impact estimate, and a POPULATED `conflicts` list.
+   *
+   * `conflicts` is a list rather than a 409 on purpose: a conflict is information the operator needs in
+   * order to decide, not an error that stops them looking.
+   */
+  async previewPromotion(payload: PromotionDraft): Promise<PromotionPreview> {
+    return httpClient.post<PromotionPreview>(API.marketing.promotionsPreview, payload)
+  },
+
+  /**
+   * CREATE a promotion. Carries the `preview_token` from the preview so the server can prove the
+   * operator approved the payload being written (§13.2).
+   */
+  async createPromotion(payload: PromotionCreatePayload): Promise<Promotion> {
+    return httpClient.post<Promotion>(API.marketing.promotionsCreate, payload)
   },
 
   /**
