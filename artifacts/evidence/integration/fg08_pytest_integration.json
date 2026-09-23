@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T14:44:09.234184+00:00",
-  "duration_ms": 88744,
+  "timestamp": "2026-09-23T17:38:31.718963+00:00",
+  "duration_ms": 83588,
   "exit_code": 0,
-  "summary": "341 passed, 1 warning in 85.98s (0:01:25)",
+  "summary": "346 passed, 1 warning in 81.02s (0:01:21)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "a9fb51785c667ae2e320c3ca5a7d859ba8c43a44\n",
-    "subject": "Preserve duplicate test names in gate evidence\n",
+    "revision": "525e82e00391bd8511e0445d76ff0eea3126b735\n",
+    "subject": "Reject new payment attempts after expiry and preserve replay\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 341,
+    "testcase_count": 346,
     "outcomes": [
       {
         "name": "test_apply_then_read_back_through_the_frozen_paths",
@@ -835,6 +835,18 @@
         "actual": "PASSED"
       },
       {
+        "name": "test_expiry_closes_payment_and_releases_stock_once",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_two_workers_close_one_expired_order_once",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_unexpired_order_remains_open",
+        "actual": "PASSED"
+      },
+      {
         "name": "test_the_eight_frozen_paths_are_registered",
         "actual": "PASSED"
       },
@@ -1332,6 +1344,14 @@
       },
       {
         "name": "test_the_create_endpoint_requires_an_idempotency_key",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_expired_order_cannot_start_a_payment_attempt",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_expired_order_can_replay_its_existing_payment_attempt",
         "actual": "PASSED"
       },
       {
@@ -2603,6 +2623,24 @@
       "pass": true
     },
     {
+      "name": "test_expiry_closes_payment_and_releases_stock_once",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_two_workers_close_one_expired_order_once",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_unexpired_order_remains_open",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
       "name": "test_the_eight_frozen_paths_are_registered",
       "expected": "PASSED",
       "actual": "PASSED",
@@ -3348,6 +3386,18 @@
     },
     {
       "name": "test_the_create_endpoint_requires_an_idempotency_key",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_expired_order_cannot_start_a_payment_attempt",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_expired_order_can_replay_its_existing_payment_attempt",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true
