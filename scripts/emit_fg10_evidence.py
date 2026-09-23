@@ -44,9 +44,11 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 
-ROOT = pathlib.Path(r"C:\Users\27363\Desktop\store")
+from gate_evidence import git_state
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON = pathlib.Path(sys.executable)
 
 #: The frozen FG-10 target, owned by the order-flow implementer (task t3). This
 #: emitter deliberately does not create it: a gate that supplies its own test is
@@ -295,6 +297,15 @@ def main(argv: list[str] | None = None) -> int:
     if exit_code != 0:
         reasons.append(f"pytest exit_code={exit_code}")
 
+    source_state = git_state((
+        "backend/app",
+        "backend/migrations",
+        "backend/tests/integration/order",
+        "scripts/emit_fg10_evidence.py",
+        "scripts/gate_evidence.py",
+    ))
+    if source_state["relevant_paths_dirty"]:
+        reasons.append("watched source paths differ from the recorded revision")
     verdict = "PASS" if not reasons else "FAIL"
 
     report = {
@@ -311,6 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         "timestamp": started.isoformat(),
         "duration_ms": duration_ms,
         "exit_code": exit_code,
+        "git": source_state,
         "summary": _summary_from_stdout(stdout),
         "verdict": verdict,
         "fail_reasons": reasons,

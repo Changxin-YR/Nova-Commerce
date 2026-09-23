@@ -39,7 +39,7 @@ from datetime import UTC, datetime
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON = pathlib.Path(sys.executable)
 
 #: pytest's own per-test verbose line, e.g.
 #: ``tests/integration/order/test_x.py::test_y PASSED [ 50%]``.
@@ -152,7 +152,7 @@ def _summary_from_stdout(stdout: str) -> str:
     return ""
 
 
-def _git_state(relevant_paths: tuple[str, ...] = ()) -> dict[str, object]:
+def git_state(relevant_paths: tuple[str, ...] = ()) -> dict[str, object]:
     """The revision this artifact was produced against, and whether it was dirty.
 
     An evidence file that says "PASS" without saying *what* passed is only half a
@@ -316,16 +316,16 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
     if exit_code != 0:
         reasons.append(f"pytest exit_code={exit_code}")
 
-    git_state = _git_state(gate.relevant_paths)
-    if git_state["relevant_paths_dirty"]:
+    source_state = git_state(gate.relevant_paths)
+    if source_state["relevant_paths_dirty"]:
         # Not a gate failure - the code may be perfectly correct - but it must not
         # be reported as PASS, because a reader cannot reproduce the run from the
         # recorded revision. Phase 5's own rule: a verdict that was not observed
         # against an identifiable tree is not evidence.
         reasons.append(
             "the paths this gate depends on were modified relative to the recorded "
-            f"commit ({git_state['revision']}): "
-            + ", ".join(git_state["relevant_paths_dirty_files"])
+            f"commit ({source_state['revision']}): "
+            + ", ".join(source_state["relevant_paths_dirty_files"])
         )
 
     verdict = "PASS" if not reasons else "FAIL"
@@ -343,7 +343,7 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
         "summary": _summary_from_stdout(stdout),
         "verdict": verdict,
         "fail_reasons": reasons,
-        "git": git_state,
+        "git": source_state,
         "infrastructure": gate.infrastructure,
         "junit_report": junit,
         "assertions": assertions,

@@ -8,7 +8,7 @@ refund implementation.
 
 Run it with the venv python from anywhere:
 
-    .\.venv\Scripts\python.exe scripts\emit_fg12_evidence.py
+    ./.venv/Scripts/python.exe scripts/emit_fg12_evidence.py
 """
 
 from __future__ import annotations
@@ -49,6 +49,8 @@ GATE = Gate(
         # and data-layer's paid_order token fix landed after the previous emission -
         # which is exactly the case the clean-path assertion exists to catch.
         "backend/tests/integration/commerce",
+        "scripts/emit_fg12_evidence.py",
+        "scripts/gate_evidence.py",
     ),
     json_out=ROOT / "artifacts" / "evidence" / "integration" / "fg12_refund_invariants.json",
     infrastructure={

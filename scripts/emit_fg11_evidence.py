@@ -9,12 +9,10 @@ inventory deduction, one fulfillment and no duplicate outbox effect
 
 Run it with the venv python from anywhere:
 
-    .\.venv\Scripts\python.exe scripts\emit_fg11_evidence.py
+    ./.venv/Scripts/python.exe scripts/emit_fg11_evidence.py
 """
 
 from __future__ import annotations
-
-import pathlib
 
 from gate_evidence import ROOT, Gate, emit
 
@@ -49,6 +47,8 @@ GATE = Gate(
         "backend/migrations",
         "backend/tests/concurrency",
         "backend/tests/conftest.py",
+        "scripts/emit_fg11_evidence.py",
+        "scripts/gate_evidence.py",
         # FG-11 uses its OWN self-contained fixture rather than the shared seed, so this
         # gate does not depend on commerce/. The payment author made that choice
         # deliberately so a seed.py change could not redden the payment suite, and the

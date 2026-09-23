@@ -14,9 +14,11 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 
-ROOT = pathlib.Path(r"C:\Users\27363\Desktop\store")
+from gate_evidence import git_state
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON = pathlib.Path(sys.executable)
 OUT = ROOT / "artifacts" / "evidence" / "concurrency" / "fg09_inventory_over_sell.json"
 
 CMD = [
@@ -27,7 +29,7 @@ CMD = [
 ]
 
 started = datetime.now(UTC)
-proc = subprocess.run(CMD, cwd=BACKEND, capture_output=True, text=True, timeout=900)
+proc = subprocess.run(CMD, cwd=BACKEND, capture_output=True, text=True, timeout=900, check=False)
 duration_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
 stdout, stderr = proc.stdout or "", proc.stderr or ""
 
@@ -45,7 +47,21 @@ for line in stdout.splitlines():
         })
 
 summary = re.search(r"=+ (.*?) =+", stdout.strip().splitlines()[-1] if stdout.strip() else "")
-verdict = "PASS" if proc.returncode == 0 and assertions and all(a["pass"] for a in assertions) else "FAIL"
+source_state = git_state((
+    "backend/app",
+    "backend/migrations",
+    "backend/tests/concurrency/test_inventory_oversell.py",
+    "scripts/emit_fg09_evidence.py",
+    "scripts/gate_evidence.py",
+))
+verdict = (
+    "PASS"
+    if proc.returncode == 0
+    and assertions
+    and all(a["pass"] for a in assertions)
+    and not source_state["relevant_paths_dirty"]
+    else "FAIL"
+)
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 report = {
@@ -58,6 +74,7 @@ report = {
     "timestamp": started.isoformat(),
     "duration_ms": duration_ms,
     "exit_code": proc.returncode,
+    "git": source_state,
     "summary": summary.group(1).strip() if summary else "",
     "infrastructure": {
         "engine": "MySQL 8.4 (real container, not mocked)",
