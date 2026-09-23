@@ -52,8 +52,20 @@ _REPO_BACKEND = Path(__file__).resolve().parents[3]
 #: editing the shared .gitignore to hide my own scratch is the wrong fix.
 _STAGE = Path(__file__).resolve().parents[2] / "build" / "probe_stage"
 
+#: The probe is named `probe_*.py` so a stray copy can never be *auto*-collected by a
+#: later run - but that also means pytest will not collect it when it is named
+#: explicitly, because collection requires the `test_*.py`/`*_test.py` pattern. Setting
+#: `python_files` to include `probe_*` inside this directory only restores collection for
+#: the file we pass by name, while the directory stays outside the package and therefore
+#: out of every normal run's discovery.
 _CONFTEST = """
+collect_ignore = []  # nothing hidden here
+
 from tests.integration.commerce.seed import engine, shop  # noqa: F401
+
+
+def pytest_configure(config):
+    config.option.python_files = ["probe_*.py"]
 """
 
 
