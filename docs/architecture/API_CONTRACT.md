@@ -789,3 +789,63 @@ un-mask it.
   Phase 4 implements and unit-tests the arithmetic against the §13.1/§13.3 shapes).
 * The paid-shipping rule and its interaction with INV-006 (see §14.4).
 * Return/refund shapes (Phase 5).
+
+---
+
+## 16. Addenda — the two system list endpoints (from HANDOFF §15.1, 2026-09-23)
+
+§13.4 froze `PUT /api/v1/system/roles/{id}/permissions` and
+`POST /api/v1/system/users/{user_id}/roles` without freezing any way to
+**discover** the ids those writes take. That is the same gap §5.2 closed for
+fulfillments (`ship` needs an id, so `GET /fulfillments/admin` was frozen). The
+ruling in HANDOFF §15.1 is transcribed here so the frontend role editor can be
+built against a contract instead of a guess.
+
+Both routes use the paged envelope of §3, always, never a bare array.
+
+### 16.1 `GET /api/v1/system/roles`
+
+Row shape = the Role shape of §13.4 (`id`, `code`, `name`, `description`,
+`is_system`, `data_scope`, `permissions[]`, `user_count`, `created_at`,
+`updated_at`). `permissions[]` is included in the list rows deliberately: the
+role editor is a **review flow, not a toggle grid** (HANDOFF §15.1 condition 3),
+so it must be able to render the current set without an N+1 fetch per row.
+
+Server obligations:
+
+1. **Merchant visibility filter:** `merchant_id = :current OR merchant_id IS NULL`
+   — system roles are global. This is a server-side authorization decision, not a
+   client convenience; a client that asks for another merchant's role gets it
+   filtered out, not a 403 that confirms it exists.
+2. Default order: `is_system DESC, id ASC` (system roles first, then
+   stable by id).
+3. Requires the caller to hold `user:read` **or** `role:assign`. No dedicated
+   `role:read` code exists in the frozen vocabulary; if one is added later it
+   supersedes this line, but until then "may read the user directory" and "may
+   assign roles" are the two capabilities that imply reading role definitions.
+
+### 16.2 `GET /api/v1/system/users`
+
+Row shape = the User shape of §13.4, with `email` and `phone` already **masked**
+(§94) on list rows exactly as on detail. A staff directory is an exfiltration
+target and the operator rarely needs the full value.
+
+Query parameters: `page`, `page_size`, plus optional `status`, `role` (role code)
+and `search` (matches username / display name / email prefix). Those three are
+frozen because a directory without them cannot be operated; they are filters, not
+new fields.
+
+Server obligations:
+
+1. Merchant scope: only users whose `merchant_id = :current`. A platform-scoped
+   administrator may pass an explicit merchant filter; there is no "all
+   merchants" mode for a merchant-scoped caller.
+2. Requires `user:read`.
+3. Default order: `created_at DESC`.
+
+### 16.3 What is still unfrozen here
+
+`GET /api/v1/system/users/{id}` (a single-user read), role creation/deletion,
+and any user create/deactivate route. The §13.2 rule stands: refuse to lower an
+`is_write` tool's `risk_level` without a separate audited approval, and audit the
+before/after set of every permission change.
