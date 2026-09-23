@@ -5,10 +5,10 @@
   "spec": "section 113 - CreateOrder workflow on real MySQL, including the snapshot-immutability test; mandatory condition 4 of section 147 (order snapshot correctness)",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/order -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg10_workflow.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T06:32:41.136359+00:00",
-  "duration_ms": 33290,
+  "timestamp": "2026-09-23T06:35:32.002781+00:00",
+  "duration_ms": 30903,
   "exit_code": 0,
-  "summary": "170 passed, 1 warning in 30.53s",
+  "summary": "170 passed, 1 warning in 28.53s",
   "verdict": "PASS",
   "fail_reasons": [],
   "infrastructure": {
