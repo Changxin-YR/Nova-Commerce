@@ -29,3 +29,10 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Scratch patchers used by whoever is editing files programmatically. They are
+# tooling, not project source: they exist for one edit and have no meaning after
+# it. Ignored rather than deleted because the author is mid-turn.
+# ---------------------------------------------------------------------------
+scripts/_w_*.py
