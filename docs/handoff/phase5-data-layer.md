@@ -101,3 +101,34 @@ which is why none reached a commit. **If this ever genuinely must be reverted, u
 revision (drop_index, drop_constraint(type_=foreignkey), drop_column) rather than
 editing the applied revision in place, and have fulfilment revert its three call sites in the
 same window.**
+
+## 8. Known cross-suite coupling: `purge_shop` deletes by MERCHANT, not by test
+
+Verified at the verifier's prompting. `purge_shop` resolves orders like this:
+
+    order_ids = [ ... select(Order.id).where(Order.merchant_id == merchant_id) ... ]
+    delete(Order).where(Order.id.in_(order_ids))
+
+So it removes **every** order belonging to the fixture's merchant, not only the ones this
+fixture created. That is deliberate - it is what lets a test that makes its own orders still
+clean up - but it means any *other* test that extends the same shop inherits this teardown.
+The verifier's FG-12 probes do exactly that: they call `paid_order(shop, ...)`, which creates
+its order under that same merchant.
+
+**Consequence, and it is the coupling the verifier was bitten by:** if their probe and my
+suite run at the same time, my teardown can delete a probe order milliseconds after it was
+created and committed. The probe then fails in a way that reads like a constraint defect
+(e.g. a missing order or a refused write) rather than like a teardown race. This is the same
+class as their measured `StaleDataError` / `ORDER_NOT_FOUND` findings: a shared mutable
+resource, with the failure set moving between runs.
+
+**Not fixed here, deliberately.** Any fix moves the boundary in one of two directions:
+scoping the delete to only the ids this fixture recorded makes it correct but stops cleaning
+orders a test created for itself; keeping the merchant scope requires each test to record its
+own ids with the fixture, which is the verifier's file, not mine. Two safer options for
+whoever picks this up:
+1. give each concurrent consumer its own merchant (a fixture variant that does not share the
+   shop), or
+2. have the probe register its order in the fixture's `created` dict so teardown is exact.
+Until then: **do not run the FG-12 probes concurrently with the commerce suite**, and treat a
+probe failure during an active suite run as unverified rather than as evidence.
