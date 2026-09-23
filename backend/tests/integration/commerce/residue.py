@@ -80,6 +80,11 @@ class ResidueReport:
     counts: dict[str, int] = field(default_factory=dict)
     merchants: list[tuple[int, str]] = field(default_factory=list)
     users: list[tuple[int, str]] = field(default_factory=list)
+    #: Rows that *look* like test output (marker-shaped event ids) but that no marker
+    #: root reaches, so this tool cannot prove they are residue. Reported, never swept:
+    #: they are inert because each run generates a fresh random marker and therefore
+    #: never reuses a leftover event id.
+    unattributable_callbacks: int = 0
 
     @property
     def total_residue(self) -> int:
@@ -91,10 +96,15 @@ class ResidueReport:
 
     def line(self) -> str:
         """One line, for embedding in a measurement record."""
+        extra = (
+            f"; unattributable event-shaped callbacks: {self.unattributable_callbacks} (inert)"
+            if self.unattributable_callbacks
+            else ""
+        )
         if self.is_clean:
-            return "residue: 0 (no rows attributable to a fixture marker)"
+            return f"residue: 0 (no rows attributable to a fixture marker){extra}"
         parts = ", ".join(f"{t}={n}" for t, n in sorted(self.counts.items()))
-        return f"residue: {self.total_residue} ({parts})"
+        return f"residue: {self.total_residue} ({parts}){extra}"
 
     def render(self) -> str:
         lines = [self.line(), ""]
@@ -138,13 +148,13 @@ def _roots(session: Session) -> tuple[list[tuple[int, str]], list[tuple[int, str
 
 def _scoped_ids(session: Session, merchant_ids: list[int], user_ids: list[int]) -> dict[str, list[int]]:
     """Every id the sweep may touch, resolved **only** from the marker roots."""
-    m = merchant_ids or [-1]
+    m = merchant_ids
     ids: dict[str, list[int]] = {
         "orders": [
             int(r[0])
             for r in session.execute(
                 select(Order.id).where(
-                    or_(Order.merchant_id.in_(m), Order.user_id.in_(user_ids or [-1]))
+                    or_(Order.merchant_id.in_(m), Order.user_id.in_(user_ids))
                 )
             ).all()
         ],
@@ -183,12 +193,12 @@ def report_residue(session: Session) -> ResidueReport:
             session.execute(select(func.count()).select_from(model).where(clause)).scalar_one()
         )
 
-    orders = ids["orders"] or [-1]
-    claims = ids["claims"] or [-1]
-    payments = ids["payments"] or [-1]
-    products = ids["products"] or [-1]
-    skus = ids["skus"] or [-1]
-    warehouses = ids["warehouses"] or [-1]
+    orders = ids["orders"]
+    claims = ids["claims"]
+    payments = ids["payments"]
+    products = ids["products"]
+    skus = ids["skus"]
+    warehouses = ids["warehouses"]
 
     report.counts["refunds"] = count(
         Refund,
@@ -204,10 +214,23 @@ def report_residue(session: Session) -> ResidueReport:
     )
     report.counts["fulfillments"] = count(Fulfillment, Fulfillment.order_id.in_(orders))
     report.counts["payments"] = count(Payment, Payment.id.in_(payments))
-    report.counts["payment_callbacks"] = count(
-        PaymentCallback,
-        or_(*[PaymentCallback.provider_event_id.like(p) for p in _EVENT_ID_PATTERNS]),
-    )
+    # Attribute the event-shaped callbacks exactly once. Those a marker reaches are
+    # residue and are swept; the rest are reported separately (see below) and never
+    # touched, because this tool cannot prove they are test output.
+    markers = {code for _, code in report.merchants} | {
+        name.split("_")[-1] for _, name in report.users
+    }
+    event_ids = [
+        str(r[0])
+        for r in session.execute(
+            select(PaymentCallback.provider_event_id).where(
+                or_(*[PaymentCallback.provider_event_id.like(p) for p in _EVENT_ID_PATTERNS])
+            )
+        ).all()
+    ]
+    attributed = [eid for eid in event_ids if any(m and m in eid for m in markers)]
+    report.unattributable_callbacks = len(event_ids) - len(attributed)
+    report.counts["payment_callbacks"] = len(attributed)
     report.counts["order_status_logs"] = count(OrderStatusLog, OrderStatusLog.order_id.in_(orders))
     report.counts["order_items"] = count(OrderItem, OrderItem.order_id.in_(orders))
     report.counts["orders"] = count(Order, Order.id.in_(orders))
@@ -220,7 +243,7 @@ def report_residue(session: Session) -> ResidueReport:
     report.counts["product_images"] = count(ProductImage, ProductImage.product_id.in_(products))
     report.counts["products"] = count(Product, Product.id.in_(products))
     report.counts["warehouses"] = count(Warehouse, Warehouse.id.in_(warehouses))
-    report.counts["user_addresses"] = count(UserAddress, UserAddress.user_id.in_(user_ids or [-1]))
+    report.counts["user_addresses"] = count(UserAddress, UserAddress.user_id.in_(user_ids))
 
     patterns = _marker_like_patterns(report)
     if patterns:
@@ -248,12 +271,12 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
     merchant_ids = [mid for mid, _ in report.merchants]
     user_ids = [uid for uid, _ in report.users]
     ids = _scoped_ids(session, merchant_ids, user_ids)
-    orders = ids["orders"] or [-1]
-    claims = ids["claims"] or [-1]
-    payments = ids["payments"] or [-1]
-    products = ids["products"] or [-1]
-    skus = ids["skus"] or [-1]
-    warehouses = ids["warehouses"] or [-1]
+    orders = ids["orders"]
+    claims = ids["claims"]
+    payments = ids["payments"]
+    products = ids["products"]
+    skus = ids["skus"]
+    warehouses = ids["warehouses"]
     patterns = _marker_like_patterns(report)
 
     # --- children before parents -------------------------------------------
@@ -289,10 +312,15 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
             or_(Inventory.warehouse_id.in_(warehouses), Inventory.sku_id.in_(skus))
         )
     )
+    # Lines that reference a fixture SKU must go before the SKU itself: both
+    # `order_items.sku_id` and `fulfillment_items.sku_id` are RESTRICT. Scoping by SKU
+    # is safe - an order line pointing at a fixture SKU cannot belong to a real order.
+    session.execute(delete(FulfillmentItem).where(FulfillmentItem.sku_id.in_(skus)))
+    session.execute(delete(OrderItem).where(OrderItem.sku_id.in_(skus)))
     session.execute(delete(ProductSku).where(ProductSku.id.in_(skus)))
     session.execute(delete(ProductImage).where(ProductImage.product_id.in_(products)))
     session.execute(delete(Product).where(Product.id.in_(products)))
-    session.execute(delete(UserAddress).where(UserAddress.user_id.in_(user_ids or [-1])))
+    session.execute(delete(UserAddress).where(UserAddress.user_id.in_(user_ids)))
 
     # --- identity last -----------------------------------------------------
     for mid in merchant_ids:
@@ -308,11 +336,17 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
             {"m": mid},
         )
         session.execute(text("DELETE FROM roles WHERE merchant_id = :m"), {"m": mid})
-    for uid in user_ids:
+    owned_user_ids = [
+        int(r[0])
+        for r in session.execute(
+            select(User.id).where(User.merchant_id.in_(merchant_ids))
+        ).all()
+    ]
+    for uid in sorted(set(user_ids) | set(owned_user_ids)):
         session.execute(text("DELETE FROM user_roles WHERE user_id = :u"), {"u": uid})
         session.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})
     session.execute(delete(Warehouse).where(Warehouse.id.in_(warehouses)))
-    session.execute(delete(Merchant).where(Merchant.id.in_(merchant_ids or [-1])))
+    session.execute(delete(Merchant).where(Merchant.id.in_(merchant_ids)))
 
     session.commit()
     return report
