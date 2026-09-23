@@ -111,6 +111,7 @@ def _sku_id_for_insert(context: Any) -> int | None:
     order_item = session.get(OrderItem, order_item_id)
     return None if order_item is None else int(order_item.sku_id)
 
+
 class Fulfillment(Base, PkMixin, TimestampMixin, MerchantScopedMixin):
     """One package: the record that goods left the building (REQ-FUL-001).
 
