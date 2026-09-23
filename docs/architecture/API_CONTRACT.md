@@ -228,12 +228,17 @@ another — most importantly, **shipping never changes `order_status`**, so
 }
 ```
 
-Two further fields on **`OrderDetail`**:
+`refundable_amount` sits on the **base** shape, so `OrderSummary` and `OrderDetail`
+both carry it. It was added to `OrderDetail` alone in the Phase 4 batch and extended
+to the list rows in Phase 5 (see section 15.8 for why that is a contract change and
+not a tidy-up).
+
+One further field on **`OrderDetail`**:
 
 | Field | Type | Why it is server-owned |
 |---|---|---|
 | `cancel_reason` | `string \| null` | Null unless `order_status` is `CANCELLED`/`CLOSED`. The reason is recorded by the cancel workflow, so the client cannot infer it. |
-| `refundable_amount` | integer minor units | `paid_amount - refunded_amount`, bounded below by 0. **The server owns this because INV-005 does.** |
+| `refundable_amount` | integer minor units | `paid_amount - refunded_amount`, bounded below by 0. **The server owns this because INV-005 does.** Present on list rows as well as detail: the consumer order list renders its refund control from it, and `undefined > 0` is `false`, so a missing field hides the control instead of throwing. |
 
 `refundable_amount` is not decorative. The frontend discovered that deriving it as
 `paid_amount - refunded_amount` client-side is a silent failure mode: on a payload
@@ -849,3 +854,301 @@ Server obligations:
 and any user create/deactivate route. The §13.2 rule stands: refuse to lower an
 `is_write` tool's `risk_level` without a separate audited approval, and audit the
 before/after set of every permission change.
+
+
+---
+
+## 15. Addenda - Phase 5: payment, fulfillment, after-sales (2026-09-23, fifth batch)
+
+Phase 5 implements `REQ-PAY-*`, `REQ-FUL-*` and `REQ-AFS-*`. Two of its shapes were
+already frozen before the code existed - the Fulfillment object (section 5), which
+`POST /fulfillments/{id}/ship` takes, and `refundable_amount` (section 6), which the
+frontend refuses to derive. This section freezes the rest, and it does so by
+**transcribing what the frontend already calls**
+(`frontend/src/api/endpoints.ts`, `frontend/src/types/domain.ts`) rather than by
+inventing a parallel surface: the frontend built against the frozen contract and a
+mock at the API boundary, so where its call shape is already written down, the
+backend conforms to it. Where the two disagreed, the contract says which won and why.
+
+### 15.1 `payment_status` vs the payment record's own status
+
+Two different things live behind the word "status", and conflating them is how a UI
+ends up showing "PAID" for an attempt that was never settled:
+
+* `orders.payment_status` is the **order's** view (PAYMENT_STATUSES of section 6:
+  `UNPAID`/`PAYING`/`PAID`/`PARTIAL_REFUNDED`/`REFUNDED`).
+* a payment row has its own lifecycle, frozen here as
+  `INITIATED -> PAYING -> SUCCESS | FAILED | CLOSED`, plus `PARTIAL_REFUNDED` /
+  `REFUNDED` once money comes back.
+
+Creating a payment attempt moves the order's axis `UNPAID -> PAYING`. It does **not**
+move it to `PAID`, and no endpoint a JWT user can reach moves it to `PAID`: that is
+`REQ-PAY-005`/`REQ-PAY-006` (INV-008), and the only writer is a verified provider
+callback (15.3).
+
+### 15.2 The Payment object
+
+```json
+{
+  "id": 41,
+  "payment_no": "NVPAY20260923000041",
+  "order_id": 456,
+  "order_no": "NV20260922000001",
+  "channel": "MOCK",
+  "status": "PAYING",
+  "amount": 279900,
+  "paid_amount": 0,
+  "refunded_amount": 0,
+  "external_transaction_no": null,
+  "pay_url": "https://.../mock-pay/NVPAY20260923000041",
+  "expires_at": "2026-09-22T23:46:07.507Z",
+  "paid_at": null,
+  "created_at": "2026-09-22T23:31:07.507Z"
+}
+```
+
+`pay_url` is present only for `channel = "MOCK"` (section 100's MockPay) and is
+`null` otherwise - a real provider's redirect URL is a client-side concern and is
+never echoed by this API. `refunded_amount` is the payment record's own cumulative
+figure; it exists so a payment detail page does not have to sum the refund history
+to answer "how much of this can still be refunded".
+
+Requests:
+
+| Method + path | Body | Notes |
+|---|---|---|
+| `POST /api/v1/payments/customer/payments` | `{order_no, channel, client_request_id}` | `Idempotency-Key` header **required** |
+| `GET /api/v1/payments/customer/payments/{payment_id}` | - | owner only |
+| `GET /api/v1/payments/customer/payments/by-order/{order_no}` | - | owner only; one payment per order in V1 |
+| `POST /api/v1/payments/customer/payments/{payment_id}/mock-pay` | `{client_request_id}` | DEV/DEMO only, see 15.3 |
+| `GET /api/v1/payments/admin/payments` | - | console, paged; filters `status`, `order_no`, `channel` |
+
+A payment belonging to somebody else is `PAYMENT_NOT_FOUND (60000)`, never `403` -
+the section 109 rule already applied to orders.
+
+### 15.3 The callback contract, and why it is not a JWT route
+
+`POST /api/v1/payments/callbacks/{provider}` carries the provider's own
+authentication model (`REQ-PAY-005`: *providers use a separate auth model*), because
+a payment provider cannot hold a user's bearer token and must not be able to act as
+one. Three headers are mandatory:
+
+```
+X-Provider-Event-Id: <provider's own event id>     # the idempotency key
+X-Provider-Timestamp: <unix seconds>
+X-Provider-Signature: <hex HMAC-SHA256>
+```
+
+The signature is `HMAC-SHA256(secret, f"{timestamp}.{raw_body}")`, hex-encoded, where
+the secret comes from `PAYMENT_CALLBACK_SECRET` (per provider via
+`PAYMENT_PROVIDER_SECRETS` when a real provider is configured). A body older than
+`PAYMENT_CALLBACK_MAX_SKEW_SECONDS` is refused even when the signature verifies,
+because a captured body replayed later would otherwise settle a payment twice.
+
+Outcomes:
+
+| Situation | Result |
+|---|---|
+| verified, first delivery | **200** with the updated Payment; one settlement |
+| verified, duplicate `(provider, provider_event_id)` | **200** with `code = 60004 PAYMENT_CALLBACK_DUPLICATE`; no second effect |
+| bad / missing / stale signature | **401** `60003`; no callback row claims success |
+| amount mismatch | **409** `60002`; the payment is NOT marked successful |
+| unknown `payment_no` | **404** `60000`; recorded as an IGNORED callback for triage |
+
+The duplicate case answers **200, not 409**, deliberately: a provider retries until
+it sees success, so answering an error to a delivery that was in fact already
+applied would make it retry forever. This is the one honest use of "200 = your
+request was already handled".
+
+The mock surface (`/payments/callbacks/mock/{payment_id}`) exists so the demo proves
+the invariants without a PSP. It is refused with `PAYMENT_MOCK_DISABLED (60006)`
+unless `PAYMENT_MOCK_ENABLED` is true **and** `APP_ENV` is `dev`, `test` or `demo`.
+The same check runs twice - once as a settings validator and once at the edge -
+because a single guard that somebody bypasses is not a guard (`INV-008`).
+
+### 15.4 The Fulfillment queue (closes section 5.2)
+
+`GET /api/v1/fulfillments/admin` - paged envelope (section 3), filters `order_no`
+and `fulfillment_status`, newest first. The row shape is the Fulfillment object of
+section 5, `items[]` included: the console's ship dialog needs the lines and their
+ids, and a queue that forces one detail fetch per row is why queues stop being used.
+
+`GET /api/v1/fulfillments/customer/orders/{order_no}/shipments` returns the same
+objects for the buyer - the same shape, because two shapes for one concept is how a
+consumer page and a console page start disagreeing about whether a parcel shipped.
+
+Shipping is the frozen task endpoint of section 4:
+
+```
+POST /api/v1/fulfillments/{id}/ship
+{ "carrier": "SF", "tracking_no": "SF1234567890",
+  "item_quantities": [ { "order_item_id": 9, "quantity": 1 } ] }
+```
+
+**Exactly three fields** (section 110 mass-assignment guard) and no
+`idempotency_key`: the guard is the fulfillment's own state
+(`FULFILLMENT_ALREADY_SHIPPED`, 70003), because "ship this package twice" is not a
+retry - the second call is a mistake and must be named as one.
+
+Consequences frozen with it:
+
+1. **Shipping never changes `order_status`** (section 31). A shipped order is still
+   `PROCESSING` until the customer confirms receipt. "Can this be shipped?" reads
+   `fulfillment_status`, never `order_status`.
+2. `fulfillment_status` is a **rollup over all packages**: some lines shipped ->
+   `PARTIAL_SHIPPED`; every line's total shipped quantity >= its ordered quantity ->
+   `SHIPPED`; nothing shipped -> `UNFULFILLED`.
+3. Shipping **less** than the package's line quantity is legal and creates a
+   residual package in the same transaction. The remainder is not silently dropped:
+   a dropped remainder is stock the customer paid for and will never receive.
+4. The cumulative shipped quantity per `order_item_id` across all packages can never
+   exceed that line's ordered quantity (`FULFILLMENT_QUANTITY_EXCEEDS_ORDER`, 70001).
+   A per-package check does not enforce this, and that gap is the defect.
+
+### 15.5 After-sale (claim) and Refund (money fact) - two objects
+
+`REQ-AFS-001` makes the separation explicit, and it is not a nomenclature preference:
+the claim is what the **customer asks for**, the refund is what the **business pays
+out**. They have different owners, different failure modes and different statuses. A
+single table would have to say "the customer wants 200 back and we paid 150" in one
+row, which is exactly the row two parties will read differently during a dispute.
+
+```json
+{
+  "id": 12,
+  "after_sale_no": "NVAS20260923000012",
+  "order_no": "NV20260922000001",
+  "type": "REFUND_ONLY",
+  "status": "APPROVED",
+  "requested_amount": 279900,
+  "approved_amount": 200000,
+  "refunded_amount": 0,
+  "reason": "商品质量问题",
+  "description": "...",
+  "evidence_urls": [],
+  "items": [ { "order_item_id": "9", "quantity": 1 } ],
+  "refunds": [],
+  "reject_reason": null,
+  "created_at": "2026-09-23T10:00:00.000Z",
+  "processed_at": "2026-09-23T11:00:00.000Z"
+}
+```
+
+`items[].order_item_id` is a **string**, matching `frontend/src/types/domain.ts`
+(AfterSale). It is deliberately left as the frontend typed it: the ids come back
+from the order detail payload the UI already holds, so re-typing them to a number on
+this one surface would introduce a coercion on a path that has never needed one.
+
+Claim status vocabulary: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`, `COMPLETED`.
+It is **not** the order's `after_sale_status` axis. Only the refund path moves that
+axis (`NONE -> PROCESSING -> PARTIAL_REFUNDED -> REFUNDED`), which is why an approved
+claim sits next to an order whose `after_sale_status` is still `PROCESSING` - and
+that is correct, because nothing has been paid back yet.
+
+```json
+{
+  "id": 31,
+  "refund_no": "NVR20260923000031",
+  "after_sale_no": "NVAS20260923000012",
+  "order_no": "NV20260922000001",
+  "amount": 150000,
+  "status": "SUCCEEDED",
+  "reason": "部分退款",
+  "operator": "staff:7",
+  "created_at": "2026-09-23T11:05:00.000Z",
+  "completed_at": "2026-09-23T11:05:00.000Z"
+}
+```
+
+V1 refunds are **synchronous**: the row is written `SUCCEEDED` in the same
+transaction that moves the money figures. A `PENDING` refund that no worker ever
+completes would be a state that lies about money, and there is no worker until
+Phase 6. The `PENDING`/`FAILED` members exist in the vocabulary because a real
+provider's asynchronous refund will need them, and widening a `CHECK` later is a
+migration.
+
+Requests:
+
+| Method + path | Body | Notes |
+|---|---|---|
+| `POST /api/v1/after-sales/customer/after-sales` | `{order_no, type, items[], requested_amount, reason, description?, evidence_urls?, client_request_id}` | `Idempotency-Key` required |
+| `GET /api/v1/after-sales/customer/after-sales` | - | owner only, paged |
+| `GET /api/v1/after-sales/customer/after-sales/{after_sale_no}` | - | owner only |
+| `POST /api/v1/after-sales/customer/after-sales/{after_sale_no}/cancel` | `{}` | `PENDING -> CANCELLED` only |
+| `GET /api/v1/after-sales/admin/after-sales` | - | console queue, paged; filters `status`, `order_no` |
+| `GET /api/v1/after-sales/admin/after-sales/{after_sale_no}` | - | console detail |
+| `POST /api/v1/after-sales/admin/after-sales/{after_sale_no}/approve` | `{approved_amount, remark?}` | `approved_amount <= requested_amount` in V1 |
+| `POST /api/v1/after-sales/admin/after-sales/{after_sale_no}/reject` | `{reject_reason}` | `PENDING -> REJECTED` |
+| `POST /api/v1/after-sales/admin/after-sales/{after_sale_no}/refund` | `{amount, reason?, idempotency_key}` | executes the refund; `Idempotency-Key` header required and must equal the body's `idempotency_key` |
+
+`requested_amount` is validated against a **server-computed** cap (what is left of
+`paid_amount - refunded_amount`, plus the per-line `payable_amount` when the claim
+names items). The client's number is a request, never a basis. An ineligible claim
+(unpaid order, cancelled/closed order, nothing left to claim, a line not on the
+order) is `AFTER_SALE_NOT_ELIGIBLE (80001)`.
+
+### 15.6 The refund caps (FG-12), and where they are enforced
+
+Already stated in section 6 for `refundable_amount`; repeated here because Phase 5 is
+where it becomes falsifiable:
+
+1. cumulative refunds on a payment/order <= the amount actually paid
+   (`REFUND_EXCEEDS_PAID_AMOUNT`, 80004);
+2. cumulative refunds attributed to one order line <= that line's `payable_amount`
+   (`REFUND_EXCEEDS_ITEM_AMOUNT`, 80005).
+
+Both are re-validated **inside the row lock against freshly read values**, not
+against the numbers the client sent or the ones read before the lock. The client-side
+`max` on the refund form is UX only: a form limit is not a guard (section 104), and
+the gate test proves the guard by driving the over-refund straight at the service.
+
+`refundable_amount` on `OrderDetail` (section 6) is the same figure the cap uses, so
+the number the UI renders and the number the server enforces cannot drift. The
+frontend's temporary `paid - refunded` fallback exists only because a payload
+predating the field reads `undefined`; with the field live on a real HTTP response
+the fallback and its test branch are deleted in the same change (HANDOFF section 17.5
+obligation 1).
+
+### 15.7 What is still not frozen, after this batch
+
+Named so that absence is not mistaken for permission (the section 10 rule):
+
+* the provider-specific `pay_url` redirect flow and any provider SDK callback body
+  beyond the four outcome rows of 15.3;
+* refund reversal / cancellation (a refund that fails after being written
+  `SUCCEEDED`), which needs the Phase 6 worker;
+* partial-quantity claims across multiple claims of the same line - the V1 rule is
+  "cumulative claimed quantity per line <= ordered quantity", enforced in the
+  service, and the *shape* of a future per-line claim ledger is not frozen;
+* the analytics view of refunds (`refund.rate`, section 8) and the console's refund
+  dashboard, which are Phase 6;
+* `GET /api/v1/fulfillments/{id}` (a single-package read) - the queue and the order
+  detail are the frozen discovery paths and are sufficient;
+* carrier codes beyond the V1 allowlist, and any integration with a carrier's own
+  tracking API.
+
+### 15.8 `refundable_amount` on the order list rows (a Phase 5 contract change)
+
+Section 6 gained `refundable_amount` on the base order shape, which means the order
+**list** rows carry it and not just the detail payload. Recorded as its own
+subsection because it edits a shape frozen in the Phase 4 batch, and a frozen shape
+must never be edited without the edit being visible.
+
+Why it changed: the consumer order list renders its refund control from this number.
+The frontend had a labelled `paid_amount - refunded_amount` fallback covering the
+window before the field existed, and Phase 5 deletes that fallback - the deletion is
+the standing proof the backend field is real (HANDOFF section 17.5, obligation 1).
+Deleting it while the field was present only on the detail payload would have traded
+one silent failure (a missing field reads as `undefined`, and `undefined > 0` is
+`false`) for the same failure one screen over. So the order list gained the field in
+the same change.
+
+Why the list is the right place for it: it is the same server-owned figure, computed
+by the same `Order.refundable_amount` property, and both surfaces already carried
+`paid_amount` and `refunded_amount`. A list endpoint that carried the two operands
+but not the consumed value was forcing the client to do arithmetic that section 15
+forbids it from owning.
+
+Server obligation (unchanged in substance): `refundable_amount == max(paid_amount -
+refunded_amount, 0)` on **every** order payload, list rows included.
+

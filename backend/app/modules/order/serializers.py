@@ -178,6 +178,9 @@ def to_summary(order: Order) -> OrderSummaryOut:
         expires_at=order.expires_at,
         item_count=order.item_count,
         first_item_name=order.first_item_name,
+        # Read from the model property, not recomputed: INV-005 has one owner, and
+        # the summary row is not allowed to grow a second derivation of it.
+        refundable_amount=order.refundable_amount,
     )
 
 
@@ -199,9 +202,25 @@ def to_detail(
     transaction* where a failure still rolls back; raising on the read path would
     instead turn a historical bad row into an unusable order, hiding the data
     someone needs in order to repair it.
+
+    ``shipments`` resolution order: an explicit argument wins, then a collection
+    the caller attached to the order (``OrderService`` does that, so the service
+    owns the query and this function keeps reading attributes only), then ``[]``.
+    The last fallback is not a silent default - section 6 explicitly allows an
+    empty list for an order with no packages, and the unit tests that build a bare
+    object are asserting exactly that.
+
+    ``refundable_amount`` is **not** passed explicitly: it now travels in
+    ``to_summary``'s dump (Phase 5 put it on the base order shape, section 15.8),
+    and ``OrderDetailOut`` inherits it. Repeating it by keyword here raised
+    ``got multiple values for keyword argument`` - a ``TypeError`` on every order
+    read, which is exactly the kind of failure the shared base field prevents.
+    There is still one implementation: the ``Order.refundable_amount`` property.
     """
     summary = to_summary(order)
     lines = list(order.items if items is None else items)
+    if not fulfillments:
+        fulfillments = tuple(getattr(order, "shipments", None) or ())
 
     return OrderDetailOut(
         **summary.model_dump(),
@@ -212,8 +231,6 @@ def to_detail(
         cancel_reason=order.cancel_reason,
         completed_at=order.completed_at,
         cancelled_at=order.cancelled_at,
-        # Read from the model property, not recomputed: INV-005 has one owner.
-        refundable_amount=order.refundable_amount,
     )
 
 

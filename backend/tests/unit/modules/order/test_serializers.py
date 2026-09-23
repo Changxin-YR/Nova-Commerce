@@ -251,6 +251,11 @@ def test_the_summary_carries_no_line_items() -> None:
         "payable_amount",
         "paid_amount",
         "refunded_amount",
+        # Added in Phase 5: the consumer order list renders its refund control from
+        # this number, and the client-side fallback that covered for its absence is
+        # deleted (HANDOFF §17.5, obligation 1). A summary row that lacked it would
+        # silently hide the control — `undefined > 0` is `false`, not an error.
+        "refundable_amount",
         "receiver_name",
         "receiver_phone",
         "created_at",
@@ -260,6 +265,7 @@ def test_the_summary_carries_no_line_items() -> None:
         "first_item_name",
     }
     assert "items" not in dumped
+    assert dumped["refundable_amount"] == 0
     assert dumped["item_count"] == 1
     assert dumped["first_item_name"].startswith("Nova Phone 15 Pro")
 

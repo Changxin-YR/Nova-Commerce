@@ -348,6 +348,13 @@ class OrderSummaryOut(BaseModel):
     expires_at: UtcTimestamp | None = None
     item_count: int
     first_item_name: str
+    #: Added in Phase 5. ``OrderDetail`` has carried ``refundable_amount`` since
+    #: Phase 4 because a missing field silently disables every refund affordance in
+    #: the UI (``undefined > 0`` is false). The list row had the same defect and it
+    #: surfaced the moment the client-side fallback was deleted: the consumer order
+    #: list derives its refund control from this number. Same owner, same rule -
+    #: ``Order.refundable_amount`` is the single implementation of INV-005.
+    refundable_amount: int
 
     @field_validator("order_status")
     @classmethod

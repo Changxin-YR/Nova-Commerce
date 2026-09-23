@@ -257,6 +257,7 @@ def test_the_wire_field_uses_the_three_digit_encoding() -> None:
         payable_amount=299900,
         paid_amount=0,
         refunded_amount=0,
+        refundable_amount=0,
         receiver_name="张*",
         receiver_phone="138****5678",
         created_at=datetime(2026, 9, 22, 23, 31, 7, 507000, tzinfo=UTC),
@@ -312,6 +313,9 @@ def test_a_summary_with_an_unknown_order_status_fails_loudly() -> None:
             payable_amount=1,
             paid_amount=0,
             refunded_amount=0,
+            # Server-owned (API_CONTRACT section 6): on the base shape since Phase 5,
+            # so a summary row cannot be built without it.
+            refundable_amount=0,
             receiver_name="张*",
             receiver_phone="138****5678",
             created_at=datetime(2026, 9, 22, tzinfo=UTC),

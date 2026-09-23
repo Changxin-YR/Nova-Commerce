@@ -167,9 +167,50 @@ def test_valid_production_configuration_is_accepted() -> None:
         JWT_SECRET_KEY="a" * 64,
         REFRESH_COOKIE_SECURE=True,
         AI_USE_FAKE_PROVIDERS=False,
+        PAYMENT_MOCK_ENABLED=False,
     )
     assert resolved.is_production
     assert not resolved.is_testing
+    assert not resolved.mock_payment_allowed
+
+
+def test_mock_payment_surface_is_refused_in_staging_and_prod() -> None:
+    """REQ-PAY-005 / INV-008: the mock settlement surface is dev/demo only.
+
+    This is the configuration-time half of the guard. The endpoint asks the same
+    question again (see ``Settings.mock_payment_allowed``'s docstring), because a
+    validator is not an authorization check and this flag is the one whose misuse
+    would let a real deployment settle a payment without a provider.
+    """
+    for env in ("prod", "staging"):
+        with pytest.raises(ValueError, match="PAYMENT_MOCK_ENABLED must be false"):
+            Settings(
+                APP_ENV=env,  # type: ignore[arg-type]
+                APP_DEBUG=False,
+                JWT_SECRET_KEY="a" * 64,
+                REFRESH_COOKIE_SECURE=True,
+                AI_USE_FAKE_PROVIDERS=False,
+                PAYMENT_MOCK_ENABLED=True,
+            )
+
+
+def test_mock_payment_surface_is_allowed_in_dev_and_test() -> None:
+    """The other half: the demo must actually be able to run MockPay (section 100)."""
+    assert Settings(APP_ENV="dev", PAYMENT_MOCK_ENABLED=True).mock_payment_allowed
+    assert Settings(APP_ENV="test", PAYMENT_MOCK_ENABLED=True).mock_payment_allowed
+    # Opted out is still respected in dev.
+    assert not Settings(APP_ENV="dev", PAYMENT_MOCK_ENABLED=False).mock_payment_allowed
+    # A hardened environment that legitimately has the flag off stays off; it is
+    # also the only combination that can be *constructed* there, since staging
+    # and prod refuse the flag being on at all (the test above).
+    assert not Settings(
+        APP_ENV="staging",
+        APP_DEBUG=False,
+        JWT_SECRET_KEY="a" * 64,
+        REFRESH_COOKIE_SECURE=True,
+        AI_USE_FAKE_PROVIDERS=False,
+        PAYMENT_MOCK_ENABLED=False,
+    ).mock_payment_allowed
 
 
 def test_chunk_overlap_must_be_smaller_than_chunk_size() -> None:

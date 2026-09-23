@@ -219,25 +219,115 @@ server-owned because it decides whether a refund control renders (contract §11)
 | INV-003 same stock never deducted twice | `inventory_movements.idempotency_key` unique (Phase 3) | FG-09, re-run with orders |
 | INV-007 every stock change explained | `reference_type`/`reference_id` on every movement | ledger verification test |
 
-## 11. What Phase 5 adds (and inherits)
+## 11. Phase 5: what it adds, and the three decisions it must not re-open
 
-* `PaymentSuccessWorkflow`: verified callback → `payment_status` `PAID`,
-  `PENDING_PAYMENT → PROCESSING`, `ORDER_DEDUCT` movements, fulfillment shell,
-  outbox — all idempotent on `UNIQUE(provider, provider_event_id)`.
-* Fulfillment: `fulfillments` / `fulfillment_items`, `fulfillment_status`
-  transitions, `POST /fulfillments/{id}/ship`; `order_status` untouched.
-* After-sales and refunds: `refunded_amount`/`after_sale_status` writers, and the
-  refund caps (`refunded ≤ paid`, item refund ≤ item payable).
-* **A deletion with an owner:** when `OrderDetail.refundable_amount` starts being
-  returned for real, the frontend's `paid − refunded` fallback bridge and its
-  test branch must be deleted in the same change. Until then the bridge is the
-  only thing keeping refund controls visible on a payload that predates the
-  backend field.
+Phase 5 is where three of the four status axes get a writer. The order module keeps
+its state machine and the axes stay independent; what changes is that
+`payment_status`, `fulfillment_status` and `after_sale_status` now have owners
+outside this module.
 
-* **Single-merchant coupling (do not relax silently):** `_reserve_stock` resolves
-  **one** warehouse per order. That is equivalent to resolving per line only because
-  `load_priced_lines` refuses a cart spanning merchants, so every line shares one
-  `merchant_id` and `get_default(merchant_id=...)` is deterministic. If that guard is
-  ever relaxed - a marketplace cart - the resolution must move inside the loop in the
-  same change, or every line in the order would be locked against one merchant's
-  warehouse. Phase 5 inherits the guard as the enforcement, not a comment.
+### 11.1 `payment_status` is written by the payment path, never by the order path
+
+* Creating a payment attempt moves the order `UNPAID -> PAYING`. That is deliberate:
+  an attempt in flight is not "unpaid with nothing happening", and a UI that showed
+  `UNPAID` while the provider had the money would offer a cancel button on an order
+  about to be paid.
+* `PAID` is written by exactly one method - `PaymentSuccessWorkflow`, after a
+  verified provider callback. No HTTP route a JWT user can reach sets it, and no
+  order-module method does either (REQ-PAY-005/006, INV-008).
+* `PARTIAL_REFUNDED`/`REFUNDED` are written by the refund workflow only, and the
+  rule is `refunded_amount == paid_amount` for `REFUNDED`, strictly less for
+  `PARTIAL_REFUNDED`.
+
+### 11.2 `fulfillment_status` is a rollup over packages, and never moves `order_status`
+
+The order's `fulfillment_status` is **recomputed from all the order's packages on
+every ship**, not incremented:
+
+| Condition | Status |
+|---|---|
+| every line's total shipped quantity >= its ordered quantity | `SHIPPED` |
+| some quantity shipped | `PARTIAL_SHIPPED` |
+| nothing shipped | `UNFULFILLED` |
+| the carrier reports delivery (Phase 6+) | `DELIVERED` |
+
+Shipping never touches `order_status` (section 31). A shipped order is still
+`PROCESSING` until `POST /orders/{order_no}/confirm-receipt` moves it, and that
+endpoint in turn never touches `fulfillment_status`. "Can this be shipped?" reads
+`fulfillment_status`; "is this order finished?" reads `order_status`; the two
+questions have different answers for most of an order's life, which is exactly why
+the axes exist.
+
+One order may ship in **several packages** (REQ-FUL-001), so `fulfillments` is
+one-to-many and `POST /fulfillments/{id}/ship` is keyed by the package id. Shipping
+*less* than a package's line quantity is legal and creates a residual package in the
+same transaction - never a silently dropped remainder, which would be stock the
+customer paid for and will never receive.
+
+### 11.3 `after_sale_status` is written by money movement, not by a claim
+
+An after-sale claim is a *business* fact ("the customer says this is damaged"); a
+refund is a *money* fact ("we paid 150 back"). `after_sales.claim_status` tracks the
+first; `orders.after_sale_status` tracks the second and is written **only** by
+`RefundWorkflow`.
+
+Consequence worth stating: an `APPROVED` claim sits next to an order whose
+`after_sale_status` is still `PROCESSING`. That is correct, not a bug - nothing has
+been paid back yet, and an order that reported `REFUNDED` on approval would be
+claiming money moved when it had not.
+
+### 11.4 `refundable_amount` moved onto the list rows too (contract change)
+
+`OrderDetail.refundable_amount` was frozen in Phase 4. Phase 5 added it to
+`OrderSummaryOut` as well, and that is a **wire change to a frozen shape**, so it is
+recorded here rather than done quietly. The reason: the frontend's consumer order
+list renders its refund control from this figure, and the client-side
+`paid_amount - refunded_amount` fallback that covered for its absence was deleted in
+the same phase (the deletion is the proof the field is real - HANDOFF section 17.5
+obligation 1). Deleting the fallback with the field present only on the detail
+payload would have turned a silent fallback into a silently hidden control on the
+list. `API_CONTRACT.md` section 6 now names the field on the base order shape.
+
+### 11.5 The outbox seam is still a seam
+
+`CreateOrderWorkflow` step 9 and `PaymentSuccessWorkflow` step 10 both carry a marked
+"Phase 6 inserts the outbox row HERE, in this same transaction" comment. Phase 5
+deliberately does **not** create the table: an outbox row that nobody publishes is
+worse than no row, because it looks like the event was recorded. The comment is
+load-bearing - the row must commit with the business rows, so its position in the
+method is not movable.
+
+## 12. Carried forward: the Phase 5 deletions, and the one coupling that must not move silently
+
+### 12.1 The frontend refundable bridge is deleted (done)
+
+`OrderDetail.refundable_amount` was frozen in Phase 4 and delivered by Phase 4's
+serializer, but the frontend had already shipped a labelled `paid_amount -
+refunded_amount` fallback for the window before it existed. That deletion is done:
+the domain function now reads the server field only, its `TODO(phase-5)` marker and
+its warn-once seam are gone, and the spec cases that pinned the fallback were
+replaced by cases that pin the field's absence being a failure. The field also moved
+onto the order **list** rows in the same change (section 11.4) because the consumer
+list renders its refund control from it.
+
+Deleting the fallback without adding the field to the summary payload would have
+been a regression, not a cleanup - the same silent-hiding failure the addendum was
+written for, one screen over.
+
+### 12.2 The outbox seam is still a seam (Phase 6)
+
+Marked in two places, deliberately unmoved:
+`CreateOrderWorkflow` step 9 and `PaymentSuccessWorkflow` step 10. Phase 6 inserts the
+row there, in the same transaction, so that a duplicate callback cannot produce a
+duplicate outbox effect. An outbox row that nobody publishes is worse than none.
+
+### 12.3 Single-merchant coupling (do not relax silently)
+
+`_reserve_stock` resolves **one** warehouse per order. That is equivalent to resolving
+per line only because `load_priced_lines` refuses a cart spanning merchants, so every
+line shares one `merchant_id` and `get_default(merchant_id=...)` is deterministic. If
+that guard is ever relaxed - a marketplace cart - the resolution must move inside the
+loop in the same change, or every line in the order would be locked against one
+merchant's warehouse. Phase 4 wrote this down and Phase 5 inherits it: it is the
+enforcement, not a comment, and Phase 5's `ORDER_DEDUCT` path (one warehouse per
+order) depends on it too.

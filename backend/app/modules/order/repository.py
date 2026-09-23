@@ -45,8 +45,9 @@ from typing import Any
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
+from app.modules.fulfillment.models import Fulfillment
 from app.modules.order.enums import OrderStatus
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.shared.db.base import utc_now
@@ -114,6 +115,32 @@ class OrderRepository:
             select(OrderItem)
             .where(OrderItem.order_id == order_id)
             .order_by(OrderItem.id.asc())
+        )
+        return list(self._session.execute(stmt).scalars().all())
+
+
+    def shipments_for(self, order_id: int) -> list[Fulfillment]:
+        """The order's packages, oldest first, items eagerly loaded (section 5.1).
+
+        The join table belongs to the fulfillment module, and this method is the
+        order module's **only** reference to it. That direction is deliberate: the
+        order owns the response field ``shipments[]`` (section 6), so the order
+        read path is where the join belongs. The reverse edge - fulfillment
+        reaching into orders - would make the dependency circular and is why the
+        fulfillment module never imports this repository.
+
+        Phase 4 needed no such query because no fulfillment table existed; the
+        field was frozen and always ``[]``. Phase 5 fills it without a wire change,
+        which is the whole reason the field was frozen early.
+
+        No ``order_status`` filtering here: hiding a package because the order was
+        cancelled would hide the one record that says a parcel left the warehouse.
+        """
+        stmt = (
+            select(Fulfillment)
+            .where(Fulfillment.order_id == order_id)
+            .order_by(Fulfillment.id.asc())
+            .options(selectinload(Fulfillment.items))
         )
         return list(self._session.execute(stmt).scalars().all())
 

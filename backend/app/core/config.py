@@ -242,6 +242,49 @@ class Settings(BaseSettings):
     ORDER_PAYMENT_TIMEOUT_MINUTES: int = Field(default=15, ge=1, le=1440)
 
     # ------------------------------------------------------------------
+    # Payment / fulfillment / after-sales (Phase 5, sections 42-46)
+    # ------------------------------------------------------------------
+    #: Number prefixes. Like ORDER_NO_PREFIX these are display/ops concerns,
+    #: not business logic, but they are settings because a support desk reads
+    #: them all day and an operator should not have to edit source to change one.
+    PAYMENT_NO_PREFIX: str = Field(default="NVPAY", min_length=1, max_length=8)
+    FULFILLMENT_NO_PREFIX: str = Field(default="NVF", min_length=1, max_length=8)
+    AFTER_SALE_NO_PREFIX: str = Field(default="NVAS", min_length=1, max_length=8)
+    REFUND_NO_PREFIX: str = Field(default="NVR", min_length=1, max_length=8)
+
+    #: Channels the deployment accepts at all (section 42). A channel absent here
+    #: is PAYMENT_CHANNEL_UNSUPPORTED (60005) rather than a stored attempt that a
+    #: provider could never settle.
+    PAYMENT_ENABLED_CHANNELS: list[str] = Field(
+        default_factory=lambda: ["MOCK", "ALIPAY", "WECHAT"]
+    )
+
+    #: The MockPay surface (section 100) is DEV/DEMO ONLY and is refused outside
+    #: it (REQ-PAY-005, INV-008). Two guards: this setting cannot be true in a
+    #: hardened environment (validator below), and the endpoint asks the same
+    #: question again at the edge, because a single guard that somebody bypasses
+    #: with model_construct() would otherwise be the only one.
+    #:
+    #: Default OFF on purpose. A default of ``True`` would mean a deployment that
+    #: simply forgets to set this flag has the mock settlement surface live, and
+    #: "safe by default, opt in to the dangerous thing" is the rule the other
+    #: hardening flags follow. ``.env.example`` sets it true for the dev profile.
+    PAYMENT_MOCK_ENABLED: bool = False
+
+    #: HMAC secret for provider callbacks (section 43). The callback surface has
+    #: NO JWT - a provider cannot hold a user's bearer token - so the signature is
+    #: the authentication model, and this is the key it is computed with.
+    PAYMENT_CALLBACK_SECRET: SecretStr = SecretStr("dev-mock-callback-secret")
+    #: Replay window. A captured body replayed after this many seconds is refused
+    #: even when its signature verifies, which is exactly the attack a signature
+    #: alone does not stop.
+    PAYMENT_CALLBACK_MAX_SKEW_SECONDS: int = Field(default=300, ge=30, le=3600)
+    #: Optional per-provider secrets as a JSON object, e.g. {"ALIPAY": "..."}.
+    #: Empty means every provider uses PAYMENT_CALLBACK_SECRET, which is the
+    #: single-provider (mock) case.
+    PAYMENT_PROVIDER_SECRETS: dict[str, SecretStr] = Field(default_factory=dict)
+
+    # ------------------------------------------------------------------
     # PII redaction + logging (§94, §131, §132)
     # ------------------------------------------------------------------
     PII_MASK_PHONE: bool = True
@@ -315,6 +358,7 @@ class Settings(BaseSettings):
         "MCP_ALLOWED_ORIGINS",
         "MCP_ALLOWED_HOSTS",
         "MCP_REQUIRED_SCOPES",
+        "PAYMENT_ENABLED_CHANNELS",
     )
 
     @field_validator(*_csv_fields, mode="before")
@@ -357,6 +401,23 @@ class Settings(BaseSettings):
             # Allowed: full mode may legitimately run without a reranker if the
             # eval shows no gain, but it must be an explicit choice, not a typo.
             self.__dict__.setdefault("_warn_reranker_disabled", True)
+
+        if self.PAYMENT_MOCK_ENABLED and self.APP_ENV in {"staging", "prod"}:
+            # REQ-PAY-005 / INV-008. Refused at configuration time and again at
+            # the endpoint, deliberately: this is the flag whose misuse would let
+            # a real deployment settle payments without a provider.
+            msg = (
+                "PAYMENT_MOCK_ENABLED must be false when "
+                f"APP_ENV={self.APP_ENV}: the mock payment surface is dev/demo only"
+            )
+            raise ValueError(msg)
+
+        unsupported = sorted(
+            set(self.PAYMENT_ENABLED_CHANNELS) - {"MOCK", "ALIPAY", "WECHAT"}
+        )
+        if unsupported:
+            msg = f"PAYMENT_ENABLED_CHANNELS contains unknown channels: {unsupported}"
+            raise ValueError(msg)
 
         if self.RAG_CHUNK_OVERLAP_TOKENS >= self.RAG_CHUNK_MAX_TOKENS:
             msg = "RAG_CHUNK_OVERLAP_TOKENS must be smaller than RAG_CHUNK_MAX_TOKENS"
@@ -402,6 +463,28 @@ class Settings(BaseSettings):
     @property
     def is_testing(self) -> bool:
         return self.APP_ENV == "test"
+
+    @property
+    def mock_payment_allowed(self) -> bool:
+        """Whether the DEV/DEMO mock payment surface may run at all.
+
+        Asked by the settings validator *and* by the endpoint. The duplication is
+        deliberate: an endpoint must not trust that it was constructed with a
+        validated Settings object, and the validator must not be the only thing
+        standing between a misconfigured deployment and a forged settlement.
+        """
+        return self.PAYMENT_MOCK_ENABLED and self.APP_ENV in {"dev", "test", "demo"}
+
+    def provider_callback_secret(self, provider: str) -> str:
+        """The HMAC secret for one provider, falling back to the shared one.
+
+        A per-provider override exists because rotating one provider's secret
+        must not invalidate another provider's in-flight callbacks.
+        """
+        secret = self.PAYMENT_PROVIDER_SECRETS.get(provider.upper())
+        if secret is not None:
+            return secret.get_secret_value()
+        return self.PAYMENT_CALLBACK_SECRET.get_secret_value()
 
     @property
     def sync_database_url(self) -> str:

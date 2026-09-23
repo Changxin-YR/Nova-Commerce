@@ -234,55 +234,103 @@ _DEFAULT_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.MCP_TOKEN_INVALID: status.HTTP_401_UNAUTHORIZED,
     ErrorCode.MCP_TOKEN_INSUFFICIENT_SCOPE: status.HTTP_403_FORBIDDEN,
     ErrorCode.MCP_ORIGIN_REJECTED: status.HTTP_403_FORBIDDEN,
+    # -- Phase 5: payment / fulfillment / after-sales / refund -------------
+    # These families mix 404s with 409s and 422s, which is exactly why each code
+    # is listed here rather than left to a family-wide guess. A family default of
+    # 400 is right for a malformed payment request and wrong for "this payment
+    # does not exist"; one number cannot serve both.
+    ErrorCode.PAYMENT_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.PAYMENT_ALREADY_PAID: status.HTTP_409_CONFLICT,
+    ErrorCode.PAYMENT_AMOUNT_MISMATCH: status.HTTP_409_CONFLICT,
+    ErrorCode.PAYMENT_CALLBACK_INVALID_SIGNATURE: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.PAYMENT_CALLBACK_DUPLICATE: status.HTTP_200_OK,
+    ErrorCode.PAYMENT_CHANNEL_UNSUPPORTED: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.PAYMENT_MOCK_DISABLED: status.HTTP_403_FORBIDDEN,
+    ErrorCode.PAYMENT_STATE_INVALID: status.HTTP_409_CONFLICT,
+    ErrorCode.FULFILLMENT_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.FULFILLMENT_QUANTITY_EXCEEDS_ORDER: status.HTTP_409_CONFLICT,
+    ErrorCode.FULFILLMENT_STATE_INVALID: status.HTTP_409_CONFLICT,
+    ErrorCode.FULFILLMENT_ALREADY_SHIPPED: status.HTTP_409_CONFLICT,
+    ErrorCode.AFTER_SALE_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.AFTER_SALE_NOT_ELIGIBLE: status.HTTP_409_CONFLICT,
+    ErrorCode.AFTER_SALE_STATE_INVALID: status.HTTP_409_CONFLICT,
+    ErrorCode.REFUND_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.REFUND_EXCEEDS_PAID_AMOUNT: status.HTTP_409_CONFLICT,
+    ErrorCode.REFUND_EXCEEDS_ITEM_AMOUNT: status.HTTP_409_CONFLICT,
+    ErrorCode.REFUND_AMOUNT_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    ErrorCode.REFUND_ALREADY_COMPLETED: status.HTTP_409_CONFLICT,
     ErrorCode.OBJECT_NOT_FOUND: status.HTTP_404_NOT_FOUND,
 }
 
 
 def http_status_for(code: ErrorCode) -> int:
+    """The canonical HTTP status for a business code.
+
+    Only reached for a code whose error class did **not** declare an explicit
+    ``http_status``; every class built with an explicit status answers from
+    :attr:`AppError.status_code` first. It is still load-bearing: a code added to
+    ``ErrorCode`` without a class (or a bare ``AppError`` subclass) would land here,
+    and answering 400 for a *not-found* code is a client-visible contract break.
+
+    ## The bug this function carried until Phase 5
+
+    The previous implementation computed ``family = int(code) // 10_000`` and then
+    asked whether that value was one of ``{30, 40, 50, 60, 70, 80, 90, 100}``.
+    ``80_000 // 10_000`` is **8**, not 80, so that membership test was False for
+    every code in the 60xxx, 70xxx, 80xxx, 90xxx and 100xxx ranges and the function
+    fell through to 400. Observed before the fix:
+
+        AFTER_SALE_NOT_FOUND   80000 -> 400   (documented: 404)
+        REFUND_NOT_FOUND       80003 -> 400   (documented: 404)
+        PAYMENT_NOT_FOUND      60000 -> 400   (documented: 404)
+        FULFILLMENT_NOT_FOUND  70000 -> 400   (documented: 404)
+
+    It went unnoticed because **every** error class in the codebase declares its own
+    ``http_status``, so this fallback had never actually been consulted. Phase 5's
+    after-sales author found it while checking the 80xxx contract, which is the
+    cheap kind of finding: the code was wrong but nothing had depended on it yet.
+
+    The two-digit family is ``int(code) // 1_000`` (with the 10xxx common range
+    being ``// 10_000``, so it is handled by its own bucket rather than being forced
+    into a two-digit guess). The table is explicit rather than derived from the
+    numeric prefix, because a prefix rule would silently give ``PAYMENT_ALREADY_PAID``
+    a 2xx/4xx status nobody chose - and this function's whole defect was a rule that
+    looked plausible and was not.
+    """
     if code in _DEFAULT_HTTP_STATUS:
         return _DEFAULT_HTTP_STATUS[code]
-    family = int(code) // 10_000
-    if code in {
-        ErrorCode.INSUFFICIENT_STOCK,
-        ErrorCode.INVENTORY_CONFLICT_STALE_VERSION,
-        ErrorCode.ORDER_STATE_INVALID,
-        ErrorCode.ORDER_AMOUNT_MISMATCH,
-        ErrorCode.PRICE_CHANGED,
-        ErrorCode.PAYMENT_AMOUNT_MISMATCH,
-        ErrorCode.FULFILLMENT_QUANTITY_EXCEEDS_ORDER,
-        ErrorCode.PROMOTION_CONFLICT,
-        ErrorCode.DOCUMENT_DUPLICATE,
-        ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-        ErrorCode.AGENT_REVALIDATION_FAILED,
-        ErrorCode.PENDING_ACTION_PAYLOAD_CHANGED,
-    }:
-        return status.HTTP_409_CONFLICT
-    if family in {30, 40, 50, 60, 70, 80, 90, 100} and code in {
-        ErrorCode.PRODUCT_NOT_FOUND,
-        ErrorCode.SKU_NOT_FOUND,
-        ErrorCode.CATEGORY_NOT_FOUND,
-        ErrorCode.BRAND_NOT_FOUND,
-        ErrorCode.INVENTORY_NOT_FOUND,
-        ErrorCode.WAREHOUSE_NOT_FOUND,
-        ErrorCode.CART_NOT_FOUND,
-        ErrorCode.CART_ITEM_NOT_FOUND,
-        ErrorCode.ORDER_NOT_FOUND,
-        ErrorCode.ADDRESS_NOT_FOUND,
-        ErrorCode.PAYMENT_NOT_FOUND,
-        ErrorCode.FULFILLMENT_NOT_FOUND,
-        ErrorCode.AFTER_SALE_NOT_FOUND,
-        ErrorCode.REFUND_NOT_FOUND,
-        ErrorCode.PROMOTION_NOT_FOUND,
-        ErrorCode.COUPON_NOT_FOUND,
-        ErrorCode.KNOWLEDGE_BASE_NOT_FOUND,
-        ErrorCode.DOCUMENT_NOT_FOUND,
-        ErrorCode.AGENT_RUN_NOT_FOUND,
-        ErrorCode.PENDING_ACTION_NOT_FOUND,
-    }:
-        return status.HTTP_404_NOT_FOUND
-    if family in {20}:
+
+    #: Canonical status per code family (the first two digits of the business code).
+    #: Values are the *category* default - an individual code that means something
+    #: else declares it on its class instead.
+    family_status: dict[int, int] = {
+        20: status.HTTP_400_BAD_REQUEST,       # identity: malformed credential/session
+        30: status.HTTP_400_BAD_REQUEST,       # catalog
+        40: status.HTTP_409_CONFLICT,          # inventory: stock conflicts
+        50: status.HTTP_409_CONFLICT,          # cart / pricing / order state
+        60: status.HTTP_400_BAD_REQUEST,       # payment
+        70: status.HTTP_409_CONFLICT,          # fulfillment state
+        80: status.HTTP_409_CONFLICT,          # after-sales / refund state
+        90: status.HTTP_409_CONFLICT,          # marketing conflicts
+        100: status.HTTP_422_UNPROCESSABLE_CONTENT,  # knowledge input
+        110: status.HTTP_409_CONFLICT,         # agent run state
+        120: status.HTTP_409_CONFLICT,         # pending action / MCP state
+        130: status.HTTP_503_SERVICE_UNAVAILABLE,  # storage outage
+        140: status.HTTP_429_TOO_MANY_REQUESTS,    # governance / rate limits
+    }
+    family = int(code) // 1_000
+    if family in family_status:
+        return family_status[family]
+
+    #: The 10xxx common range is the only family that is not two digits.
+    if 10_000 <= int(code) < 11_000:
         return status.HTTP_400_BAD_REQUEST
-    return status.HTTP_400_BAD_REQUEST
+
+    # A code with no entry anywhere is a defect in ErrorCode, not a business
+    # condition, so it answers 500 and is loud rather than masquerading as a 400 a
+    # client will retry. `test_every_error_code_declares_a_status` is what keeps
+    # this line unreachable in practice.
+    return status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 # ---------------------------------------------------------------------------
@@ -492,12 +540,48 @@ PaymentCallbackSignatureError = _error(
 PaymentMockDisabledError = _error(
     "Mock payment is only available in dev/demo", ErrorCode.PAYMENT_MOCK_DISABLED, http_status=403
 )
+#: 60004 is deliberately a **2xx-family** code: a provider retries until it sees
+#: success, so a duplicate delivery that was in fact already applied must be
+#: answered as handled. See API_CONTRACT section 15.3.
+PaymentCallbackDuplicateError = _error(
+    "Payment callback was already processed",
+    ErrorCode.PAYMENT_CALLBACK_DUPLICATE,
+    http_status=200,
+)
+#: 60003 is 401 rather than 400: the signature IS the authentication model for this
+#: surface (it carries no JWT), so a bad signature is an authentication failure.
+#: The existing class above was built before that was written down; this comment is
+#: the reason it stays at 400 until a caller needs otherwise - both are refusals and
+#: no frozen contract names the status for this code.
+PaymentStateInvalidError = _error(
+    "Payment is not in a state that allows this action",
+    ErrorCode.PAYMENT_STATE_INVALID,
+    http_status=409,
+)
+PaymentChannelUnsupportedError = _error(
+    "Payment channel is not supported by this deployment",
+    ErrorCode.PAYMENT_CHANNEL_UNSUPPORTED,
+    http_status=422,
+)
 
 # -- fulfillment ------------------------------------------------------------
 FulfillmentNotFoundError = _error("Fulfillment not found", ErrorCode.FULFILLMENT_NOT_FOUND, http_status=404)
 FulfillmentQuantityError = _error(
     "Shipment quantity exceeds the ordered quantity",
     ErrorCode.FULFILLMENT_QUANTITY_EXCEEDS_ORDER,
+    http_status=409,
+)
+FulfillmentStateInvalidError = _error(
+    "Fulfillment is not in a state that allows this action",
+    ErrorCode.FULFILLMENT_STATE_INVALID,
+    http_status=409,
+)
+#: 70003 is its own code, not the generic 70002, because "this package already
+#: shipped" is a normal outcome of a double click and the UI says something
+#: different for it than for "you cannot do that from here".
+FulfillmentAlreadyShippedError = _error(
+    "Fulfillment has already been shipped",
+    ErrorCode.FULFILLMENT_ALREADY_SHIPPED,
     http_status=409,
 )
 
@@ -513,6 +597,29 @@ RefundExceedsPaidError = _error(
 RefundExceedsItemError = _error(
     "Refund would exceed the item's paid amount",
     ErrorCode.REFUND_EXCEEDS_ITEM_AMOUNT,
+    http_status=409,
+)
+#: 80002 is the claim's own state machine answer ("this claim was rejected and
+#: cannot be approved"), distinct from 80001 (it was never eligible at all) and
+#: from the refund codes, which describe money.
+AfterSaleStateInvalidError = _error(
+    "After-sale request is not in a state that allows this action",
+    ErrorCode.AFTER_SALE_STATE_INVALID,
+    http_status=409,
+)
+#: 80006 covers "<= 0" and "above the approved amount" together: both mean the
+#: caller sent a number the workflow cannot act on, and splitting them would give
+#: the client two codes it renders identically.
+RefundAmountInvalidError = _error(
+    "Refund amount is invalid",
+    ErrorCode.REFUND_AMOUNT_INVALID,
+    http_status=422,
+)
+#: 80007 is raised when an idempotency key is reused for a refund that would not be
+#: the same refund - the money-movement analogue of 10011.
+RefundAlreadyCompletedError = _error(
+    "Refund has already been completed",
+    ErrorCode.REFUND_ALREADY_COMPLETED,
     http_status=409,
 )
 

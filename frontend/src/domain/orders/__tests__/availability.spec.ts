@@ -13,7 +13,7 @@
  *     it on the fulfillment.
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   canCancelOrder,
   canConfirmReceipt,
@@ -24,15 +24,18 @@ import {
   orderActionBlockedReason,
   orderActionFlags,
   refundableAmount,
-  refundableBridgeState,
 } from '@/domain/orders/availability'
 import type { AfterSaleStatus, FulfillmentStatus, OrderStatus, PaymentStatus } from '@/types/domain'
 import type { Fulfillment } from '@/types/frozen-contract'
 
 /**
- * Build the minimal order shape the predicates read, using the FROZEN field names
- * (`order_status`, and `paid_amount`/`refunded_amount` instead of a server-side
- * `refundable_amount`).
+ * Build the minimal order shape the predicates read, using the FROZEN field names.
+ *
+ * `refundable_amount` is present because every real `OrderDetail` carries it
+ * (§6): the field is server-owned, and the client-side fallback that used to cover
+ * for its absence is deleted (HANDOFF §17.5, obligation 1). Stubbing it here the
+ * way the server computes it - `max(paid - refunded, 0)` - is a FIXTURE
+ * convenience; the code under test must never do that arithmetic itself.
  */
 function order(overrides: {
   order_status: OrderStatus
@@ -41,14 +44,18 @@ function order(overrides: {
   after_sale_status?: AfterSaleStatus
   paid_amount?: number
   refunded_amount?: number
+  refundable_amount?: number
 }) {
+  const paid = overrides.paid_amount ?? 0
+  const refunded = overrides.refunded_amount ?? 0
   return {
     order_status: overrides.order_status,
     payment_status: overrides.payment_status ?? 'PAID',
     fulfillment_status: overrides.fulfillment_status ?? 'UNFULFILLED',
     after_sale_status: overrides.after_sale_status ?? ('NONE' as AfterSaleStatus),
-    paid_amount: overrides.paid_amount ?? 0,
-    refunded_amount: overrides.refunded_amount ?? 0,
+    paid_amount: paid,
+    refunded_amount: refunded,
+    refundable_amount: overrides.refundable_amount ?? Math.max(0, paid - refunded),
   }
 }
 
@@ -67,98 +74,52 @@ function fulfillment(overrides: Partial<Pick<Fulfillment, 'id' | 'carrier' | 'tr
 /** A shippable fulfillment: nothing stamped on it yet. */
 const unshipped = fulfillment()
 
-describe('refundableAmount — server-owned, with a documented pre-backend bridge', () => {
-  it('READS the server field when it is present', () => {
-    // `API_CONTRACT.md` §11 made this server-owned because it gates whether a refund control
+describe('refundableAmount - server-owned, no client-side derivation', () => {
+  it('READS the server field', () => {
+    // `API_CONTRACT.md` §6 made this server-owned because it gates whether a refund control
     // renders at all (§15: the client must not be the authority on an accounting rule).
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: 279900 })).toBe(
-      279900,
-    )
+    expect(
+      refundableAmount({ refundable_amount: 279900 }),
+    ).toBe(279900)
   })
 
-  it('prefers the server figure over its own arithmetic when the two disagree', () => {
-    // The server may bound the value below 0, account for a rule the client does not know about,
-    // or hold a lock. Its number wins — that is the whole point of the addendum.
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: 100000 })).toBe(
-      100000,
-    )
+  it('uses the server figure even when it disagrees with its own arithmetic', () => {
+    // The server may bound the value, account for a rule the client does not know about, or be
+    // rendering a snapshot taken under a lock. Its number wins - that is the whole point of the
+    // addendum. This is the case that would fail if the fallback ever came back.
+    expect(
+      refundableAmount({ refundable_amount: 100000 }),
+    ).toBe(100000)
   })
 
   it('never returns a negative amount, even if the server sends one', () => {
-    expect(refundableAmount({ paid_amount: 100, refunded_amount: 500, refundable_amount: -50 })).toBe(0)
-  })
-
-  it('still works BEFORE the backend ships the field, so refunds never silently vanish', () => {
-    // THE FAILURE MODE THE ADDENDUM WAS WRITTEN FOR: `undefined > 0` is false, so a missing field
-    // would hide every refund affordance without throwing anything. The bridge derives the value
-    // until the order module lands.
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0 })).toBe(279900)
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 79900 })).toBe(200000)
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 279900 })).toBe(0)
-    // An explicit null is treated as "absent", not as zero.
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: null })).toBe(
-      279900,
-    )
-  })
-
-  it('subtracts what was refunded from what was paid (bridge)', () => {
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0 })).toBe(279900)
-    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 79900 })).toBe(200000)
-  })
-
-  it('never goes negative, even if the server reports an over-refund', () => {
-    expect(refundableAmount({ paid_amount: 100, refunded_amount: 500 })).toBe(0)
+    expect(
+      refundableAmount({ refundable_amount: -50 }),
+    ).toBe(0)
   })
 
   it('is 0 for an unpaid order, so a refund is never offered on it', () => {
-    expect(refundableAmount({ paid_amount: 0, refunded_amount: 0 })).toBe(0)
-  })
-})
-
-describe('the refundable bridge ANNOUNCES itself (§15 transition hygiene)', () => {
-  /**
-   * The bridge is tolerated only while it is noisy. These tests exist because a silent fallback
-   * becomes a permanent fallback: the whole point of the warning is that a bridge which speaks up
-   * gets deleted, so the warning is a behaviour worth pinning rather than a nicety.
-   */
-  beforeEach(() => {
-    refundableBridgeState.warned = false
+    expect(refundableAmount({ refundable_amount: 0 })).toBe(0)
   })
 
-  it('warns when it falls back, naming the missing field and the removal trigger', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    refundableAmount({ paid_amount: 279900, refunded_amount: 0 })
-
-    expect(warn).toHaveBeenCalledTimes(1)
-    const message = String(warn.mock.calls[0]?.[0] ?? '')
-    // Names the missing field...
-    expect(message).toContain('OrderDetail.refundable_amount')
-    // ...and the condition that retires the bridge, so nobody has to reverse-engineer it.
-    expect(message).toContain('Phase 5')
-    expect(message).toContain('Removal trigger')
-    warn.mockRestore()
+  it('fails safe to 0 on a malformed payload instead of deriving a number', () => {
+    // The fallback is deleted, so a non-numeric field must NOT become `paid - refunded`: that
+    // would re-create the second source of truth §6 forbids. 0 hides the affordance rather than
+    // offering a refund the server would refuse.
+    const malformed = { refundable_amount: Number.NaN }
+    expect(refundableAmount(malformed)).toBe(0)
   })
 
-  it('does NOT warn when the server supplied the field', () => {
-    // The bridge must be silent on the happy path, otherwise the signal becomes noise and the
-    // warning is ignored exactly when it matters.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: 279900 })
-
-    expect(warn).not.toHaveBeenCalled()
-    warn.mockRestore()
+  it('a partial refund leaves the remaining balance refundable', () => {
+    expect(
+      refundableAmount({ refundable_amount: 200000 }),
+    ).toBe(200000)
   })
 
-  it('warns only ONCE per session, because it is called from computed values and templates', () => {
-    // A per-call warning would flood the console into uselessness the moment an order list renders.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const legacyOrder = { paid_amount: 279900, refunded_amount: 0 }
-    refundableAmount(legacyOrder)
-    refundableAmount(legacyOrder)
-    refundableAmount(legacyOrder)
-
-    expect(warn).toHaveBeenCalledTimes(1)
-    warn.mockRestore()
+  it('a fully refunded order has nothing left', () => {
+    expect(
+      refundableAmount({ refundable_amount: 0 }),
+    ).toBe(0)
   })
 })
 

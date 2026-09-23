@@ -288,6 +288,10 @@ class OrderService:
         order = self._orders.get_by_order_no(order_no, user_id=principal.user_id)
         if order is None:
             raise OrderNotFoundError("order not found", context={"order_no": order_no})
+        # The packages travel with the order (section 5.1). Loaded here rather than
+        # in the serializer so the serializer keeps its "attributes only" contract
+        # and cannot acquire a database dependency.
+        order.shipments = self._orders.shipments_for(order.id)
         return order
 
     def list_customer_orders(
@@ -334,6 +338,7 @@ class OrderService:
             # merchant filter is applied in the query, so a foreign row is never fetched
             # and therefore cannot be confirmed to exist.
             raise OrderNotFoundError("order not found", context={"order_no": order_no})
+        order.shipments = self._orders.shipments_for(order.id)
         return order
 
     def list_admin_orders(

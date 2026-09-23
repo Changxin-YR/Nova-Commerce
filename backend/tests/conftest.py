@@ -71,19 +71,33 @@ def storage(settings):
 
 @pytest.fixture
 def client(settings):
-    """ASGI test client.
+    """ASGI test client that actually works, via ``fastapi.testclient``.
 
-    Uses ``httpx.ASGITransport`` so requests exercise the real middleware stack
-    (correlation, body limit, security headers, error handlers) without binding
-    a socket.
+    **This fixture was broken from Phase 1 until Phase 5** and no test used it, so
+    the defect was latent: ``httpx.Client(transport=httpx.ASGITransport(app=app))``
+    cannot work with httpx 0.28, because ``ASGITransport`` implements only
+    ``handle_async_request``. A *synchronous* ``httpx.Client`` therefore raises
+    ``AttributeError: 'ASGITransport' object has no attribute 'handle_request'`` on
+    its first call. Phase 4 worked around it with a module-local fixture in
+    ``tests/integration/order/conftest.py`` and reported it rather than silently
+    patching a file it did not own; Phase 5 fixes it at source (HANDOFF section
+    17.5, obligation 4).
+
+    ``fastapi.testclient.TestClient`` drives the app through its own anyio portal,
+    so no async test plumbing is needed at the call site, and the real middleware
+    stack (correlation id, body limit, security headers, error handlers) still
+    runs - which is the property the original fixture was reaching for.
+
+    A caller that needs async (an SSE stream, say) must use
+    ``httpx.AsyncClient(transport=httpx.ASGITransport(app))`` explicitly; keeping
+    both modes in one fixture is how the sync one became broken in the first
+    place.
     """
-    import httpx
+    from fastapi.testclient import TestClient
 
     from app.main import create_app
 
-    app = create_app(settings)
-    transport = httpx.ASGITransport(app=app)
-    with httpx.Client(transport=transport, base_url="http://testserver") as http_client:
+    with TestClient(create_app(settings)) as http_client:
         yield http_client
 
 

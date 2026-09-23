@@ -51,12 +51,16 @@ export interface OrderStateLike {
   /** Integer minor units already refunded. */
   refunded_amount: number
   /**
-   * SERVER-OWNED remaining refundable amount (`OrderDetail`, §11 addendum).
+   * SERVER-OWNED remaining refundable amount (`OrderDetail`, §6 / §11 addendum).
    *
-   * Optional in the TYPE only because the bridge below still has to cope with a payload produced
-   * before the backend order module lands; every real `OrderDetail` carries it.
+   * **Required, not optional.** The backend has returned this field since Phase 4:
+   * `app/modules/order/serializers.py::to_detail` reads `Order.refundable_amount`, which
+   * is `max(paid_amount - refunded_amount, 0)`. It was optional for exactly one reason -
+   * the pre-backend fallback - and that fallback is deleted (HANDOFF §17.5, obligation 1).
+   * Leaving it optional would let the same silent-fallback defect return without a type
+   * error, which is the failure mode §6 froze the field to prevent.
    */
-  refundable_amount?: number | null
+  refundable_amount: number
 }
 
 export type OrderAction = 'cancel' | 'confirmReceipt' | 'ship' | 'refund' | 'viewDetail'
@@ -70,68 +74,35 @@ export interface OrderActionFlags {
 }
 
 /**
- * Remaining refundable amount, in integer minor units — **read from the server**.
+ * Remaining refundable amount, in integer minor units - **read from the server**.
  *
- * `API_CONTRACT.md` §11 made `refundable_amount` server-owned, and the reason is worth stating where
- * the value is consumed: this figure decides whether a refund CONTROL IS RENDERED AT ALL, so a
- * client-side derivation would put an accounting rule (INV-005) in the UI. §15 forbids the client
- * from being the authority on it.
+ * `API_CONTRACT.md` §6/§11 made `refundable_amount` server-owned because this
+ * figure decides whether a refund CONTROL IS RENDERED AT ALL: a client-side
+ * derivation puts an accounting rule (INV-005) in the UI, and `undefined > 0` is
+ * `false` - so a payload without the field would silently disable every refund
+ * affordance without throwing anything.
  *
- * WHY THERE IS STILL A DERIVATION HERE: the order module does not exist yet (`app/modules/*`), so
- * until it lands a real payload has no `refundable_amount`. Without the fallback, `undefined > 0` is
- * `false` and EVERY refund affordance would silently disappear — a dead UI is worse than a clearly
- * marked transition, because a dead UI gets debugged while a silent fallback gets forgotten.
+ * There is exactly ONE implementation of this number, and it is the backend's.
+ * This function previously derived `paid_amount - refunded_amount` as a labelled
+ * bridge while the order module was being built. That branch is now deleted, with
+ * its `TODO(phase-5)` marker, its warn-once seam and its spec cases: a fallback
+ * that is never exercised is a second source of truth waiting to disagree with the
+ * first, and the deletion is the proof the field is real (HANDOFF §17.5,
+ * obligation 1).
  *
- * @deprecated TRANSITIONAL BRIDGE. This arithmetic must be removed once the backend ships
- *   `OrderDetail.refundable_amount`. It lives in the DOMAIN layer, and a second source of truth for a
- *   money figure is exactly the shape §15 forbids — so it is tolerated only as a labelled, noisy,
- *   temporary bridge. See `TODO(phase-5)` at the fallback branch below.
+ * The `Math.max(0, ...)` clamp is NOT a reimplementation of the server rule - it
+ * is input hardening. A negative balance reaching a form's `max` attribute renders
+ * as a nonsense cap, and a malformed response must not become a UI rule.
  */
-export function refundableAmount(
-  order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount'> & {
-    refundable_amount?: number | null
-  },
-): number {
+export function refundableAmount(order: Pick<OrderStateLike, 'refundable_amount'>): number {
   const fromServer = order.refundable_amount
-  if (typeof fromServer === 'number' && Number.isFinite(fromServer)) {
-    return Math.max(0, fromServer)
+  if (typeof fromServer !== 'number' || !Number.isFinite(fromServer)) {
+    // A well-typed payload cannot reach here. If one somehow does, refusing to
+    // guess is the honest answer: showing the derived number re-creates the
+    // bridge, and 0 fails safe by never offering a refund the server would refuse.
+    return 0
   }
-
-  // TODO(phase-5): DELETE this branch AND its spec cases once Phase 5 lands
-  //   `OrderDetail.refundable_amount`.
-  // Removal trigger: a real `GET /orders/{admin/{order_no}}` response carries the field, so this
-  //   branch becomes unreachable in production and the domain layer goes back to having ONE source
-  //   of truth for a money figure. Owner: the backend implementer completing Phase 5 (the
-  //   definition of done for Phase 5 in HANDOFF.md names this deletion explicitly).
-  warnBridgeHit()
-  return Math.max(0, order.paid_amount - order.refunded_amount)
-}
-
-/**
- * Test seam. The warn-once latch is module state, so the tests reset it to assert the warning fires
- * exactly once per session rather than on every render pass.
- */
-export const refundableBridgeState = { warned: false }
-
-/**
- * A silent fallback becomes a PERMANENT fallback. The bridge therefore announces itself in
- * development, naming the missing field and the condition that retires it, so it cannot be forgotten
- * — the point being that a bridge which speaks up is a bridge that gets deleted.
- *
- * `import.meta.env.DEV` keeps this out of production builds entirely: the warning is a developer
- * signal, not user-facing noise. Warns ONCE per session because this function is called from
- * computed values and templates, and a per-call warning would flood the console into uselessness.
- */
-function warnBridgeHit(): void {
-  if (!import.meta.env.DEV || refundableBridgeState.warned) return
-  refundableBridgeState.warned = true
-  console.warn(
-    '[nexora] refundableAmount() fell back to paid_amount - refunded_amount.\n' +
-      '  Missing field: OrderDetail.refundable_amount (server-owned, API_CONTRACT.md §11).\n' +
-      '  This is a TRANSITIONAL BRIDGE in the domain layer and a second source of truth for a money\n' +
-      '  figure that gates whether refund controls render (INV-005 / §15).\n' +
-      '  Removal trigger: delete the fallback + its spec cases once Phase 5 ships the field.',
-  )
+  return Math.max(0, fromServer)
 }
 
 /** Cancellable while nothing has left the warehouse and refunds have not started. */
@@ -215,9 +186,10 @@ export function canShipOrder(
 
 /** A refund can still be issued while money remains un-refunded on a paid order. */
 export function canRefundOrder(
-  order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount' | 'payment_status'> & {
-    refundable_amount?: number | null
-  },
+  order: Pick<
+    OrderStateLike,
+    'payment_status' | 'paid_amount' | 'refunded_amount' | 'refundable_amount'
+  >,
 ): boolean {
   const refundableStates: PaymentStatus[] = ['PAID', 'PARTIAL_REFUNDED']
   return refundableStates.includes(order.payment_status) && refundableAmount(order) > 0
@@ -233,6 +205,7 @@ export function orderActionFlags(
     | 'after_sale_status'
     | 'paid_amount'
     | 'refunded_amount'
+    | 'refundable_amount'
   >,
   fulfillment?: Pick<Fulfillment, 'carrier'> | null,
 ): OrderActionFlags {
@@ -257,6 +230,7 @@ export function orderActionBlockedReason(
     | 'after_sale_status'
     | 'paid_amount'
     | 'refunded_amount'
+    | 'refundable_amount'
   >,
   fulfillment?: Pick<Fulfillment, 'carrier'> | null,
 ): string {

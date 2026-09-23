@@ -125,6 +125,16 @@ export interface OrderBase {
   payable_amount: number
   paid_amount: number
   refunded_amount: number
+  /**
+   * Integer minor units still refundable (`paid_amount - refunded_amount`, floored at 0),
+   * SERVER-OWNED because INV-005 is (§6 / §11 addendum).
+   *
+   * On EVERY order payload, list rows included. The consumer order list renders its refund
+   * control from this number, and `undefined > 0` is `false` — a missing field would silently
+   * hide the control instead of throwing, which is the failure mode the addendum was written
+   * for. The client-side `paid - refunded` fallback this field replaced is deleted.
+   */
+  refundable_amount: number
   /** Already masked by the server (§94) — the client must NOT try to un-mask it. */
   receiver_name: string
   /** Already masked by the server (§94). */
@@ -158,16 +168,7 @@ export interface OrderDetail extends OrderBase {
    * workflow, so the client cannot infer it — the cancel endpoint accepts the reason as its writer.
    */
   cancel_reason: string | null
-  /**
-   * Integer minor units, `paid_amount - refunded_amount`, bounded below by 0 (§11 addendum).
-   *
-   * SERVER-OWNED BECAUSE INV-005 IS. This value decides whether a refund control renders at all, so
-   * having the client compute it would put an accounting rule in the UI: on a payload lacking the
-   * field the expression yields `undefined`, `undefined > 0` is `false`, and every refund
-   * affordance would silently vanish without anything throwing.
-   */
-  refundable_amount: number
-  items: OrderItem[]
+    items: OrderItem[]
   /** Fulfillment objects that can be shipped. This is where the ship id comes from. */
   shipments: Fulfillment[]
 }

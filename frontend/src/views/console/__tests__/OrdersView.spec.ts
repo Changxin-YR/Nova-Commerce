@@ -71,6 +71,9 @@ function makeOrder(overrides: Partial<OrderSummary> = {}): OrderSummary {
     payable_amount: 599900,
     paid_amount: 0,
     refunded_amount: 0,
+    // Server-owned (API_CONTRACT §6). Zero on an unpaid order, which is what makes
+    // the refund action unavailable rather than merely disabled-looking.
+    refundable_amount: 0,
     receiver_name: '张**',
     receiver_phone: '138****5678',
     created_at: '2026-09-22T23:31:07.507Z',
