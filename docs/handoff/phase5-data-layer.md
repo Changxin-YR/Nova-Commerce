@@ -49,3 +49,53 @@ Verified against the repo, not recalled. State when written: HEAD `e338eca`,
 - **`alembic check` is unstable while tests run** - it transiently diffed the verifier's `_fg12_twin_payments`, then passed quiesced. Take gate readings on a quiet DB.
 - **Residue counts are unstable under concurrent agents** - only marker-scoped counts are comparable.
 - **I did not re-run the whole suite after the last three commits** (13.1). Last full measurement: `1094 passed, 0 failed, 0 errors` on a clean DB.
+
+## 7. `sku_id` revert — attempt abandoned; exact state and the reliable recipe
+
+`t7`'s `sku_id` column is **still in the tree** (HEAD `5d4c5f1`). The captain ruled it out
+("remove sku_id, this reverses my own reversal"), and I tried and **failed to land the
+revert**. Recording this honestly because the next agent should not repeat my approach.
+
+**Why it is not a one-file change.** Three call sites in fulfilment's committed code depend
+on the column, and they are not mine:
+
+    fulfillment/serializers.py:75   sku_id=row.sku_id                    <- reads the column
+    fulfillment/service.py:319      sku_id=line.sku_id                   <- create_shell writes it
+    fulfillment/service.py:744      sku_id=sku_id                        <- residual package writes it
+
+So removal needs the two commits above to be reverted **in the same window**, or
+fulfilment's serializer raises `AttributeError` and both inserts fail `NOT NULL`. Two of
+the captain's premises in that message are factually wrong and worth correcting before
+anyone acts on them: `create_shell` **does** set the column (line 319, verified), and the
+suites **were** green with it (fulfilment 38 passed, commerce 8 passed).
+
+**What I actually tried, and why it failed.** Four attempts: regex deletion of the column /
+FK / index / backfill blocks; then line-index deletion. Symptoms observed, in order:
+writes that reported success but did not persist (the file was byte-identical to HEAD and
+`git status` clean afterwards); one write that did land and left an `IndentationError` at
+line 273; and line-index arithmetic that drifted on an 850-line file, deleting the
+`ix_fulfillment_items_order_item_id` index as collateral. I verified after each attempt
+rather than trusting the write, which is the only reason none of this reached a commit.
+I then restored both files with `git checkout` so the tree stayed consistent — `alembic
+check` clean, `alembic current` at head, model and migration agreeing.
+
+**The reliable recipe for the next agent — do this first, do not repeat mine:**
+1. `git checkout -- backend/app/modules/fulfillment/models.py backend/migrations/versions/20260923_1643_3f1ae2c55c54_phase5_payment_fulfillment_aftersales_and_refund.py`
+   (start from the committed state; do not inherit my partial edits).
+2. Edit the **model** with a targeted editor operation, not a regex: delete the
+   `_sku_id_for_insert` helper, the `sku_id` `mapped_column(...)` block, and
+   `Index("ix_fulfillment_items_sku_id", "sku_id"),`. Confirm with
+   `python -c "from app.modules.fulfillment.models import FulfillmentItem as F; print(sorted(c.name for c in F.__table__.columns))"`.
+3. **For the migration, prefer a NEW revision** that drops the index, the FK and the column
+   (`op.drop_index`, `op.drop_constraint(type_="foreignkey")`, `op.drop_column`) over
+   editing `3f1ae2c55c54` in place. In-place editing of an applied revision is what defeated
+   me: it is an 850-line file and every anchor I chose drifted. A new revision is also the
+   safer habit, since the applied one is referenced by the DDL evidence artifact.
+   If you do edit in place, the four things to remove are the `sa.Column("sku_id", ...)`,
+   the `sa.ForeignKeyConstraint(["sku_id"], ...)`, the `op.create_index("ix_fulfillment_items_sku_id", ...)`
+   block, and the nullable → backfill → `ALTER ... MODIFY NOT NULL` block — and then
+   `SHOW COLUMNS FROM fulfillment_items` must show 8 columns.
+4. Only then tell fulfilment to revert `serializers.py:75` and `service.py:319,744`.
+
+**Also unresolved, and smaller:** `PHASE5_DESIGN` §5.4 and `REQ-FUL-002` both deny the
+column, so until the revert lands the schema contradicts two documents.
