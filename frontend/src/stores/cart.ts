@@ -1,93 +1,128 @@
-/**
- * Cart store (§105) — one of the only six allowed Pinia stores.
- *
- * The cart is SERVER state. This store is a cache of the last server response plus
- * a `revision` counter, so two tabs and the product page agree. It never computes
- * prices: `selected_amount` and every `subtotal_amount` come from the server, and
- * the store must not "fix up" a number the backend produced.
- */
-
-import { computed, ref } from 'vue'
+/** Cart selection lives in Pinia and localStorage; order preview owns every price (§14.1). */
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { cartApi } from '@/api'
-import type { Cart } from '@/types/domain'
-import type { NormalizedApiError } from '@/types/api'
+import { useAuthStore } from '@/stores/auth'
+import type { CartItem } from '@/types/domain'
+
+const MAX_QUANTITY = 1_000_000
+
+function validLine(value: unknown): value is CartItem {
+  if (!value || typeof value !== 'object') return false
+  const line = value as Partial<CartItem>
+  return typeof line.product_id === 'string' && /^\d+$/.test(line.product_id)
+    && typeof line.sku_id === 'string' && /^\d+$/.test(line.sku_id)
+    && Number.isSafeInteger(line.quantity) && Number(line.quantity) > 0
+    && Number(line.quantity) <= MAX_QUANTITY && typeof line.selected === 'boolean'
+}
 
 export const useCartStore = defineStore('cart', () => {
-  const cart = ref<Cart | null>(null)
+  const auth = useAuthStore()
+  const items = ref<CartItem[]>([])
   const loading = ref(false)
   const mutating = ref(false)
-  const error = ref<NormalizedApiError | null>(null)
-
-  const items = computed(() => cart.value?.items ?? [])
-  const itemCount = computed(() => cart.value?.item_count ?? 0)
-  /** Integer minor units, selected items only, as reported by the server. */
-  const selectedAmount = computed(() => cart.value?.selected_amount ?? 0)
+  const itemCount = computed(() => items.value.reduce((count, item) => count + item.quantity, 0))
   const selectedItems = computed(() => items.value.filter((item) => item.selected))
   const isEmpty = computed(() => items.value.length === 0)
+  const storageKey = computed(() => `nova:cart:v1:${auth.user?.id ?? 'guest'}`)
+  let loadedKey = ''
+
+  function persist(): void {
+    try {
+      localStorage.setItem(storageKey.value, JSON.stringify(items.value))
+    } catch {
+      // The in-memory cart remains usable when browser storage is unavailable.
+    }
+  }
 
   async function load(): Promise<void> {
+    if (loadedKey === storageKey.value) return
     loading.value = true
-    error.value = null
     try {
-      cart.value = await cartApi.get()
-    } catch (e) {
-      error.value = e as NormalizedApiError
-      throw e
+      const stored = localStorage.getItem(storageKey.value)
+      const parsed: unknown = stored ? JSON.parse(stored) : []
+      items.value = Array.isArray(parsed)
+        ? parsed.filter(validLine).map((line) => ({
+            id: line.sku_id,
+            product_id: line.product_id,
+            sku_id: line.sku_id,
+            quantity: line.quantity,
+            selected: line.selected,
+            product_title: typeof line.product_title === 'string' ? line.product_title : undefined,
+            sku_name: typeof line.sku_name === 'string' ? line.sku_name : undefined,
+            cover_url: typeof line.cover_url === 'string' ? line.cover_url : undefined,
+          }))
+        : []
+      loadedKey = storageKey.value
+    } catch {
+      items.value = []
+      loadedKey = storageKey.value
     } finally {
       loading.value = false
     }
   }
 
-  /** Wraps one mutation; every mutation returns the authoritative new cart. */
-  async function mutate(action: () => Promise<Cart>): Promise<Cart> {
+  watch(storageKey, () => {
+    items.value = []
+    loadedKey = ''
+    void load()
+  })
+
+  async function mutate(action: () => void): Promise<void> {
+    await load()
     mutating.value = true
-    error.value = null
     try {
-      cart.value = await action()
-      return cart.value
-    } catch (e) {
-      error.value = e as NormalizedApiError
-      throw e
+      action()
+      persist()
     } finally {
       mutating.value = false
     }
   }
 
-  const addItem = (productId: string, skuId: string, quantity = 1) =>
-    mutate(() => cartApi.addItem({ product_id: productId, sku_id: skuId, quantity }))
+  async function addItem(
+    productId: string,
+    skuId: string,
+    quantity = 1,
+    display: Pick<CartItem, 'product_title' | 'sku_name' | 'cover_url'> = {},
+  ): Promise<void> {
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
+      throw new Error('invalid cart quantity')
+    }
+    await mutate(() => {
+      const existing = items.value.find((line) => line.sku_id === skuId)
+      if (existing) {
+        if (existing.quantity + quantity > MAX_QUANTITY) throw new Error('cart quantity limit exceeded')
+        existing.quantity += quantity
+        existing.selected = true
+        Object.assign(existing, display)
+      } else {
+        items.value.push({ id: skuId, product_id: productId, sku_id: skuId, quantity, selected: true, ...display })
+      }
+    })
+  }
 
-  const updateQuantity = (itemId: string, quantity: number) =>
-    mutate(() => cartApi.updateItem(itemId, { quantity }))
-
-  const removeItem = (itemId: string) => mutate(() => cartApi.removeItem(itemId))
-
-  const selectItems = (itemIds: string[], selected: boolean) =>
-    mutate(() => cartApi.select({ item_ids: itemIds, selected }))
-
-  const clear = () => mutate(() => cartApi.clear())
+  const updateQuantity = async (itemId: string, quantity: number) => mutate(() => {
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
+      throw new Error('invalid cart quantity')
+    }
+    const line = items.value.find((item) => item.id === itemId)
+    if (line) line.quantity = quantity
+  })
+  const removeItem = async (itemId: string) => mutate(() => {
+    items.value = items.value.filter((item) => item.id !== itemId)
+  })
+  const selectItems = async (itemIds: string[], selected: boolean) => mutate(() => {
+    const ids = new Set(itemIds)
+    for (const item of items.value) if (ids.has(item.id)) item.selected = selected
+  })
+  const clear = async () => mutate(() => { items.value = [] })
 
   function reset(): void {
-    cart.value = null
-    error.value = null
+    items.value = []
+    loadedKey = ''
   }
 
   return {
-    cart,
-    loading,
-    mutating,
-    error,
-    items,
-    itemCount,
-    selectedAmount,
-    selectedItems,
-    isEmpty,
-    load,
-    addItem,
-    updateQuantity,
-    removeItem,
-    selectItems,
-    clear,
-    reset,
+    loading, mutating, items, itemCount, selectedItems, isEmpty,
+    load, addItem, updateQuantity, removeItem, selectItems, clear, reset,
   }
 })

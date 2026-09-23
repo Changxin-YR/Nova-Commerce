@@ -93,25 +93,6 @@ export interface SkuPayload {
 }
 
 // ---------------------------------------------------------------------------
-// cart
-// ---------------------------------------------------------------------------
-
-export interface AddCartItemRequest {
-  product_id: string
-  sku_id: string
-  quantity: number
-}
-
-export interface UpdateCartItemRequest {
-  quantity: number
-}
-
-export interface SelectCartItemsRequest {
-  item_ids: string[]
-  selected: boolean
-}
-
-// ---------------------------------------------------------------------------
 // order
 // ---------------------------------------------------------------------------
 

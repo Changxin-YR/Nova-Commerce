@@ -17,9 +17,9 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
   The coupon amount columns were read back as BIGINT, and all coupon checks,
   indexes, and foreign keys were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
-- Frontend: current typecheck and production build pass, with **294 Vitest
+- Frontend: current typecheck, lint, and production build pass, with **297 Vitest
   cases**. The prior FG-03/20/21 artifacts are version-bound and must be
-  refreshed after this increment.
+  refreshed after the local-cart increment.
 - `FINAL_GATE.md` currently shows **9 PASS, 17 MISSING**, overall
   **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
   index, not a claim that the whole product is complete.
@@ -62,6 +62,11 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 7. The checkout view now sends `items` and `coupon_id` per API_CONTRACT §14,
    and renders the server's separate promotion and coupon amounts. Two view
    tests assert the preview and create payloads.
+8. The cart now stores only SKU selection and quantity in user-scoped browser
+   storage. It does not call `/cart` or display a client-calculated amount.
+   The frontend order paths were corrected to `/orders` and `/orders/preview`.
+   Three store tests cover persistence, user separation, malformed data, and
+   the path contract.
 
 ## Remaining work, in execution order
 
@@ -88,16 +93,16 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 6. **Remote sync**: all continuation commits remain local. Push only after the
    intended branch/review path is settled. Re-run affected evidence after each
    watched source change and regenerate `FINAL_GATE.md` at the end.
-7. **Frontend contract audit**: API_CONTRACT §14.1 freezes the cart as local
-   Pinia selection, but the current store still calls an absent `/cart`
-   backend router. The catalog customer API is also absent. These are actual
-   live checkout blockers despite the frontend compile and view tests passing;
-   implement the local cart and missing catalog API before claiming a browser
-   purchase flow.
+7. **Live route audit**: `create_app().openapi()["paths"]` currently lists 47
+   paths. Identity and catalog customer APIs are absent, so a browser cannot
+   log in or load products despite frontend compile and shell tests passing.
+   Analytics, knowledge, agent, governance, and audit API routers are also
+   absent. These are actual V1 completion gaps. Implement auth/catalog HTTP
+   first, then a purchase browser case; gate PASS counts alone do not prove it.
 
 ## Next code entry point
 
-After the source commit, refresh all source-watched gate artifacts and regenerate
-`FINAL_GATE.md`. Next implement the local cart contract (§14.1), then the
-missing customer catalog API and an end-to-end checkout browser case. Phase 6
-Analytics remains a separate backend and gate increment.
+After the source commit, refresh the source-watched gate artifacts and regenerate
+`FINAL_GATE.md`. Next implement the missing identity and customer catalog APIs,
+then an end-to-end checkout browser case. Phase 6 Analytics remains a separate
+backend and gate increment.

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
  * Cart — the checkout-conversion page, so it uses the commercial conventions:
- *   * a hairline table (checkbox | product | unit price | quantity | subtotal | action)
+ *   * a hairline table (checkbox | product | quantity | action)
  *   * a quantity stepper, not a free-text field
- *   * a STICKY action bar with the selected count, the total and the checkout button
+ *   * a STICKY action bar with the selected count and checkout button
  *
- * All totals come from the server's cart response. This page performs NO money
- * arithmetic — a client total that disagrees with the server is exactly what
- * `ORDER_AMOUNT_MISMATCH` exists to catch. `<PriceText>` only formats.
+ * §14.1 freezes the cart as a local selection. Order preview computes prices
+ * after the customer opens checkout; this page never shows an invented total.
  */
 import { computed, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -15,7 +14,6 @@ import { useCartStore } from '@/stores/cart'
 import { useNotificationStore } from '@/stores/notification'
 import { normalizeError } from '@/api/error'
 import StateView from '@/components/ui/StateView.vue'
-import PriceText from '@/components/ui/PriceText.vue'
 
 const cart = useCartStore()
 const router = useRouter()
@@ -51,7 +49,6 @@ function toggleOne(itemId: string, selected: boolean): void {
 
 const status = computed(() => {
   if (cart.loading) return 'loading' as const
-  if (cart.error) return cart.error.forbidden ? ('permission_denied' as const) : ('error' as const)
   return cart.isEmpty ? ('empty' as const) : ('success' as const)
 })
 </script>
@@ -66,7 +63,6 @@ const status = computed(() => {
 
       <StateView
         :state="status"
-        :error="cart.error"
         :title="cart.isEmpty ? '购物车还是空的' : undefined"
         :description="cart.isEmpty ? '挑几件喜欢的 3C 好物再回来结算。' : undefined"
         @retry="cart.load()"
@@ -79,9 +75,7 @@ const status = computed(() => {
               <span>全选</span>
             </label>
             <span class="cart__col cart__col--product">商品信息</span>
-            <span class="cart__col cart__col--price">单价</span>
             <span class="cart__col cart__col--qty">数量</span>
-            <span class="cart__col cart__col--sub">小计</span>
             <span class="cart__col cart__col--action">操作</span>
           </div>
 
@@ -90,13 +84,11 @@ const status = computed(() => {
             v-for="item in cart.items"
             :key="item.id"
             class="cart__row"
-            :class="{ 'cart__row--unavailable': !item.available }"
           >
             <label class="cart__check">
               <input
                 type="checkbox"
                 :checked="item.selected"
-                :disabled="!item.available"
                 @change="toggleOne(item.id, ($event.target as HTMLInputElement).checked)"
               />
             </label>
@@ -115,17 +107,10 @@ const status = computed(() => {
                   :to="{ name: 'product', params: { id: item.product_id } }"
                   class="cart__title"
                 >
-                  {{ item.product_title }}
+                  {{ item.product_title ?? `商品 #${item.product_id}` }}
                 </RouterLink>
-                <p class="cart__specs">{{ Object.values(item.sku_specs).join(' / ') || item.sku_id }}</p>
-                <p v-if="!item.available" class="cart__warning">
-                  {{ item.unavailable_reason ?? '该商品当前不可购买' }}
-                </p>
+                <p class="cart__specs">{{ item.sku_name ?? `SKU #${item.sku_id}` }}</p>
               </div>
-            </div>
-
-            <div class="cart__price">
-              <PriceText :amount="item.unit_price_amount" size="sm" muted />
             </div>
 
             <div class="cart__qty">
@@ -148,10 +133,6 @@ const status = computed(() => {
                   +
                 </button>
               </div>
-            </div>
-
-            <div class="cart__sub">
-              <PriceText :amount="item.subtotal_amount" size="md" />
             </div>
 
             <div class="cart__action">
@@ -186,9 +167,8 @@ const status = computed(() => {
 
           <div class="cart__bar-right">
             <span class="cart__bar-summary">
-              已选 <b>{{ selectedCount }}</b> 件，合计
+              已选 <b>{{ selectedCount }}</b> 种商品
             </span>
-            <PriceText :amount="cart.selectedAmount" size="lg" class="cart__bar-total" />
 
             <button
               type="button"
@@ -202,7 +182,7 @@ const status = computed(() => {
         </div>
 
         <p class="nx-muted cart__note">
-          合计金额由服务端计算并返回，页面不做本地金额计算；提交订单时会再由服务端复核一次。
+          最新价格、优惠和库存将在结算页由服务端计算，提交订单时再次校验。
         </p>
       </StateView>
     </div>
@@ -234,7 +214,7 @@ const status = computed(() => {
   &__head,
   &__row {
     display: grid;
-    grid-template-columns: 40px 1fr 110px 130px 120px 80px;
+    grid-template-columns: 40px 1fr 130px 80px;
     align-items: center;
     gap: 10px;
     padding: 0 12px;

@@ -60,7 +60,6 @@ TAGS_METADATA = [
     {"name": "users", "description": "Account and address management."},
     {"name": "catalog", "description": "Products, SKUs, categories, brands, images."},
     {"name": "inventory", "description": "Stock levels, movements and adjustments."},
-    {"name": "cart", "description": "Server-authoritative cart pricing preview."},
     {"name": "orders", "description": "Order preview, creation, lifecycle."},
     {"name": "payments", "description": "Payment intent, provider callbacks, mock pay."},
     {"name": "fulfillments", "description": "Packages, shipping and delivery."},

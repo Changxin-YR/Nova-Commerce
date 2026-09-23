@@ -26,7 +26,6 @@ export {
 
 export { authApi, addressApi } from '@/api/auth'
 export { catalogApi, catalogAdminApi } from '@/api/catalog'
-export { cartApi } from '@/api/cart'
 export { orderApi, orderAdminApi, fulfillmentAdminApi } from '@/api/order'
 export { paymentApi } from '@/api/payment'
 export { afterSaleApi, afterSaleAdminApi } from '@/api/aftersales'

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import CheckoutView from '@/views/consumer/CheckoutView.vue'
+import { useCartStore } from '@/stores/cart'
 
-const getCart = vi.fn()
 const listAddresses = vi.fn()
 const myCoupons = vi.fn()
 const previewOrder = vi.fn()
@@ -13,7 +13,6 @@ const navigate = vi.fn()
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: navigate }) }))
 vi.mock('@/api', () => ({
-  cartApi: { get: (...args: unknown[]) => getCart(...args) },
   addressApi: { list: (...args: unknown[]) => listAddresses(...args) },
   marketingApi: { myCoupons: (...args: unknown[]) => myCoupons(...args) },
   orderApi: {
@@ -23,19 +22,17 @@ vi.mock('@/api', () => ({
   paymentApi: { create: (...args: unknown[]) => createPayment(...args) },
 }))
 
-function mountView() {
+async function mountView() {
   const pinia = createPinia()
   setActivePinia(pinia)
+  await useCartStore().addItem('7', '42', 2)
   return mount(CheckoutView, { global: { plugins: [pinia], stubs: ['RouterLink'] } })
 }
 
 describe('checkout sends server-owned order inputs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    getCart.mockResolvedValue({
-      id: '1', selected_amount: 1000, item_count: 1,
-      items: [{ id: '9', sku_id: '42', product_id: '7', quantity: 2, selected: true, available: true }],
-    })
+    localStorage.clear()
     listAddresses.mockResolvedValue([{ id: '3', is_default: true, receiver_name: 'Test', receiver_phone: '13800000000' }])
     myCoupons.mockResolvedValue([{
       id: 55, template_id: 8, merchant_id: 1, status: 'UNUSED',
@@ -56,7 +53,7 @@ describe('checkout sends server-owned order inputs', () => {
   })
 
   it('previews selected SKU quantities with numeric address and coupon IDs', async () => {
-    const wrapper = mountView()
+    const wrapper = await mountView()
     await flushPromises()
     expect(previewOrder).toHaveBeenCalledWith({
       items: [{ sku_id: 42, quantity: 2 }], address_id: 3, coupon_id: undefined,
@@ -71,7 +68,7 @@ describe('checkout sends server-owned order inputs', () => {
   })
 
   it('creates an order with the same business inputs and one idempotency value', async () => {
-    const wrapper = mountView()
+    const wrapper = await mountView()
     await flushPromises()
     await wrapper.find('select.checkout__coupon').setValue('55')
     await flushPromises()

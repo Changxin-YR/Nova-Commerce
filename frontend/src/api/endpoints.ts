@@ -56,21 +56,12 @@ export const API = {
     movements: '/inventory/admin/movements',
   },
 
-  // -- cart ---------------------------------------------------------------
-  cart: {
-    current: '/cart/customer/cart',
-    items: '/cart/customer/cart/items',
-    item: (itemId: string) => `/cart/customer/cart/items/${itemId}`,
-    select: '/cart/customer/cart/select',
-    clear: '/cart/customer/cart/items',
-  },
-
   // -- orders (§96, §99) --------------------------------------------------
   orders: {
-    preview: '/orders/orders/preview',
-    create: '/orders/orders',
-    list: '/orders/orders',
-    detail: (orderNo: string) => `/orders/orders/${orderNo}`,
+    preview: '/orders/preview',
+    create: '/orders',
+    list: '/orders',
+    detail: (orderNo: string) => `/orders/${orderNo}`,
     /**
      * TASK endpoints (§99), FROZEN paths from PROJECT_BASELINE.yaml `task_endpoints`:
      *   POST /api/v1/orders/{order_no}/cancel

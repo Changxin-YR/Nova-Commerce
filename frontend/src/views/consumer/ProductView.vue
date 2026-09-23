@@ -85,15 +85,21 @@ const SERVICE_NOTES = [
   '无忧退换：7 天无理由（以售后政策为准）',
 ]
 
-async function addToCart(): Promise<void> {
-  if (!selectedSku.value || soldOut.value) return
+async function addToCart(): Promise<boolean> {
+  if (!selectedSku.value || soldOut.value) return false
   submitting.value = true
   try {
-    await cart.addItem(productId.value, selectedSku.value.id, quantity.value)
+    await cart.addItem(productId.value, selectedSku.value.id, quantity.value, {
+      product_title: product.value?.title,
+      sku_name: skuLabel(selectedSku.value),
+      cover_url: currentImage.value?.url,
+    })
     notifications.success('已加入购物车', `${product.value?.title ?? ''} × ${quantity.value}`)
+    return true
   } catch (e) {
     const normalized = normalizeError(e)
     notifications.error('加入购物车失败', normalized.message, normalized.code, normalized.traceId)
+    return false
   } finally {
     submitting.value = false
   }
@@ -101,8 +107,7 @@ async function addToCart(): Promise<void> {
 
 async function buyNow(): Promise<void> {
   // Buy-now still goes through the server-side preview: the client never invents a price.
-  await addToCart()
-  if (!cart.error) await router.push({ name: 'cart' })
+  if (await addToCart()) await router.push({ name: 'cart' })
 }
 </script>
 

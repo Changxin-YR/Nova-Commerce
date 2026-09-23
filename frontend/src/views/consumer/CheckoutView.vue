@@ -79,15 +79,10 @@ const submitting = ref(false)
 /** One idempotency key per checkout attempt; regenerated only after success. */
 const clientRequestId = ref(newTraceId())
 const idempotencyKey = computed(() => `order-${clientRequestId.value}`)
-const pageStatus = computed(() => cart.error ? 'error' : orderItems.value.length === 0 ? 'empty' : previewStatus.value)
-const pageError = computed(() => cart.error ?? previewError.value)
+const pageStatus = computed(() => orderItems.value.length === 0 ? 'empty' : previewStatus.value)
 
 async function refreshPage(): Promise<void> {
-  try {
-    await cart.load()
-  } catch {
-    return
-  }
+  await cart.load()
   await Promise.all([
     loadAddresses(),
     marketingApi.myCoupons().then((coupons) => { ownedCoupons.value = coupons }).catch(() => undefined),
@@ -146,7 +141,7 @@ async function createOrder(): Promise<void> {
     <div class="nx-container">
       <h1 class="checkout__page-title">确认订单</h1>
 
-      <StateView :state="pageStatus" :error="pageError" :description="pageStatus === 'empty' ? '请先在购物车选择要结算的商品。' : undefined" @retry="refreshPage()">
+      <StateView :state="pageStatus" :error="previewError" :description="pageStatus === 'empty' ? '请先在购物车选择要结算的商品。' : undefined" @retry="refreshPage()">
         <!-- step 1: address ------------------------------------------------- -->
         <section class="nx-block checkout__step">
           <div class="nx-block__head">

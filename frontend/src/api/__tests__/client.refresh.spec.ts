@@ -110,7 +110,7 @@ describe('NovaHttpClient single-flight refresh', () => {
     // Fire five requests that will all fail with 401 at roughly the same time.
     const pending = Promise.all([
       client.get<{ ok: boolean }>('/orders/orders'),
-      client.get<{ ok: boolean }>('/cart/customer/cart'),
+      client.get<{ ok: boolean }>('/orders'),
       client.get<{ ok: boolean }>('/auth/users/me'),
       client.get<{ ok: boolean }>('/analytics/admin/overview'),
       client.get<{ ok: boolean }>('/inventory/admin/stock'),

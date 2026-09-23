@@ -206,28 +206,20 @@ export interface ProductSummary {
 }
 
 export interface CartItem {
+  /** Local selection key: one line per SKU, never a server cart-row ID. */
   id: string
   product_id: string
   sku_id: string
-  product_title: string
-  sku_specs: Record<string, string>
+  /** Display-only snapshot from the product page; checkout reloads current details. */
+  product_title?: string
+  sku_name?: string
   cover_url?: string
   quantity: number
-  /** Integer minor units, price captured at the time of adding. */
-  unit_price_amount: MoneyAmount
-  /** Integer minor units. */
-  subtotal_amount: MoneyAmount
   selected: boolean
-  /** Server-computed; the UI must not assume stock is available. */
-  available: boolean
-  unavailable_reason?: string
 }
 
 export interface Cart {
-  id: string
   items: CartItem[]
-  /** Integer minor units, selected items only. */
-  selected_amount: MoneyAmount
   item_count: number
 }
 
