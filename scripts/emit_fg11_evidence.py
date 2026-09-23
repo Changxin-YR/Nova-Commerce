@@ -49,6 +49,10 @@ GATE = Gate(
         "backend/migrations",
         "backend/tests/concurrency",
         "backend/tests/conftest.py",
+        # FG-11 uses its OWN self-contained fixture rather than the shared seed, so this
+        # gate does not depend on commerce/. The payment author made that choice
+        # deliberately so a seed.py change could not redden the payment suite, and the
+        # path set reflects it.
     ),
     json_out=ROOT / "artifacts" / "evidence" / "concurrency" / "fg11_payment_idempotency.json",
     infrastructure={

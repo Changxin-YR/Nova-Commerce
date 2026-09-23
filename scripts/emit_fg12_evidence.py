@@ -44,6 +44,11 @@ GATE = Gate(
         "backend/migrations",
         "backend/tests/integration/refund",
         "backend/tests/concurrency/test_refund_concurrency.py",
+        # The gate's tests build their worlds with the SHARED SEED (paid_order), so a
+        # change to it changes what this gate exercised. It was missing from this set,
+        # and data-layer's paid_order token fix landed after the previous emission -
+        # which is exactly the case the clean-path assertion exists to catch.
+        "backend/tests/integration/commerce",
     ),
     json_out=ROOT / "artifacts" / "evidence" / "integration" / "fg12_refund_invariants.json",
     infrastructure={
