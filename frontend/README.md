@@ -179,3 +179,15 @@ Types in `src/types/` are a hand-written mirror of the backend. The mirror canno
 rot: `src/types/__tests__/domain-mirror.spec.ts` parses
 `backend/app/core/errors.py` and fails if any business code name or value differs. It also
 asserts the frozen status enums and the 12 agent event names.
+
+### Deploy note — the brand rename invalidated existing client sessions
+
+Renaming the product to Nova also renamed the `localStorage` keys (`nexora.*` → `nova.*`,
+see `STORAGE_KEYS` in `src/config/constants.ts`). No migration shim was added, so **any
+browser still holding a token under the old keys is logged out once on the next load** — the
+client finds no token and starts a fresh session. That is the right outcome for a pre-launch
+rename; a seeded demo environment just needs to log in again (or carry the keys over).
+
+The `nx-*` CSS class and `--nx-*` custom-property prefix was deliberately **not** renamed: it
+is our own namespace and never contained the brand name, so renaming it would have been 627
+edits of churn with real regression risk and no user-visible benefit.
