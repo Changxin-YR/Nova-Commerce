@@ -283,6 +283,152 @@ def test_cap_one_is_a_backstop_because_cap_two_implies_it(seeded_shop, session_f
 # ---------------------------------------------------------------------------
 # Cap 2 - the per-line cumulative cap
 # ---------------------------------------------------------------------------
+def test_cap_one_and_cap_two_are_distinguishable_by_code(
+    seeded_shop, session_factory
+) -> None:
+    """80004 vs 80005: which guard refuses, asserted by **code** and by the evidence it reports.
+
+    FG-12 is a non-waivable gate, so "the test passed" and "the invariant holds" must not be able
+    to diverge. The way they diverge here is a cap-1 test that is really satisfied by cap 2: a
+    loose ``pytest.raises(AppError)``, or a check for "some 80xxx", would pass while proving
+    nothing about which limit was enforced.
+
+    **Both states are built directly** rather than reached through a refund sequence, and the
+    reason is the arithmetic this module already documents: because
+    ``sum(order_items.payable_amount) == payments.paid_amount``, any request cap 1 would refuse is
+    also above some claimed line's remaining capacity, so through the *workflow* cap 2 answers
+    first. To test each guard - and each guard's *reporting*, which is what the code contract is
+    for - the rows are placed in the state that guard exists to refuse. That is the same technique
+    the stale-claim test uses for cap 2, and it is honest: the state is asserted to be one the
+    scheme's own invariants permit (both amounts are within their caps).
+
+    What is asserted, and why it is the real requirement:
+
+    * **cap 2** refuses with 80005 and reports *line* capacity (``line_remaining``);
+    * **cap 1** refuses with 80004 and reports *payment* capacity (``paid_amount``/``refundable``);
+    * neither context may contain the other's key - a refusal that reported the wrong kind of limit
+      is what lets a cap-1 test pass while cap 2 did the work.
+    """
+    from sqlalchemy import text
+
+    from app.core.errors import RefundExceedsPaidError
+
+    def _insert_approved_claim(order_item_id: int, amount: int, suffix: str) -> str:
+        """An APPROVED claim on one line, written directly so no apply-time rule interferes."""
+        after_sale_no = f"NVAS-CAPD-{suffix}"
+        with session_factory() as session:
+            session.execute(
+                text(
+                    "INSERT INTO after_sales (after_sale_no, order_id, order_no, user_id, "
+                    "merchant_id, type, claim_status, requested_amount, approved_amount, "
+                    "refunded_amount, reason, idempotency_key, client_request_id, request_hash, "
+                    "created_at, updated_at) VALUES (:no, :oid, :ono, :uid, :mid, 'REFUND_ONLY', "
+                    "'APPROVED', :amt, :amt, 0, 'cap probe', :key, :crid, :rh, NOW(3), NOW(3))"
+                ),
+                {
+                    "no": after_sale_no,
+                    "oid": seeded_shop.order_id,
+                    "ono": seeded_shop.order_no,
+                    "uid": seeded_shop.consumer_id,
+                    "mid": seeded_shop.merchant_id,
+                    "amt": amount,
+                    "key": seeded_shop.key(f"capd-{suffix}"),
+                    "crid": seeded_shop.client_request_id(f"capd-{suffix}"),
+                    "rh": "e" * 64,
+                },
+            )
+            claim_id = int(
+                session.execute(
+                    text("SELECT id FROM after_sales WHERE after_sale_no = :no"),
+                    {"no": after_sale_no},
+                ).scalar_one()
+            )
+            session.execute(
+                text(
+                    "INSERT INTO after_sale_items (after_sale_id, order_item_id, product_name, "
+                    "sku_name, quantity, created_at, updated_at) "
+                    "VALUES (:aid, :oid, 'probe', 'probe', 1, NOW(3), NOW(3))"
+                ),
+                {"aid": claim_id, "oid": order_item_id},
+            )
+            session.commit()
+        return after_sale_no
+
+    line1_payable = seeded_shop.order_item_amounts[0]
+
+    # -- cap 2: the claimed line is at its payable, the payment is untouched ---
+    with session_factory() as session:
+        first = seeded_shop.file_claim(
+            session, amount=line1_payable, item_indexes=(0,), quantities=(1,), suffix="d1"
+        )
+        first_no = first.after_sale_no
+        seeded_shop.approve(session, first, amount=line1_payable)
+    with session_factory() as session:
+        seeded_shop.refund(
+            None, load_claim(session, after_sale_no=first_no), amount=line1_payable, suffix="d1-r"
+        )
+
+    # Sanity: the payment has headroom, so no payment-level guard can be the one that refuses.
+    with session_factory() as session:
+        money = read_money(session, order_no=seeded_shop.order_no)
+    assert money["payment_refunded"] == line1_payable
+    assert money["payment_paid"] - money["payment_refunded"] > 0
+
+    line_probe = _insert_approved_claim(seeded_shop.order_item_ids[0], 100, "line")
+    with session_factory() as session, pytest.raises(RefundExceedsItemError) as line_case:
+        seeded_shop.refund(
+            None, load_claim(session, after_sale_no=line_probe), amount=100, suffix="line-r"
+        )
+    line_context = dict(line_case.value.context)
+    assert line_case.value.code.name == "REFUND_EXCEEDS_ITEM_AMOUNT"
+    assert int(line_case.value.code) == 80_005
+    assert "line_remaining" in line_context
+    assert "paid_amount" not in line_context, (
+        "a per-line refusal must not report payment-level evidence"
+    )
+
+    # -- cap 1: the payment is at its paid amount, the line keeps capacity -----
+    # Both sides are within their own caps (payment.refunded == paid is legal; the line is not
+    # over-refunded), so this is a state the scheme permits - not an invariant already broken.
+    with session_factory() as session:
+        session.execute(
+            text("UPDATE payments SET refunded_amount = paid_amount WHERE id = :id"),
+            {"id": seeded_shop.payment_id},
+        )
+        session.commit()
+
+    with session_factory() as session:
+        money = read_money(session, order_no=seeded_shop.order_no)
+    assert money["payment_refunded"] == money["payment_paid"]
+
+    paid_probe = _insert_approved_claim(seeded_shop.order_item_ids[1], 100, "paid")
+    with session_factory() as session, pytest.raises(RefundExceedsPaidError) as paid_case:
+        seeded_shop.refund(
+            None, load_claim(session, after_sale_no=paid_probe), amount=100, suffix="paid-r"
+        )
+    paid_context = dict(paid_case.value.context)
+    assert paid_case.value.code.name == "REFUND_EXCEEDS_PAID_AMOUNT"
+    assert int(paid_case.value.code) == 80_004
+
+    # Payment-level evidence, and emphatically not line-level - this is the assertion that stops a
+    # cap-1 test from being satisfied by cap 2.
+    assert "paid_amount" in paid_context
+    assert "refundable" in paid_context
+    assert paid_context["refundable"] == 0
+    assert "line_remaining" not in paid_context, (
+        "a cap-1 refusal must not masquerade as a line-level one"
+    )
+
+    # Neither refusal wrote anything.
+    with session_factory() as session:
+        assert refunds_for(
+            session, after_sale_id=load_claim(session, after_sale_no=line_probe).id
+        ) == []
+        assert refunds_for(
+            session, after_sale_id=load_claim(session, after_sale_no=paid_probe).id
+        ) == []
+
+
 def test_cap_two_refuses_a_line_that_is_already_fully_refunded(seeded_shop, session_factory) -> None:
     """``REFUND_EXCEEDS_ITEM_AMOUNT (80005)`` - the per-line cap, cumulatively.
 
