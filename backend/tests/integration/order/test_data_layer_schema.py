@@ -73,6 +73,10 @@ EXPECTED_CHECK_CONSTRAINTS: dict[str, set[str]] = {
         "ck_orders_payment_status_valid",
         "ck_orders_fulfillment_status_valid",
         "ck_orders_after_sale_status_valid",
+        # Phase 5 (FG-12). The invariant is `refunded <= paid`, and it lives here
+        # rather than only in the refund workflow because that is the difference
+        # between "the service checks" and "the money cannot be wrong".
+        "ck_orders_refund_cap",
     },
     "order_items": {
         "ck_order_items_quantity_positive",
@@ -80,6 +84,10 @@ EXPECTED_CHECK_CONSTRAINTS: dict[str, set[str]] = {
         "ck_order_items_allocated_consistent",
         "ck_order_items_payable_consistent",
         "ck_order_items_after_sale_status_valid",
+        # Phase 5 (FG-12): a line cannot be refunded beyond what it contributed.
+        # The *cumulative* form of this rule spans refund rows and is therefore
+        # enforced in RefundWorkflow; this is the single-row floor beneath it.
+        "ck_order_items_refund_cap",
     },
     "order_status_logs": {
         "ck_order_status_logs_from_status_valid",

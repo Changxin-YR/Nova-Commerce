@@ -45,6 +45,20 @@ is arranged around those two sentences:
 
 ## 3. Module layout (file ownership)
 
+> **The layout below is intent, not mandate.** Where a layer would exist only to
+> satisfy this list, it does not get created. Two rulings from the build:
+>
+> * `fulfillment/workflow.py` does not exist and should not. The ship path is
+>   `FulfillmentService.ship` plus the pure `compute_fulfillment_status` /
+>   `compute_residual` helpers; adding an empty workflow module would be scaffolding
+>   with no owner and no caller.
+> * `payment/api/admin.py` exists because the console needs the payment list the
+>   contract froze; a module that only mirrors another module's endpoints does not.
+>
+> A docstring naming a module that should not exist is worse than no docstring -
+> fix the reference, do not create the file.
+
+
 ```
 backend/app/modules/payment/
     __init__.py          # public surface: enums, models, service, workflow
