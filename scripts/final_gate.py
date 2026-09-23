@@ -88,7 +88,6 @@ def render() -> str:
         if all(s == "PASS" for s in states)
         else "IN PROGRESS"
     )
-    revision = _git("rev-parse", "--short", "HEAD") or "unknown"
     return "\n".join(
         [
             "# FINAL GATE",
@@ -96,7 +95,6 @@ def render() -> str:
             "This is an index of run artifacts. A gate passes only when its recorded tests",
             "passed and its watched paths still match the tested revision.",
             "",
-            f"Repository revision: `{revision}`",
             f"**PROJECT STATUS: {status}**",
             "",
             "| Gate | Name | Mandatory | Artifact | Status | Evidence check |",

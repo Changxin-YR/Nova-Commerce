@@ -5,15 +5,15 @@
   "spec": "REQ-PAY-004 / section 44 - a duplicate callback produces exactly one business effect: one payment confirm, one inventory effect, one fulfillment, no duplicate outbox side effect; mandatory condition 2 of section 147",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/concurrency/test_payment_idempotency.py -v --no-header -p no:cacheprovider -m concurrency",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T11:15:12.386197+00:00",
-  "duration_ms": 5277,
+  "timestamp": "2026-09-23T14:33:56.660217+00:00",
+  "duration_ms": 4885,
   "exit_code": 0,
-  "summary": "11 passed in 3.06s",
+  "summary": "11 passed in 2.76s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "0e2b0ec64f90cccea3aa6e57a702124d7abfacb7\n",
-    "subject": "﻿Fix a vacuous proof: the nested probe was never collected\n",
+    "revision": "d543f8a802326a0deb5fe0780e1a59f94dec9bcb\n",
+    "subject": "Record source revision for every existing gate\n",
     "relevant_paths": [
       "backend/app/core",
       "backend/app/shared",
@@ -25,15 +25,14 @@
       "backend/app/modules/inventory",
       "backend/migrations",
       "backend/tests/concurrency",
-      "backend/tests/conftest.py"
+      "backend/tests/conftest.py",
+      "scripts/emit_fg11_evidence.py",
+      "scripts/gate_evidence.py"
     ],
     "relevant_paths_dirty": false,
     "relevant_paths_dirty_files": [],
-    "other_paths_dirty": true,
-    "other_paths_dirty_files": [
-      " M backend/tests/integration/aftersales/conftest.py",
-      " M backend/tests/integration/commerce/residue.py"
-    ]
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
   },
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
