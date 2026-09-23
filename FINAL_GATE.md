@@ -21,7 +21,7 @@
 | Spec version | `1.0.0-FINAL-DESIGN-FREEZE` |
 | Baseline | `PROJECT_BASELINE.yaml` v1.0.0 |
 | Base commit | `ea2410508950abfe86faac1cd470feda93325632` |
-| Current phase | **Phase 0 complete — Phase 1 pending** |
+| Current phase | Phase 3b complete (FG-09 green) — Phase 4 next |
 | **PROJECT STATUS** | **IN PROGRESS** |
 
 Legend: ✅ pass · ❌ fail · ⬜ not yet produced · ⏭️ out of scope for this phase
@@ -40,7 +40,7 @@ Legend: ✅ pass · ❌ fail · ⬜ not yet produced · ⏭️ out of scope for 
 | FG-06 | Seed Idempotency | | `migration/fg06_seed_idempotency.json` | ⬜ |
 | FG-07 | Unit Tests | | `unit/fg07_pytest_unit.json` | ⬜ |
 | FG-08 | Integration Tests | | `integration/fg08_pytest_integration.json` | ⬜ |
-| FG-09 | Inventory Concurrency | **✅** | `concurrency/fg09_inventory_over_sell.json` | ⬜ |
+| FG-09 | Inventory Concurrency | **✅** | `concurrency/fg09_inventory_over_sell.json` | ✅ |
 | FG-10 | Workflow Tests | | `integration/fg10_workflow.json` | ⬜ |
 | FG-11 | Payment Idempotency | **✅** | `concurrency/fg11_payment_idempotency.json` | ⬜ |
 | FG-12 | Refund Invariants | **✅** | `integration/fg12_refund_invariants.json` | ⬜ |
@@ -67,7 +67,7 @@ Any single ❌ below sets `PROJECT STATUS = FAIL` regardless of all other result
 
 | # | Condition | Gate | Status |
 |---|---|---|---|
-| 1 | Inventory concurrency never oversells | FG-09 | ⬜ |
+| 1 | Inventory concurrency never oversells | FG-09 | ✅ |
 | 2 | Payment callback is idempotent | FG-11 | ⬜ |
 | 3 | Refund never exceeds amount actually paid | FG-12 | ⬜ |
 | 4 | Order snapshot correctness | FG-10 | ⬜ |
@@ -83,7 +83,7 @@ Any single ❌ below sets `PROJECT STATUS = FAIL` regardless of all other result
 
 ---
 
-## Phase 0 evidence (already produced at baseline time)
+## Phase 0 evidence (historical - produced at baseline time)
 
 Phase 0 is complete, and its own claims were verified by execution rather than
 assertion. Raw results are recorded in `PROJECT_BASELINE.yaml` →
@@ -97,6 +97,37 @@ assertion. Raw results are recorded in `PROJECT_BASELINE.yaml` →
 | Qdrant available | `GET /collections` | `{"status":"ok"}` |
 | MinIO available | `GET /minio/health/live` | HTTP 200 |
 | MCP SDK matches the frozen protocol baseline | package introspection | `LATEST_PROTOCOL_VERSION == '2026-07-28'` |
+
+---
+
+## FG-09 — Inventory Concurrency (the first mandatory gate to go green)
+
+| Field | Value |
+|---|---|
+| Verdict | **PASS** (recomputed from `assertions[]` + `exit_code`) |
+| Exit code | `0` |
+| Assertions | 6/6 passed |
+| Duration | 3314 ms |
+| Artifact | `artifacts/evidence/concurrency/fg09_inventory_over_sell.json` |
+| Reproduce | `python scripts/emit_fg09_evidence.py` |
+
+Assertions actually observed:
+
+- `PASS` — `test_20_concurrent_reservations_against_1_unit`
+- `PASS` — `test_stock_never_goes_negative_at_any_point`
+- `PASS` — `test_the_database_itself_refuses_a_negative_balance`
+- `PASS` — `test_ledger_explains_the_balance`
+- `PASS` — `test_replaying_the_same_idempotency_key_does_not_double_deduct`
+- `PASS` — `test_naive_read_then_write_DOES_oversell`
+
+**The negative control is what makes this meaningful.** `test_naive_read_then_write_DOES_oversell`
+implements the wrong algorithm on purpose — read, decide, write, no lock — and
+forces the interleaving with a barrier. It asserts that the naive path **does**
+oversell. Without it, a green concurrency test only proves the load was too gentle
+to expose a bug; with it, the lock is demonstrably doing the work.
+
+Evidence is produced by **running the tests and parsing pytest's own report**, so
+the artifact cannot claim a verdict that was not observed (spec §144).
 
 ---
 
