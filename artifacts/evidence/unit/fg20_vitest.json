@@ -1,0 +1,1794 @@
+{
+  "gate_id": "FG-20",
+  "command": [
+    "C:\\Users\\27363\\Desktop\\store\\frontend\\node_modules\\.bin\\vitest.cmd",
+    "run",
+    "--reporter=junit",
+    "--outputFile=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\unit\\fg20_vitest.xml"
+  ],
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
+  "timestamp": "2026-09-23T14:50:09.021538+00:00",
+  "duration_ms": 19820,
+  "exit_code": 0,
+  "git": {
+    "revision": "7d7eca683c89ab69a410dbf552b2f19bcb353f92\n",
+    "subject": "Add revision-bound frontend gate evidence emitter\n",
+    "relevant_paths": [
+      "frontend/src",
+      "frontend/tests",
+      "frontend/e2e",
+      "frontend/package.json",
+      "frontend/package-lock.json",
+      "frontend/vite.config.ts",
+      "frontend/playwright.config.ts",
+      "scripts/emit_frontend_evidence.py",
+      "scripts/gate_evidence.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "junit_report": {
+    "path": "artifacts\\evidence\\unit\\fg20_vitest.xml",
+    "parses": true,
+    "testcase_count": 292
+  },
+  "browser_report": null,
+  "assertions": [
+    {
+      "name": "createSseParser > parses one complete frame",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "createSseParser > parses MULTIPLE frames delivered in one chunk",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "createSseParser > handles a frame split across chunk boundaries",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "createSseParser > ignores comment/keep-alive lines",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "createSseParser > normalizes CRLF line endings",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "createSseParser > joins multi-line data fields",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "decodeSseFrame > decodes a well-formed event",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "decodeSseFrame > drops a frame with invalid JSON",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "decodeSseFrame > drops a frame with no data",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "decodeSseFrame > uses the SSE `event:` field when the payload omits `event`",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "parseAgentEvent — fail closed > accepts only the 12 frozen names",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "parseAgentEvent — fail closed > drops an UNKNOWN event name instead of rendering it",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "parseAgentEvent — fail closed > drops a payload that is not an object",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "parseAgentEvent — fail closed > drops an event without a run_id",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "parseAgentEvent — fail closed > rejects a chart_spec on any event other than final_answer",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "toToolProgress > projects the identifying fields of a tool event",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > refreshes ONCE for N concurrent 401s and replays every request",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > does not refresh when the request succeeds",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > allows a SECOND refresh after the first one settled (promise is not cached)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > fails fast without looping when the retry also returns 401",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > propagates a trace id on every attempt and stores it for error reporting",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > clears the session only when the refresh itself fails",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > reads code, message and trace_id from the envelope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > falls back to a curated message when the code is unknown, never the raw one",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > NEVER surfaces a 5xx envelope message verbatim (gateway/proxy leakage)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > maps forbidden codes to the permission UI path",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > treats MERCHANT_MISMATCH as forbidden rather than unauthenticated",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > maps token codes to the unauthenticated path",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > does NOT treat ACCOUNT_DISABLED as a refreshable session (it clears the session)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — backend envelope > marks 429 and 503 as retryable",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > maps a network failure to a retryable negative code",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > distinguishes a timeout from a network failure",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > maps a cancellation to a non-retryable, non-error state",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > handles a response with NO envelope (gateway HTML) without leaking the body",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > maps a bare 401/403/404 without an envelope to the matching code",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > passes an already-normalized error through unchanged",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > handles a plain Error and a totally unknown throwable",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizeError — transport failures > uses the interceptor trace id when the envelope has none",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > builds a line chart with categories and series",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > builds a bar chart and a pie chart",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > renders a gauge from a single value",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > returns empty options for a table spec (tables are HTML, not canvas)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > formats money axes in MAJOR units without touching the underlying data",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > uses a safe per-series colour and falls back to the palette",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > emits NO executable text derived from agent strings",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildEChartsOption > keeps a category literally named __proto__ as data only",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — happy path > accepts a valid spec and rebuilds it as plain data",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — happy path > keeps a safe colour and drops an unsafe one",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — happy path > accepts a CSS variable colour token (design-token theming)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — fail closed > rejects an unknown chart kind instead of guessing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — fail closed > rejects a missing kind",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — fail closed > rejects non-objects and arrays",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — fail closed > rejects a spec with no usable series",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — fail closed > rejects a table without columns or rows",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > never carries a function through, even nested in a series",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > drops __proto__ / constructor keys instead of assigning them (prototype pollution)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > ignores inherited properties (only own keys are read)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > strips control characters that could forge log lines or terminal escapes",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > drops NaN / Infinity so a layout cannot be broken silently",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > caps series, categories, data points and table rows",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — security > truncates over-long strings instead of shipping a megabyte label",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — alignment > aligns categories and data to the shorter side and explains why",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — alignment > keeps only the first series for pie and gauge",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "sanitizeChartSpec — alignment > renders a table preserving column order and dropping unknown keys",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatSpecValue > converts minor units for money specs without floating point drift",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > renders 299900 cents as ¥2,999.00",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > keeps the cents padded so 5 cents never renders as .5",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > groups thousands above 4 digits",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > can drop grouping for narrow table cells",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > renders a negative amount with a sign rather than a stray hyphen inside the digits",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > renders zero explicitly instead of leaving the field blank",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > omits the cents when asked, without rounding the integer up",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — minor units to major units > can hide the currency symbol for columns with a \"金额\" header",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — original (list) price > shows a struck-through original price only when it is actually higher",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — original (list) price > hides the original price when none was supplied",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — accessibility + theming > exposes one readable sentence to assistive tech",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "PriceText — accessibility + theming > applies the size scale class and the muted variant",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "isEmptyPaged > detects the empty paged envelope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "isEmptyPaged > does not treat a non-empty page as empty",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "isEmptyPaged > ignores shapes that are not paged payloads",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > reports empty for an empty bare array",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > reports empty for an empty PAGED payload (the console regression)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > reports success for a populated paged payload",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > reports empty for null and undefined results",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > honours a caller-supplied isEmpty predicate over the built-in heuristic",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > maps a forbidden failure to permission_denied, not error (§104 UI consequence)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > maps a plain failure to error",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > refresh() re-runs the loader without passing through loading",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > returns null from execute() on failure so callers can branch",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "useAsyncState — status derivation > resolves the deferred value (guards against a loader that never settles)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > removes the element when the code is not granted",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > keeps the element when the code IS granted",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > treats an empty value as \"no requirement\" and keeps the element",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > supports multiple codes with .any (default) semantics",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > supports .all semantics",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > works under the v-can alias too",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "permission directive > removes the node, so an unprivileged user cannot reach it via the DOM",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "__isAllowed (pure decision function) > handles any/all/empty cases",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "afterSaleRefundable — the cap the server enforces independently > uses the approved amount when the merchant approved something",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "afterSaleRefundable — the cap the server enforces independently > falls back to the requested amount while nothing is approved yet",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "afterSaleRefundable — the cap the server enforces independently > subtracts what was already refunded (partial refunds)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "afterSaleRefundable — the cap the server enforces independently > never returns a negative cap, even if the server reports an over-refund",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "after-sale decisions > allows approve/reject only while PROCESSING",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "after-sale decisions > allows a first refund on PROCESSING and a further one on PARTIAL_REFUNDED",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "after-sale decisions > refuses a refund when nothing is left or the request is closed",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "after-sale decisions > exposes the right row-action set for each status",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "after-sale decisions > explains a closed request instead of hiding the column",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "validateRefundAmount — rejects before the server has to > accepts an amount inside the cap",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "validateRefundAmount — rejects before the server has to > rejects a non-integer, zero, negative, or over-cap amount",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > requires a usable optimistic-lock version",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > reads sellable stock from the SERVER field and never recomputes it",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > flags over-reserved rows, which are an integrity problem not a display quirk",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > flags low stock by sellable quantity, not raw on-hand",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > rejects a no-op or negative-resulting adjustment",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > validates against the server number, not on_hand_qty - locked_qty",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "inventory adjustment > narrows a frozen Inventory row without inventing fields",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "pending actions (HITL) > allows a decision only while PENDING",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "pending actions (HITL) > requires human approval for HIGH and CRITICAL, and NOT for READ/LOW/MEDIUM",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "pending actions (HITL) > derives both decide flags from the status in one place",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "pending actions (HITL) > explains why each non-decidable state is blocked",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizePaging > defaults to page 1 with the default page size",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizePaging > clamps page to at least 1 (a stale filter can leave page at 0 or negative)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizePaging > caps page_size so a hand-edited URL cannot request everything",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizePaging > truncates fractional paging values instead of forwarding them",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "normalizePaging > falls back to defaults for non-numeric input",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "optionalText > trims and drops empty or whitespace-only input",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildProductListParams > omits the status key entirely when \"全部\" is selected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildProductListParams > forwards a chosen frozen status verbatim",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildProductListParams > trims the keyword and keeps paging",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildProductListParams > treats a whitespace-only keyword as no filter",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildOrderListParams > sends only paging when no filter is set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildOrderListParams > maps the order-number box onto the backend keyword parameter",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildOrderListParams > forwards all three frozen status filters independently",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildOrderListParams > forwards a date window and omits empty ends",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildOrderListParams > accepts every frozen OrderStatus as a filter value",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildAfterSaleListParams > omits empty filters and maps the number box onto keyword",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildAfterSaleListParams > forwards the frozen after-sale statuses",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildInventoryListParams > sends low_stock_only only when the toggle is ON",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildInventoryListParams > maps the product filter onto product_id and the keyword separately",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildKnowledgeDocParams + buildAnalyticsParams > builds paging plus an optional keyword for documents",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "buildKnowledgeDocParams + buildAnalyticsParams > always sends granularity, and dates only when set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelAgentRun > allows cancelling a RUNNING run",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelAgentRun > allows cancelling a run WAITING_APPROVAL — it is live and holding budget",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelAgentRun > REFUSES cancelling a terminal run",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelAgentRun > agrees with isTerminalRun for the whole frozen vocabulary",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "§108 agent surface states > WAITING_APPROVAL is the waiting state, and it is live",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "runActionBlockedReason — explains rather than hides > never returns an empty explanation for any status",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "runActionBlockedReason — explains rather than hides > distinguishes an already-cancelled run from a finished one",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — minor_currency stays money, and stays INTEGER > hands the raw minor-unit value through for <PriceText> to render",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — minor_currency stays money, and stays INTEGER > never divides by 100 or produces a formatted money string itself",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — minor_currency stays money, and stays INTEGER > does not treat a zero amount as empty",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — count is NEVER rendered as currency > renders an order count as a grouped integer",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — count is NEVER rendered as currency > groups large counts",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — count is NEVER rendered as currency > rounds a fractional count instead of showing cents",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — count is NEVER rendered as currency > renders a negative count with a minus sign",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > renders 0.12 as 12%, NOT as ¥0.12",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > renders a zero ratio as 0%, not as an empty field",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > trims a trailing .0 so 0.5 reads as 50%",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > keeps one decimal for ratios that need it",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > normalises a percentage-style value (12) to 12% rather than 1200%",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > treats a value at or below 1 as a fraction",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "formatAnalyticsValue — ratio is a percentage, and the trap is explicit > tolerates a non-finite value instead of rendering NaN%",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "the three units produce three genuinely different renderings > a single numeric value renders differently per unit",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "unitLabel > labels each unit for headers and tooltips",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkMetricUnit — catches a server/contract unit mismatch > accepts the frozen unit for each of the five metrics",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkMetricUnit — catches a server/contract unit mismatch > flags refund.rate arriving as money — the dangerous case",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkMetricUnit — catches a server/contract unit mismatch > flags order_count arriving as money",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkMetricUnit — catches a server/contract unit mismatch > flags gmv arriving as a ratio",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkMetricUnit — catches a server/contract unit mismatch > returns null for a metric outside the frozen five",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canReprocess — re-running a document (§53) > allows READY and FAILED",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canReprocess — re-running a document (§53) > REFUSES while PROCESSING — a parse/embed job is already in flight",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canReprocess — re-running a document (§53) > REFUSES an ARCHIVED document, which would silently resurrect it",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canReprocess — re-running a document (§53) > REFUSES UPLOADED — nothing has been parsed yet, so \"re-process\" has no meaning",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canArchive — withdrawing a document (§53) > allows UPLOADED, READY and FAILED",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canArchive — withdrawing a document (§53) > REFUSES while PROCESSING — the in-flight job would write chunks into an archived document",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canArchive — withdrawing a document (§53) > REFUSES an already ARCHIVED document (the action is not idempotent as a button)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "the two actions are never both unavailable by accident (every non-terminal state offers one) > READY and FAILED offer both; UPLOADED offers archive only",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "the two actions are never both unavailable by accident (every non-terminal state offers one) > PROCESSING and ARCHIVED are the only operator-terminal states",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "the two actions are never both unavailable by accident (every non-terminal state offers one) > covers the whole frozen vocabulary, so a new status cannot slip through untested",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "§108 knowledge surface states > PROCESSING is the live/processing state",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "§108 knowledge surface states > FAILED is the state that needs operator attention",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "docActionBlockedReason — the UI explains WHY instead of hiding the rule > explains that a parsing document is busy, per action",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "docActionBlockedReason — the UI explains WHY instead of hiding the rule > explains that an archived document is out of the active set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "docActionBlockedReason — the UI explains WHY instead of hiding the rule > never returns an empty explanation for any status/action pair",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "promotion lifecycle > offers 上线 only on a DRAFT",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "promotion lifecycle > offers 下线 only on an ACTIVE promotion",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "promotion lifecycle > treats ENDED as terminal, offering neither action",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "promotion lifecycle > exactly one action is available for each non-terminal state",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "promotion lifecycle > explains every blocked transition instead of hiding the rule",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "coupon availability > offers only UNUSED coupons as available",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "coupon availability > never presents a LOCKED coupon as available — it is committed to another order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "coupon availability > never presents a USED or EXPIRED coupon as available",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "coupon availability > covers the whole frozen coupon vocabulary, so a new status cannot slip through",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > READS the server field",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > uses the server figure even when it disagrees with its own arithmetic",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > never returns a negative amount, even if the server sends one",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > is 0 for an unpaid order, so a refund is never offered on it",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > fails safe to 0 on a malformed payload instead of deriving a number",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > a partial refund leaves the remaining balance refundable",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "refundableAmount - server-owned, no client-side derivation > a fully refunded order has nothing left",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "isUnshippedFulfillment — the carrier is the server’s own answer > treats carrier === null as outstanding",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "isUnshippedFulfillment — the carrier is the server’s own answer > treats a stamped carrier CODE as already shipped",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "isUnshippedFulfillment — the carrier is the server’s own answer > is exactly a null check — only the server’s explicit null counts",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "findUnshippedFulfillment — picking the package a ship click acts on > returns the first fulfillment with no carrier",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "findUnshippedFulfillment — picking the package a ship click acts on > returns undefined when every package has shipped",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "findUnshippedFulfillment — picking the package a ship click acts on > never returns an id for an already-shipped package",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelOrder > allows cancelling an unpaid order that has not shipped",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelOrder > allows cancelling a paid but unshipped order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelOrder > REFUSES cancel once anything shipped, even though status is still PROCESSING (§31)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelOrder > REFUSES cancel on terminal orders",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canCancelOrder > REFUSES cancel once money has been refunded",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > allows shipping a paid, processing, unshipped order with an unshipped fulfillment",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > allows shipping a partially shipped order (a second package)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > REFUSES shipping when no fulfillment exists — there would be no URL to call",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > REFUSES shipping a fulfillment the server has already stamped with a carrier",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > REFUSES shipping an unpaid order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > REFUSES shipping an already fully shipped or delivered order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canShipOrder > REFUSES shipping a cancelled or completed order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canConfirmReceipt > allows confirming a shipped or partially shipped processing order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canConfirmReceipt > REFUSES confirming before anything shipped",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canConfirmReceipt > REFUSES confirming an order that is already DELIVERED (receipt already given)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canConfirmReceipt > REFUSES confirming an unpaid order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canRefundOrder > allows a refund while money remains on a paid order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canRefundOrder > allows a further refund after a partial one",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canRefundOrder > REFUSES when there is no refundable balance",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "canRefundOrder > REFUSES on an unpaid order even if a balance were reported",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionFlags — the row-action matrix > an unpaid, unshipped order exposes cancel but NOT ship",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionFlags — the row-action matrix > a paid, unshipped order exposes cancel + ship, but not confirm-receipt",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionFlags — the row-action matrix > a shipped order exposes confirm-receipt and NO ship",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionFlags — the row-action matrix > a delivered order exposes neither ship nor confirm-receipt",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionFlags — the row-action matrix > a completed order exposes no row actions except detail",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionFlags — the row-action matrix > a cancelled order exposes no row actions at all",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionBlockedReason — the UI explains WHY, it does not silently hide > explains a shipped order cannot be cancelled",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionBlockedReason — the UI explains WHY, it does not silently hide > explains an unpaid order cannot ship",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionBlockedReason — the UI explains WHY, it does not silently hide > explains a missing fulfillment instead of pretending the order cannot ship",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionBlockedReason — the UI explains WHY, it does not silently hide > explains that a package already carrying a carrier cannot be shipped again",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "orderActionBlockedReason — the UI explains WHY, it does not silently hide > explains an empty refundable balance",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > starts a message on run_started and reaches succeeded on final_answer",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > tracks tool progress and updates it in place on tool_completed",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > enters waiting_approval and renders an ActionProposal block (never auto-executes)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > reflects an approval decision on the block",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > RENDERS A VALID chart and REFUSES an invalid one (fail closed)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > drops out-of-order and duplicate events by seq",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > maps run_failed onto the Failed state with a traceable error",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > cancel() produces the Cancelled state, NOT a failure (§108)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "aiThread store > records citations from evidence_ready as a Citation block",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frontend/backend contract drift > mirrors every backend ErrorCode name and value",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frontend/backend contract drift > keeps the trace header name in sync with the backend constant",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact order status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact payment status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact fulfillment status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact after-sale status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact coupon status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact knowledge document status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact pending action status set",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps the exact risk level set (READ is the lowest level, not a typo for RED)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "frozen enums (§105) > keeps exactly the 12 frozen agent events, with no chain-of-thought channel",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "status codes stay ints and unique > has no duplicate values in the frontend ErrorCode mirror",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > renders cents without float artifacts",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > formats with symbol, grouping and sign",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > never produces a float artefact for awkward values",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > parses user input in major units back to minor units",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > round-trips through parse and format",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > splits an amount for the styled price renderer",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > never loses the leading zero of the minor part when splitting",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > sums and computes percentages with integers",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "money (integer minor units) > rejects non-integer amounts in dev",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — coupon creation is preview then confirm (§47, §12.1) > opens the form without writing anything",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — coupon creation is preview then confirm (§47, §12.1) > 预览 calls the PREVIEW endpoint and still writes nothing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — coupon creation is preview then confirm (§47, §12.1) > 确认提交 carries the preview_token the server returned",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — coupon creation is preview then confirm (§47, §12.1) > renders the SERVER preview warnings instead of swallowing them",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — coupon creation is preview then confirm (§47, §12.1) > a preview failure surfaces an error and does NOT advance to the confirm step",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — coupon creation is preview then confirm (§47, §12.1) > editing after a preview DISCARDS the approval, so a stale token cannot be reused",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — promotion creation is preview then confirm (§47, §13.2) > PREVIEW builds the payload; nothing is written from the form step",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — promotion creation is preview then confirm (§47, §13.2) > confirm carries the preview_token, binding the write to what was approved",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Marketing — promotion creation is preview then confirm (§47, §13.2) > renders server CONFLICTS instead of treating them as an error (§13.2)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > an UNPAID order offers 取消 but NOT 发货 / 确认收货",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > a PAID, unshipped order with an outstanding fulfillment offers 发货 and 取消",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > a PAID order whose package ALREADY has a carrier is NOT shippable",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > a SHIPPED order offers 确认收货 and NOT 发货 (order_status is still PROCESSING, §31)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > names the goods from the §11 summary fields, without an N+1 detail fetch",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > omits the quantity suffix for a single-unit order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — row actions follow the frozen state machine > queries the fulfillment queue for outstanding packages only",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — actions call the FROZEN task endpoints > 取消 calls orderApi.cancel (POST /orders/{no}/cancel) and refreshes the list",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — actions call the FROZEN task endpoints > 确认收货 calls orderApi.confirmReceipt (POST /orders/{no}/confirm-receipt)",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — actions call the FROZEN task endpoints > 发货 uses the queue id, then calls fulfillmentAdminApi.ship with EXACTLY three fields",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — actions call the FROZEN task endpoints > does not open the ship dialog when the queue reports nothing outstanding",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — 403 from an action is handled, not crashed > shows a permission notice when the server rejects the action with FORBIDDEN",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — §108 states > renders the Empty state when the server returns no rows",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — §108 states > renders the Error state with a retry affordance when the list call fails",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "console Orders — §108 states > renders the PermissionDenied state (not a generic error) for a forbidden list call",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "toolchain spike > mounts a Vue 3 component in jsdom",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "stderr_tail": "",
+  "verdict": "PASS"
+}
