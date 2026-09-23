@@ -120,7 +120,7 @@ def _item_out(item: OrderItem) -> OrderItemOut:
     )
 
 
-def _fulfillment_out(row: Any, *, sku_by_line: dict[int, int] | None = None) -> FulfillmentOut:
+def _fulfillment_out(row: Any, *, sku_by_line: dict[int, int]) -> FulfillmentOut:
     """Project a fulfillment ORM row into the frozen shape of API_CONTRACT section 5.
 
     ## ``sku_id`` is DERIVED, not stored
@@ -141,9 +141,18 @@ def _fulfillment_out(row: Any, *, sku_by_line: dict[int, int] | None = None) -> 
     *snapshot* table, not the live catalogue - which is exactly why this lookup is
     allowed here and a catalogue join would not be.
 
-    The map is a parameter rather than a lookup performed inline so this function
-    stays attribute-only and keeps the property the phase-4 tests pin: it never
-    touches the database itself, so it cannot become an N+1 by accident.
+    ``sku_by_line`` is **required**, and that is deliberate rather than a missed
+    convenience default. It was ``| None = None`` for one commit, which read as
+    optional while the body could not honour it: omitting the map left it empty, every
+    line failed the lookup, and the caller got the ``InternalError`` reserved for a
+    corrupt row. The caller's actual mistake was "forgot the map", and the message
+    sent them hunting a data problem that does not exist - the most expensive kind of
+    wrong error. As a required keyword, forgetting it is a ``TypeError`` at the call
+    site, naming the argument.
+
+    It is a parameter rather than a lookup performed inline so this function stays
+    attribute-only and keeps the property the phase-4 tests pin: it never touches the
+    database itself, so it cannot become an N+1 by accident.
 
     There is deliberately **no** fallback to a ``sku_id`` attribute on the row: the
     column does not exist (REQ-FUL-002), and a fallback would have let a future
@@ -155,7 +164,7 @@ def _fulfillment_out(row: Any, *, sku_by_line: dict[int, int] | None = None) -> 
     the FK guarantees the order line exists, and the map is built from that order's
     own lines.
     """
-    resolved = sku_by_line or {}
+    resolved = sku_by_line
     items: list[FulfillmentItemOut] = []
     for line in getattr(row, "items", None) or ():
         sku_id = resolved.get(line.order_item_id)

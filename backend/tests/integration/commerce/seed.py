@@ -421,6 +421,8 @@ def shop(engine) -> Iterator[Shop]:
         purge_shop(created, marker=marker)
 
 
+
+
 # ---------------------------------------------------------------------------
 # Creating an order, and settling it through the real payment path
 # ---------------------------------------------------------------------------
