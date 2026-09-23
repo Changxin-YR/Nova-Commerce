@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T17:38:31.718963+00:00",
-  "duration_ms": 83588,
+  "timestamp": "2026-09-23T18:04:23.521834+00:00",
+  "duration_ms": 74473,
   "exit_code": 0,
-  "summary": "346 passed, 1 warning in 81.02s (0:01:21)",
+  "summary": "350 passed, 1 warning in 71.80s (0:01:11)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "525e82e00391bd8511e0445d76ff0eea3126b735\n",
-    "subject": "Reject new payment attempts after expiry and preserve replay\n",
+    "revision": "8f2a6a4bc9bbd937dd872825daf09f4fe152299f\n",
+    "subject": "feat(marketing): persist and apply previewed promotions\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 346,
+    "testcase_count": 350,
     "outcomes": [
       {
         "name": "test_apply_then_read_back_through_the_frozen_paths",
@@ -1016,6 +1016,22 @@
       },
       {
         "name": "test_the_movement_key_survives_a_discount",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_preview_token_and_published_rule_price_the_order",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_preview_rejects_scope_ids_outside_the_merchant",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_concurrent_orders_cannot_exceed_promotion_quota",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_promotion_http_preview_create_and_task_routes",
         "actual": "PASSED"
       },
       {
@@ -2894,6 +2910,30 @@
     },
     {
       "name": "test_the_movement_key_survives_a_discount",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_preview_token_and_published_rule_price_the_order",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_preview_rejects_scope_ids_outside_the_merchant",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_concurrent_orders_cannot_exceed_promotion_quota",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_promotion_http_preview_create_and_task_routes",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

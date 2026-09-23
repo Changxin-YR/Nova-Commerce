@@ -13,12 +13,12 @@ passed and its watched paths still match the tested revision.
 | FG-04 | Docker Build |  | [artifacts/evidence/docker/fg04_docker_build.txt](artifacts/evidence/docker/fg04_docker_build.txt) | MISSING | No proof artifact |
 | FG-05 | Alembic Migration |  | [artifacts/evidence/migration/fg05_alembic.txt](artifacts/evidence/migration/fg05_alembic.txt) | MISSING | No proof artifact |
 | FG-06 | Seed Idempotency |  | [artifacts/evidence/migration/fg06_seed_idempotency.json](artifacts/evidence/migration/fg06_seed_idempotency.json) | MISSING | No proof artifact |
-| FG-07 | Unit Tests |  | [artifacts/evidence/unit/fg07_pytest_unit.xml](artifacts/evidence/unit/fg07_pytest_unit.xml) | PASS | 780 assertions at 525e82e |
-| FG-08 | Integration Tests |  | [artifacts/evidence/integration/fg08_pytest_integration.xml](artifacts/evidence/integration/fg08_pytest_integration.xml) | PASS | 346 assertions at 525e82e |
-| FG-09 | Inventory Concurrency | Yes | [artifacts/evidence/concurrency/fg09_inventory_over_sell.json](artifacts/evidence/concurrency/fg09_inventory_over_sell.json) | PASS | 6 assertions at 525e82e |
-| FG-10 | Workflow Tests | Yes | [artifacts/evidence/integration/fg10_workflow.xml](artifacts/evidence/integration/fg10_workflow.xml) | PASS | 173 assertions at 525e82e |
-| FG-11 | Payment Idempotency | Yes | [artifacts/evidence/concurrency/fg11_payment_idempotency.json](artifacts/evidence/concurrency/fg11_payment_idempotency.json) | PASS | 11 assertions at a06ab0c |
-| FG-12 | Refund Invariants | Yes | [artifacts/evidence/integration/fg12_refund_invariants.json](artifacts/evidence/integration/fg12_refund_invariants.json) | PASS | 13 assertions at a06ab0c |
+| FG-07 | Unit Tests |  | [artifacts/evidence/unit/fg07_pytest_unit.xml](artifacts/evidence/unit/fg07_pytest_unit.xml) | PASS | 780 assertions at 8f2a6a4 |
+| FG-08 | Integration Tests |  | [artifacts/evidence/integration/fg08_pytest_integration.xml](artifacts/evidence/integration/fg08_pytest_integration.xml) | PASS | 350 assertions at 8f2a6a4 |
+| FG-09 | Inventory Concurrency | Yes | [artifacts/evidence/concurrency/fg09_inventory_over_sell.json](artifacts/evidence/concurrency/fg09_inventory_over_sell.json) | PASS | 6 assertions at 8f2a6a4 |
+| FG-10 | Workflow Tests | Yes | [artifacts/evidence/integration/fg10_workflow.xml](artifacts/evidence/integration/fg10_workflow.xml) | PASS | 177 assertions at 8f2a6a4 |
+| FG-11 | Payment Idempotency | Yes | [artifacts/evidence/concurrency/fg11_payment_idempotency.json](artifacts/evidence/concurrency/fg11_payment_idempotency.json) | PASS | 11 assertions at 8f2a6a4 |
+| FG-12 | Refund Invariants | Yes | [artifacts/evidence/integration/fg12_refund_invariants.json](artifacts/evidence/integration/fg12_refund_invariants.json) | PASS | 13 assertions at 8f2a6a4 |
 | FG-13 | Auth Session / Refresh Rotation | Yes | [artifacts/evidence/auth/fg13_refresh_rotation.json](artifacts/evidence/auth/fg13_refresh_rotation.json) | MISSING | No proof artifact |
 | FG-14 | Agent Authorization | Yes | [artifacts/evidence/agent/fg14_agent_authorization.json](artifacts/evidence/agent/fg14_agent_authorization.json) | MISSING | No proof artifact |
 | FG-15 | LangGraph HITL Resume / No Duplicate Side Effect | Yes | [artifacts/evidence/agent/fg15_hitl_resume.json](artifacts/evidence/agent/fg15_hitl_resume.json) | MISSING | No proof artifact |
