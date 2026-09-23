@@ -1,3 +1,149 @@
+# HANDOFF — READ THIS FIRST
+
+> **Snapshot:** commit `e34ee66` (plus the commit that adds this section, which is documentation-only —
+> no code changed, so the gate outputs below still apply).
+> Everything below the `---` line is chronological history. This block is the entry point.
+
+## 1. State in one screen
+
+Four gates, all run on this exact tree (literal output):
+
+| Command | Output | Exit |
+| --- | --- | --- |
+| `npx vue-tsc --noEmit` | *(no output)* | 0 |
+| `npx vite build` | `✓ 2385 modules transformed` `✓ built in 5.73s` | 0 |
+| `npx vitest run` | `Test Files 20 passed (20)` / `Tests 285 passed (285)` | 0 |
+| `npx eslint .` | *(no output)* | 0 |
+
+`git status --porcelain` → empty.
+
+**Done:** all 22 routes, the whole `API_CONTRACT.md` migration (types → availability → views), the §11
+addenda, and all 10 console pages on the dense 京麦 pattern.
+
+**Not done:** two flows are blocked on contract detail (see §3), and there is a frozen task endpoint
+with no UI at all (§2, `agentApi.cancelRun` — the most actionable item here).
+
+## 2. The five console pages
+
+| Page | Status | Actions/fields WIRED | NOT wired |
+| --- | --- | --- | --- |
+| `console/AfterSalesView.vue` | DONE | list (keyword + status + paging), approve, reject, refund; claim vs money columns | `afterSaleAdminApi.detail` (no detail page); `reject_reason`, `description`, `evidence_urls`, `items[]` never displayed |
+| `console/KnowledgeView.vue` | DONE | bases, documents (keyword + paging), upload, **reprocess**, **archive**, retrieval debug, evaluation, PROCESSING auto-poll | `knowledgeAdminApi.createBase` (no UI to create a knowledge base); no document detail view |
+| `console/MarketingView.vue` | DONE | coupon list, **coupon preview → create**, promotion list, **publish/unpublish** | **promotion CREATE** (blocked — §3.1); `marketingApi.myCoupons` / `claim` (no consumer coupon-center page) |
+| `console/SystemView.vue` | DONE | health `ready`/`live`, dependency table w/ criticality, audit list (filter + paging) | **role/permission editing** (blocked — §3.2); the `system.rolePermissions` / `system.userRoles` endpoints exist in `endpoints.ts` but have **no API function and no UI** |
+| `console/AiWorkspaceView.vue` | DONE | agent runs list, tools, pending actions approve/reject, SSE streaming (5 tabs) | **`agentApi.cancelRun` — a FROZEN task endpoint (§4) with no UI**; `agentApi.run` (single run), `agentApi.threads`, `agentApi.chat` (streaming is used instead) |
+
+The 5 views that were "pre-redesign markup" at the start of t4 all render filter bar → hairline
+`.nx-table` → pager, with `StateView` covering all five §108 states, and every row action gated by a
+pure tested availability module rather than an inline status check.
+
+## 3. Blocked on contract detail (reported, NOT guessed)
+
+`API_CONTRACT.md` §12 froze these PATHS but defined **no response shape** for any of them. §4 names the
+types — `PromotionPreview`, `Promotion`, `CouponPreview`, `CouponTemplate`, `Role`, `User` — and none
+of those six shapes exists anywhere in the document:
+
+1. **Promotion creation** — needs the promotion **rule** shape. `Promotion.rule` is currently
+   `Record<string, unknown>` (a local assumption in `src/api/marketing.ts`), and a form cannot be
+   built on that.
+2. **Role / permission editing** — needs `Role` / `User` shapes **plus** the §12.2 semantics (the
+   server must refuse a change that lowers a write tool's `risk_level` without separate audited
+   approval). §12.2 exists specifically so the forbidden operation is not one checkbox away; building
+   the UI before the rule has a concrete shape would re-create exactly that.
+
+Both are documented in §12.3's own terms: *the rule was frozen and the interface was not.*
+
+## 4. Every assumption made (consolidated)
+
+All of these are §10 territory and are marked as assumptions in the code as well as here.
+
+1. **`AgentRun` / `PendingAction` shapes are NOT frozen** (§10). The AI workspace reads, and therefore
+   assumes: `AgentRun` = `id, thread_id, agent_name, status, query, tokens_used, cost_amount,
+   started_at, finished_at, pending_action_id, error_code, error_message`; `PendingAction` = `id,
+   agent_run_id, action_type, tool_name, summary, risk_level, status, payload, payload_hash, diff,
+   requested_by, decided_by, expires_at, created_at`. Documented in a comment block at the top of
+   `AiWorkspaceView.vue`; the list is kept deliberately **narrow** so a Phase 10/13 freeze only needs
+   that one field list reconciled.
+2. **`CouponPreviewResult`** — §12.1 freezes the endpoints, not the `CouponPreview` shape. Narrow
+   local view model: `preview_token` (stated as certain by §12.1) plus the echoed request fields.
+3. **Promotion shape + lifecycle** (`DRAFT`/`ACTIVE`/`ENDED`, the local `Promotion` interface) is
+   unfrozen, so both the vocabulary and the transitions are assumptions.
+4. **Analytics QUERY parameter names** — sent as `from` / `to` / `granularity`, mirroring the `period`
+   keys the RESPONSE does freeze. Response envelope is authoritative; only the request side is assumed.
+5. **Analytics route** — `/analytics/admin/metrics/{metric}`. §8 froze the envelope and the 5 metric
+   names, not the route. One function to change.
+6. **Knowledge + promotion transition guards** — the frontend's conservative reading of §53 / §47
+   (`PROCESSING` and `ARCHIVED` block both document actions; only DRAFT publishes). The server stays
+   authoritative (`DOCUMENT_STATE_INVALID` 100002, `PROMOTION_CONFLICT` 90001) and both views handle
+   those codes explicitly.
+7. **`InventoryMovement`** — left module-local in `src/api/inventory.ts`; §10 does not freeze it and it
+   is display-only (and currently has no UI).
+
+## 5. `refundable_amount` bridge — THREE CONDITIONS (pass this forward)
+
+`API_CONTRACT.md` §11 made `OrderDetail.refundable_amount` server-owned because it is **INV-005 exposed
+to the client**, and §15 forbids the client being its authority. The backend order module has not
+landed, so `src/domain/orders/availability.ts::refundableAmount()` falls back to
+`paid_amount - refunded_amount`. **Deleting the fallback today would silently kill every refund
+affordance** (`undefined > 0` is `false`), so it is kept under three conditions — all three must
+survive:
+
+1. **It SPEAKS** — a dev-only `console.warn` naming the missing field and the removal trigger, guarded
+   by `import.meta.env.DEV` (verified tree-shaken: the text is absent from `dist/assets/*.js` after a
+   real build). Warns once per session.
+2. **It is NAMED** — `@deprecated` JSDoc on `refundableAmount` plus `TODO(phase-5)` at the fallback.
+3. **Deletion has an OWNER** — Phase 5's definition of done in `HANDOFF.md`. **Verify this is still
+   there:** as of `e34ee66` a grep of `HANDOFF.md` for `refundable_amount`/`bridge` returned nothing.
+
+Three tests pin it: the fallback warns; the server path does **not** warn (or the signal stops meaning
+anything); it warns only once per session. **When Phase 5 lands the field, remove the fallback AND those
+fallback spec cases — do not leave a silent second source of truth for money in the domain layer.**
+
+## 6. Next steps (in priority order)
+
+1. **Wire `agentApi.cancelRun`.** §4 freezes `POST /agent/runs/{run_id}/cancel` and the API function
+   exists, but no view calls it — a frozen task endpoint with no entry point. `AgentRunStatus` already
+   has `CANCELLED`, and the §108 agent states already include `cancelled`, so the surface exists.
+2. **Decide §3**: either freeze the six response shapes, or approve narrow assumed view models. The
+   role/permission case should wait for a shape — its semantic risk is much higher than the coupon one.
+3. **Wire the remaining frozen-but-unused surface** if it is wanted: `inventoryAdminApi.movements`,
+   `catalogApi.categories` / `brands`, `catalogAdminApi.upsertSku`, `knowledgeAdminApi.createBase`,
+   `governanceApi.pendingAction`. *(Measured: a script audit of `src/api` exports against all
+   `src/views` + `src/components` + `src/stores` references found 13 unwired functions; those five are
+   the ones with a plausible UI home.)*
+4. **Retire the `.nx-card` / `.nx-pill` compatibility aliases** once nothing references them
+   (73 + 17 occurrences across 15 files at last count) — cosmetic, not a defect.
+5. **Delete the home-floor preview block** (`tags: ['预览数据']`) in `HomeView.vue` once the catalog
+   module answers for real.
+
+## 7. Problems found but NOT handled
+
+- **`agentApi.cancelRun` has no UI** (item 6.1) — the only frozen task endpoint in this repo with no
+  entry point. Found by script audit, not fixed.
+- **Persistent test-noise:** `user-event`/`jsdom` emit `Failed to resolve component` warnings in some
+  view specs; harmless, but a genuinely missing global component registration would be hidden by them.
+  Not investigated.
+- **No e2e coverage of the new pages.** `playwright` has 5 specs from the t1 scaffold; none exercise
+  AfterSales / Knowledge / Marketing / System / AiWorkspace. The gates above are unit + build only, so
+  "the API contract is honoured" is verified at the type and module-mock level, **not** against a live
+  backend.
+- **No page has been exercised against a real backend.** All 12 `app/modules/*` APIs are absent, so
+  every list in this app currently renders the Empty/Error state against a live server. Everything
+  verified here is verified against module mocks and the OpenAPI document.
+- **`RequestLog`/audit `before_snapshot`/`after_snapshot` are never rendered** in `SystemView`; §133
+  masking is a server concern, but the UI shows none of it.
+
+## 8. Rule carried forward for reports
+
+**Every factual statement in a report must either carry the command output that proves it, or be
+explicitly marked as unverified.** This project's hardest bugs were all "plausible and wrong": a nested
+`snapshot` shape, `order.status` being `undefined` (which silently hides every action without
+throwing), `SalesTrend.money: boolean` making the unit a guess, and a client-derived `refundable_amount`
+that would disable refund controls silently. None of them would have failed a build. State the evidence
+or label the guess.
+
+---
+
 # Frontend redesign — migration status
 
 ## Phase 8 (t2) — Merchant console
