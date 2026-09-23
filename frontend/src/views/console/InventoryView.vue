@@ -13,9 +13,9 @@ import { inventoryAdminApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
 import { normalizeError } from '@/api/error'
-import { newTraceId } from '@/utils/trace'
+import { validateAdjustment } from '@/domain/inventory/availability'
 import StateView from '@/components/ui/StateView.vue'
-import type { StockRow } from '@/api/inventory'
+import type { Inventory } from '@/types/frozen-contract'
 
 const notifications = useNotificationStore()
 
@@ -35,32 +35,48 @@ const {
 const rows = computed(() => stockData.value?.items ?? [])
 const meta = computed(() => stockData.value?.meta ?? null)
 
-const editing = ref<StockRow | null>(null)
+const editing = ref<Inventory | null>(null)
 const busy = ref(false)
 
-const form = reactive({ delta: 0, reason: '' })
+/** `delta_available` — the FROZEN field name (§7), never `delta`. */
+const form = reactive({ delta_available: 0, reason: '' })
 
-function openAdjust(row: StockRow): void {
+function openAdjust(row: Inventory): void {
   editing.value = row
-  form.delta = 0
+  form.delta_available = 0
   form.reason = ''
 }
+
+/** Immediate client-side reason, so the operator is not told "invalid" by a round trip. */
+const adjustmentProblem = computed(() =>
+  editing.value ? validateAdjustment(editing.value, form.delta_available) : null,
+)
 
 async function submitAdjust(): Promise<void> {
   const row = editing.value
   if (!row) return
+  const problem = validateAdjustment(row, form.delta_available)
+  if (problem) {
+    notifications.warning('调整数量不合法', problem)
+    return
+  }
   if (!form.reason.trim()) {
     notifications.warning('请填写调整原因', '库存变动会写入流水，原因必填')
     return
   }
   busy.value = true
   try {
-    await inventoryAdminApi.adjust(row.sku_id, {
-      delta: form.delta,
-      reason: form.reason,
-      // Echo the version we rendered. This is the optimistic-lock token.
+    /**
+     * The FROZEN adjustment request (§7) — note it is NOT sku-keyed and the delta field is
+     * `delta_available`. `version` is the optimistic lock; there is deliberately no
+     * `idempotency_key`, because the lock IS the concurrency guard and §110 forbids extra fields.
+     */
+    await inventoryAdminApi.adjust({
+      warehouse_id: row.warehouse_id,
+      sku_id: row.sku_id,
       version: row.version,
-      idempotency_key: `adj-${newTraceId()}`,
+      delta_available: form.delta_available,
+      reason: form.reason.trim(),
     })
     notifications.success('库存已调整')
     editing.value = null
@@ -108,14 +124,15 @@ async function submitAdjust(): Promise<void> {
         </thead>
         <tbody>
           <tr v-for="row in rows" :key="row.sku_id">
-            <td><code>{{ row.sku_code }}</code></td>
+            <td><code>{{ row.sku_no }}</code></td>
             <td>
-              <strong>{{ row.product_title }}</strong>
-              <p class="nx-muted">{{ Object.values(row.specs).join(' / ') }}</p>
+              <strong>{{ row.product_name }}</strong>
+              <p class="nx-muted">{{ row.sku_name }}</p>
             </td>
-            <td>{{ row.on_hand }}</td>
-            <td>{{ row.reserved }}</td>
-            <td class="inventory__sellable">{{ row.on_hand - row.reserved }}</td>
+            <td>{{ row.on_hand_qty }}</td>
+            <td>{{ row.locked_qty }}</td>
+            <!-- Server-computed `sellable_qty`: the UI must NOT recompute this (§7). -->
+            <td class="inventory__sellable">{{ row.sellable_qty }}</td>
             <td><span class="inventory__version">v{{ row.version }}</span></td>
             <td>
               <button type="button" class="nx-btn nx-btn--ghost" @click="openAdjust(row)">调整</button>
@@ -141,15 +158,17 @@ async function submitAdjust(): Promise<void> {
     <div v-if="editing" class="inventory__modal" role="dialog" aria-modal="true" aria-label="调整库存">
       <div class="inventory__modal-card nx-card">
         <div class="nx-card__body">
-          <h3 class="nx-section-title">调整库存 · {{ editing.sku_code }}</h3>
+          <h3 class="nx-section-title">调整库存 · {{ editing.sku_no }}</h3>
           <p class="nx-muted">
-            当前在库 {{ editing.on_hand }}，预占 {{ editing.reserved }}，版本 v{{ editing.version }}
+            当前在库 {{ editing.on_hand_qty }}，预占 {{ editing.locked_qty }}，可售
+            {{ editing.sellable_qty }}，版本 v{{ editing.version }}
           </p>
 
           <label class="inventory__field">
             <span>调整数量（正数入库，负数出库）</span>
-            <input v-model.number="form.delta" type="number" />
+            <input v-model.number="form.delta_available" type="number" />
           </label>
+          <p v-if="adjustmentProblem" class="nx-muted">{{ adjustmentProblem }}</p>
 
           <label class="inventory__field">
             <span>原因</span>

@@ -21,7 +21,8 @@ import { normalizeError } from '@/api/error'
 import StateView from '@/components/ui/StateView.vue'
 import StatusChip from '@/components/ui/StatusChip.vue'
 import PriceText from '@/components/ui/PriceText.vue'
-import type { Order, OrderStatus } from '@/types/domain'
+import { refundableAmount } from '@/domain/orders/availability'
+import type { OrderSummary, OrderStatus } from '@/types/domain'
 
 const router = useRouter()
 const notifications = useNotificationStore()
@@ -42,7 +43,7 @@ const { data: orderData, status, error, execute } = useAsyncState(
   { immediate: true },
 )
 
-const orders = computed(() => orderData.value ?? [])
+const orders = computed(() => orderData.value?.items ?? [])
 const busyOrderNo = ref('')
 
 function changeTab(value: '' | OrderStatus): void {
@@ -92,16 +93,27 @@ async function goPay(orderNo: string): Promise<void> {
   }
 }
 
-function canCancel(order: Order): boolean {
-  return order.status === 'PENDING_PAYMENT' || order.status === 'PROCESSING'
+/**
+ * The list payload is `OrderSummary` (API_CONTRACT.md §6), so the state field is `order_status`
+ * and money is FLAT on the order. Reading `order.status` here would be `undefined`, every
+ * comparison would be false, and the whole action bar would silently disappear.
+ */
+function canCancel(order: OrderSummary): boolean {
+  return order.order_status === 'PENDING_PAYMENT' || order.order_status === 'PROCESSING'
 }
-function canConfirm(order: Order): boolean {
-  return order.status === 'PROCESSING' && order.fulfillment_status !== 'UNFULFILLED'
+function canConfirm(order: OrderSummary): boolean {
+  return order.order_status === 'PROCESSING' && order.fulfillment_status !== 'UNFULFILLED'
 }
-function canApplyAfterSale(order: Order): boolean {
+function canApplyAfterSale(order: OrderSummary): boolean {
   return (
-    (order.status === 'PROCESSING' || order.status === 'COMPLETED') && order.after_sale_status === 'NONE'
+    (order.order_status === 'PROCESSING' || order.order_status === 'COMPLETED') &&
+    order.after_sale_status === 'NONE'
   )
+}
+
+/** The frozen payload has no `refundable_amount`; it is `paid − refunded`, derived in one place. */
+function refundableOf(order: OrderSummary): number {
+  return refundableAmount(order)
 }
 
 /** Chinese weekday-free timestamp, compact for a dense list. */
@@ -149,40 +161,37 @@ function stamp(iso: string): string {
               <span class="orders__shop">Nova 官方旗舰店</span>
               <span class="orders__strip-right">
                 <StatusChip :status="order.fulfillment_status" kind="fulfillment" dot />
-                <StatusChip :status="order.status" kind="order" />
+                <StatusChip :status="order.order_status" kind="order" />
               </span>
             </header>
 
             <div class="orders__body">
-              <!-- items column -->
+              <!--
+                ITEMS COLUMN — deliberately NOT a per-line list.
+                The frozen list payload is `OrderSummary`, which carries NO `items[]`
+                (API_CONTRACT.md §6: the list/detail split exists so a page of orders does not drag
+                every line item across the wire). The old code rendered `order.snapshot.items`
+                here, which on a frozen payload is simply `undefined`.
+                Real line items would need one detail call PER ROW, so the list shows the
+                order-level figures and routes to the detail page, which does have `items[]`.
+              -->
               <div class="orders__items">
-                <div v-for="item in order.snapshot.items" :key="item.id" class="orders__row">
-                  <RouterLink
-                    :to="{ name: 'product', params: { id: item.product_id } }"
-                    class="orders__thumb-link"
-                  >
-                    <img v-if="item.cover_url" :src="item.cover_url" :alt="item.product_title" class="orders__thumb" />
-                    <span v-else class="orders__thumb orders__thumb--empty" aria-hidden="true">暂无图片</span>
-                  </RouterLink>
-
+                <div class="orders__row">
                   <div class="orders__info">
                     <RouterLink
-                      :to="{ name: 'product', params: { id: item.product_id } }"
+                      :to="{ name: 'order-detail', params: { orderNo: order.order_no } }"
                       class="orders__title"
                     >
-                      {{ item.product_title }}
+                      订单 {{ order.order_no }}
                     </RouterLink>
                     <p class="nx-muted orders__specs">
-                      {{ Object.values(item.sku_specs).join(' / ') }} × {{ item.quantity }}
-                    </p>
-                    <p v-if="item.refunded_amount > 0" class="orders__refunded">
-                      该商品已退
-                      <PriceText :amount="item.refunded_amount" size="sm" />
+                      收货人 {{ order.receiver_name }} · 商品金额
+                      <PriceText :amount="order.original_amount" size="sm" muted />
                     </p>
                   </div>
 
                   <div class="orders__unit">
-                    <PriceText :amount="item.subtotal_amount" size="sm" muted />
+                    <PriceText :amount="order.payable_amount" size="sm" muted />
                   </div>
                 </div>
               </div>
@@ -192,7 +201,7 @@ function stamp(iso: string): string {
                 <dl class="nx-rows orders__amounts">
                   <div>
                     <dt>应付</dt>
-                    <dd><PriceText :amount="order.snapshot.payable_amount" size="md" /></dd>
+                    <dd><PriceText :amount="order.payable_amount" size="md" /></dd>
                   </div>
                   <div>
                     <dt>实付</dt>
@@ -202,9 +211,9 @@ function stamp(iso: string): string {
                     <dt>已退款</dt>
                     <dd><PriceText :amount="order.refunded_amount" size="sm" muted /></dd>
                   </div>
-                  <div v-if="order.refundable_amount > 0">
+                  <div v-if="refundableOf(order) > 0">
                     <dt>可退余额</dt>
-                    <dd><PriceText :amount="order.refundable_amount" size="sm" muted /></dd>
+                    <dd><PriceText :amount="refundableOf(order)" size="sm" muted /></dd>
                   </div>
                 </dl>
 
@@ -215,7 +224,7 @@ function stamp(iso: string): string {
 
                 <div class="orders__actions">
                   <button
-                    v-if="order.status === 'PENDING_PAYMENT'"
+                    v-if="order.order_status === 'PENDING_PAYMENT'"
                     type="button"
                     class="nx-btn nx-btn--primary nx-btn--sm"
                     :disabled="busyOrderNo === order.order_no"
@@ -256,9 +265,14 @@ function stamp(iso: string): string {
                   </RouterLink>
                 </div>
 
-                <p v-if="order.cancel_reason" class="nx-muted orders__cancel">
-                  取消原因：{{ order.cancel_reason }}
-                </p>
+                <!--
+                  NOTE: a "取消原因" line used to render here from `order.cancel_reason`.
+                  `API_CONTRACT.md` §6 does NOT define that field on `OrderSummary`/`OrderDetail`,
+                  so on a frozen payload it is `undefined` and the line could never appear. The
+                  field is removed rather than kept as decoration over a value the server never
+                  sends. If the backend adds a cancel reason later it should be added to the
+                  contract first and this block restored from it (see the migration report).
+                -->
               </div>
             </div>
           </article>

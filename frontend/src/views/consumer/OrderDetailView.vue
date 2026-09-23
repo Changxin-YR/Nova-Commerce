@@ -2,16 +2,26 @@
 /**
  * Order detail.
  *
- * Renders the SNAPSHOT, not live catalog data: `order.snapshot` is what the buyer
- * agreed to, and it must not change when the merchant edits the product afterwards.
- * Refund figures use the server's `refundable_amount` as the input ceiling — the
- * backend still rejects an over-refund (REFUND_EXCEEDS_PAID_AMOUNT / _ITEM_AMOUNT).
+ * Renders the order SNAPSHOT, not live catalog data: the line items frozen onto the order at
+ * creation are what the buyer agreed to, and they must not change when the merchant edits the
+ * product afterwards.
+ *
+ * FROZEN SHAPE (API_CONTRACT.md §6): items live at `order.items` (NOT `order.snapshot.items`),
+ * money is FLAT on the order (`original_amount` / `promotion_discount_amount` /
+ * `coupon_discount_amount` / `shipping_amount` / `payable_amount`), the state field is
+ * `order_status`, and `receiver_name` / `receiver_phone` arrive ALREADY MASKED (§94) — this view
+ * must never attempt to un-mask them.
+ *
+ * The refund ceiling is derived as `paid_amount - refunded_amount`, because the frozen payload has
+ * no `refundable_amount` field; the backend independently rejects an over-refund
+ * (REFUND_EXCEEDS_PAID_AMOUNT / _ITEM_AMOUNT).
  */
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { afterSaleApi, orderApi, paymentApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
+import { refundableAmount } from '@/domain/orders/availability'
 import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
@@ -36,18 +46,24 @@ const {
   execute: loadShipments,
 } = useAsyncState(() => orderApi.shipments(orderNo.value), { immediate: true })
 
-const canPay = computed(() => order.value?.status === 'PENDING_PAYMENT')
+const canPay = computed(() => order.value?.order_status === 'PENDING_PAYMENT')
 const canCancel = computed(
-  () => order.value?.status === 'PENDING_PAYMENT' || order.value?.status === 'PROCESSING',
+  () =>
+    order.value?.order_status === 'PENDING_PAYMENT' || order.value?.order_status === 'PROCESSING',
 )
-const canConfirm = computed(() => order.value?.status === 'PROCESSING')
+const canConfirm = computed(() => order.value?.order_status === 'PROCESSING')
 const canApplyAfterSale = computed(
   () =>
-    (order.value?.status === 'PROCESSING' || order.value?.status === 'COMPLETED') &&
+    (order.value?.order_status === 'PROCESSING' || order.value?.order_status === 'COMPLETED') &&
     order.value?.after_sale_status === 'NONE',
 )
-/** Server-provided ceiling; the form uses it as `max` but never as authorization. */
-const refundable = computed(() => order.value?.refundable_amount ?? 0)
+/**
+ * The ceiling is DERIVED: `paid_amount - refunded_amount`. The frozen payload carries no
+ * `refundable_amount`, and reading one would yield `undefined` — which compares false against
+ * every bound, silently disabling refunds. The form uses this as a `max`, never as authorization;
+ * the backend rejects an over-refund independently.
+ */
+const refundable = computed(() => (order.value ? refundableAmount(order.value) : 0))
 
 async function pay(): Promise<void> {
   busy.value = true
@@ -99,7 +115,7 @@ async function applyRefundForRemaining(): Promise<void> {
     await afterSaleApi.apply({
       order_no: order.value.order_no,
       type: 'REFUND_ONLY',
-      items: order.value.snapshot.items.map((item) => ({
+      items: order.value.items.map((item) => ({
         order_item_id: item.id,
         quantity: item.quantity,
       })),
@@ -131,14 +147,17 @@ async function applyRefundForRemaining(): Promise<void> {
                   <p class="nx-muted">下单时间 {{ new Date(order.created_at).toLocaleString() }}</p>
                 </div>
                 <div class="order-detail__chips">
-                  <StatusChip :status="order.status" kind="order" />
+                  <StatusChip :status="order.order_status" kind="order" />
                   <StatusChip :status="order.payment_status" kind="payment" />
                   <StatusChip :status="order.fulfillment_status" kind="fulfillment" />
                   <StatusChip :status="order.after_sale_status" kind="aftersale" />
                 </div>
               </header>
 
-              <p v-if="order.expires_at && order.status === 'PENDING_PAYMENT'" class="order-detail__expire">
+              <p
+                v-if="order.expires_at && order.order_status === 'PENDING_PAYMENT'"
+                class="order-detail__expire"
+              >
                 请在 {{ new Date(order.expires_at).toLocaleString() }} 前完成支付，超时后订单将自动关闭。
               </p>
             </div>
@@ -148,20 +167,20 @@ async function applyRefundForRemaining(): Promise<void> {
             <div class="nx-card__body">
               <h2 class="nx-section-title">商品快照</h2>
               <ul class="order-detail__items">
-                <li v-for="item in order.snapshot.items" :key="item.id">
-                  <img v-if="item.cover_url" :src="item.cover_url" :alt="item.product_title" />
+                <li v-for="item in order.items" :key="item.id">
+                  <img v-if="item.image_url" :src="item.image_url" :alt="item.product_name" />
                   <span v-else class="order-detail__placeholder" aria-hidden="true">无图</span>
                   <span class="order-detail__item-info">
-                    <strong>{{ item.product_title }}</strong>
-                    <span class="nx-muted">{{ Object.values(item.sku_specs).join(' / ') }}</span>
+                    <strong>{{ item.product_name }}</strong>
+                    <span class="nx-muted">{{ item.sku_name }}</span>
                     <span v-if="item.refunded_amount > 0" class="order-detail__refunded">
                       已退 <PriceText :amount="item.refunded_amount" size="sm" />
                     </span>
                   </span>
                   <span class="nx-muted">
-                    <PriceText :amount="item.unit_price_amount" size="sm" muted /> × {{ item.quantity }}
+                    <PriceText :amount="item.unit_price" size="sm" muted /> × {{ item.quantity }}
                   </span>
-                  <PriceText :amount="item.subtotal_amount" size="md" />
+                  <PriceText :amount="item.payable_amount" size="md" />
                 </li>
               </ul>
             </div>
@@ -170,20 +189,25 @@ async function applyRefundForRemaining(): Promise<void> {
           <section class="nx-card">
             <div class="nx-card__body">
               <h2 class="nx-section-title">收货信息</h2>
+              <!--
+                §94: `receiver_name` / `receiver_phone` arrive ALREADY MASKED (张** / 138****5678).
+                They are shown as received; un-masking is neither possible nor attempted.
+              -->
               <dl class="order-detail__snapshot">
-                <div><dt>收货人</dt><dd>{{ order.snapshot.receiver_name }}</dd></div>
-                <div><dt>联系电话</dt><dd>{{ order.snapshot.receiver_phone }}</dd></div>
-                <div><dt>收货地址</dt><dd>{{ order.snapshot.full_address }}</dd></div>
-                <div><dt>商品金额</dt><dd><PriceText :amount="order.snapshot.items_amount" size="sm" muted /></dd></div>
-                <div><dt>优惠</dt><dd>−<PriceText :amount="order.snapshot.discount_amount" size="sm" muted /></dd></div>
-                <div><dt>运费</dt><dd><PriceText :amount="order.snapshot.shipping_amount" size="sm" muted /></dd></div>
+                <div><dt>收货人</dt><dd>{{ order.receiver_name }}</dd></div>
+                <div><dt>联系电话</dt><dd>{{ order.receiver_phone }}</dd></div>
+                <div v-if="order.full_address"><dt>收货地址</dt><dd>{{ order.full_address }}</dd></div>
+                <div><dt>商品金额</dt><dd><PriceText :amount="order.original_amount" size="sm" muted /></dd></div>
+                <div><dt>活动优惠</dt><dd>−<PriceText :amount="order.promotion_discount_amount" size="sm" muted /></dd></div>
+                <div><dt>优惠券</dt><dd>−<PriceText :amount="order.coupon_discount_amount" size="sm" muted /></dd></div>
+                <div><dt>运费</dt><dd><PriceText :amount="order.shipping_amount" size="sm" muted /></dd></div>
                 <div class="order-detail__snapshot-total">
                   <dt>应付</dt>
-                  <dd><PriceText :amount="order.snapshot.payable_amount" size="lg" /></dd>
+                  <dd><PriceText :amount="order.payable_amount" size="lg" /></dd>
                 </div>
                 <div><dt>实付</dt><dd><PriceText :amount="order.paid_amount" size="sm" muted /></dd></div>
                 <div><dt>已退款</dt><dd><PriceText :amount="order.refunded_amount" size="sm" muted /></dd></div>
-                <div><dt>可退余额</dt><dd><PriceText :amount="order.refundable_amount" size="sm" muted /></dd></div>
+                <div><dt>可退余额</dt><dd><PriceText :amount="refundable" size="sm" muted /></dd></div>
               </dl>
             </div>
           </section>
@@ -247,11 +271,14 @@ async function applyRefundForRemaining(): Promise<void> {
               </RouterLink>
             </div>
 
-            <p v-if="order.status === 'CANCELLED' && order.cancel_reason" class="nx-muted order-detail__note">
-              取消原因：{{ order.cancel_reason }}
-            </p>
+            <!--
+              NOTE: a "取消原因" line used to render here from `order.cancel_reason`.
+              `API_CONTRACT.md` §6 does NOT define that field, so on a frozen payload it is
+              `undefined` and the line could never appear. Removed rather than kept as decoration
+              over a value the server never sends.
+            -->
             <p class="nx-muted order-detail__note">
-              金额与状态均来自服务端。退款上限为「实付 − 已退款」，由后端在事务内校验。
+              金额与状态均来自服务端，收货人信息由服务端脱敏。退款上限由「实付 − 已退款」推导，后端在事务内独立校验。
             </p>
           </div>
         </aside>

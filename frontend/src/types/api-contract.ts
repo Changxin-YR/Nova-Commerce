@@ -206,7 +206,7 @@ export interface CreatePaymentRequest {
 export interface ApplyAfterSaleRequest {
   order_no: string
   type: 'REFUND_ONLY' | 'RETURN_REFUND'
-  items: { order_item_id: string; quantity: number }[]
+  items: { order_item_id: number; quantity: number }[]
   /** Integer minor units. */
   requested_amount: number
   reason: string

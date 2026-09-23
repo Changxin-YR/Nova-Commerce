@@ -6,13 +6,19 @@
  * reaches into component internals or stubs axios.
  *
  * What this locks down, beyond the pure availability unit tests:
- *   1. The action that renders is the one the frozen state machine allows — an unpaid order
- *      shows 取消 and NOT 发货.
+ *   1. The action that renders is the one the frozen state machine allows — an unpaid order shows
+ *      取消 and NOT 发货.
  *   2. Clicking an action calls the FROZEN TASK ENDPOINT function (orderApi.cancel,
  *      orderApi.confirmReceipt, fulfillmentAdminApi.ship) — never a status patch.
- *   3. Shipping resolves a fulfillment id first, because the endpoint is fulfillment-keyed.
- *   4. A 403 from an action is handled gracefully (an error notice, no crash) — the case
- *      where the UI and the server disagree about permission.
+ *   3. Shipping takes its id from the FULFILLMENT QUEUE (`GET /fulfillments/admin`, §5.2), which
+ *      is what the frozen contract provides for discovering an id — the list payload has no
+ *      `shipments[]`.
+ *   4. A package the server already stamped a carrier on is NOT offered for shipping.
+ *   5. A 403 from an action is handled gracefully (an error notice, no crash) — the case where the
+ *      UI and the server disagree about permission.
+ *
+ * FROZEN SHAPES ONLY: `OrderSummary` for list rows and `Fulfillment` for packages. No `snapshot`,
+ * no `status`, no string ids.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,11 +26,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import OrdersView from '@/views/console/OrdersView.vue'
 import { useNotificationStore } from '@/stores/notification'
-import type { Order } from '@/types/domain'
+import type { OrderSummary } from '@/types/domain'
+import type { Fulfillment } from '@/types/frozen-contract'
 
 /** The API-module boundary under test. */
 const listMock = vi.fn()
-const detailMock = vi.fn()
+const fulfillmentListMock = vi.fn()
 const cancelMock = vi.fn()
 const confirmReceiptMock = vi.fn()
 const shipMock = vi.fn()
@@ -32,59 +39,75 @@ const shipMock = vi.fn()
 vi.mock('@/api', () => ({
   orderAdminApi: {
     list: (...args: unknown[]) => listMock(...args),
-    detail: (...args: unknown[]) => detailMock(...args),
   },
   orderApi: {
     cancel: (...args: unknown[]) => cancelMock(...args),
     confirmReceipt: (...args: unknown[]) => confirmReceiptMock(...args),
   },
   fulfillmentAdminApi: {
+    list: (...args: unknown[]) => fulfillmentListMock(...args),
     ship: (...args: unknown[]) => shipMock(...args),
   },
 }))
 
-/** A realistic order fixture built only from frozen fields. */
-function makeOrder(overrides: Partial<Order> = {}): Order {
+/**
+ * A list row built ONLY from frozen `OrderSummary` fields (API_CONTRACT.md §6).
+ *
+ * Note what is absent by design: no `items[]`, no `shipments[]`, no address. The list payload
+ * genuinely does not carry them.
+ */
+function makeOrder(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
-    id: 'ord-1',
-    order_no: 'NOVA20250101001',
-    user_id: 'user-1',
-    status: 'PENDING_PAYMENT',
+    id: 456,
+    order_no: 'NV20260922000001',
+    order_status: 'PENDING_PAYMENT',
     payment_status: 'UNPAID',
     fulfillment_status: 'UNFULFILLED',
     after_sale_status: 'NONE',
-    snapshot: {
-      receiver_name: '张三',
-      receiver_phone: '13800000000',
-      full_address: '北京市朝阳区某路 1 号',
-      items: [
-        {
-          id: 'item-1',
-          product_id: 'prod-1',
-          sku_id: 'sku-1',
-          product_title: '轻薄本 14 英寸',
-          sku_specs: { 颜色: '深空灰' },
-          quantity: 1,
-          unit_price_amount: 599900,
-          subtotal_amount: 599900,
-          refunded_amount: 0,
-        },
-      ],
-      items_amount: 599900,
-      discount_amount: 0,
-      shipping_amount: 0,
-      payable_amount: 599900,
-    },
-    shipments: [],
+    original_amount: 599900,
+    promotion_discount_amount: 0,
+    coupon_discount_amount: 0,
+    shipping_amount: 0,
+    payable_amount: 599900,
     paid_amount: 0,
     refunded_amount: 0,
-    refundable_amount: 0,
-    created_at: '2025-01-01T10:00:00Z',
+    receiver_name: '张**',
+    receiver_phone: '138****5678',
+    created_at: '2026-09-22T23:31:07.507Z',
+    paid_at: null,
+    expires_at: '2026-09-22T23:46:07.507Z',
     ...overrides,
   }
 }
 
-function pageOf(items: Order[]) {
+/** A package the server has NOT shipped yet: `carrier` and `tracking_no` are null (§5). */
+function makeFulfillment(overrides: Partial<Fulfillment> = {}): Fulfillment {
+  return {
+    id: 77,
+    order_id: 456,
+    order_no: 'NV20260922000001',
+    fulfillment_no: 'NVF20260922000001',
+    fulfillment_status: 'UNFULFILLED',
+    carrier: null,
+    tracking_no: null,
+    shipped_at: null,
+    delivered_at: null,
+    created_at: '2026-09-22T23:31:07.507Z',
+    items: [
+      {
+        id: 1,
+        order_item_id: 9,
+        sku_id: 3,
+        product_name: 'Nova Phone 15 Pro',
+        sku_name: '原色钛金属 256GB',
+        quantity: 1,
+      },
+    ],
+    ...overrides,
+  }
+}
+
+function pageOf<T>(items: T[]) {
   return {
     items,
     meta: { page: 1, page_size: 20, total: items.length, total_pages: 1 },
@@ -104,13 +127,14 @@ function buttonLabels(wrapper: ReturnType<typeof mountView>): string[] {
 }
 
 async function findButton(wrapper: ReturnType<typeof mountView>, label: string) {
-  const button = wrapper.findAll('button').find((candidate) => candidate.text().trim() === label)
-  return button
+  return wrapper.findAll('button').find((candidate) => candidate.text().trim() === label)
 }
 
 describe('console Orders — row actions follow the frozen state machine', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: nothing outstanding in the fulfillment queue.
+    fulfillmentListMock.mockResolvedValue(pageOf<Fulfillment>([]))
   })
 
   it('an UNPAID order offers 取消 but NOT 发货 / 确认收货', async () => {
@@ -126,16 +150,18 @@ describe('console Orders — row actions follow the frozen state machine', () =>
     expect(wrapper.text()).toContain('不可发货')
   })
 
-  it('a PAID, unshipped order offers 发货 and 取消', async () => {
+  it('a PAID, unshipped order with an outstanding fulfillment offers 发货 and 取消', async () => {
     listMock.mockResolvedValue(
       pageOf([
         makeOrder({
-          status: 'PROCESSING',
+          order_status: 'PROCESSING',
           payment_status: 'PAID',
-          refundable_amount: 599900,
+          paid_amount: 599900,
         }),
       ]),
     )
+    fulfillmentListMock.mockResolvedValue(pageOf([makeFulfillment()]))
+
     const wrapper = mountView()
     await flushPromises()
 
@@ -145,14 +171,36 @@ describe('console Orders — row actions follow the frozen state machine', () =>
     expect(labels).not.toContain('确认收货')
   })
 
-  it('a SHIPPED order offers 确认收货 and NOT 发货 (status is still PROCESSING, §31)', async () => {
+  it('a PAID order whose package ALREADY has a carrier is NOT shippable', async () => {
+    // THE CARRIER RULE: every status field says "shippable" (PROCESSING / PAID / UNFULFILLED),
+    // and only the fulfillment's own `carrier` says otherwise.
     listMock.mockResolvedValue(
       pageOf([
         makeOrder({
-          status: 'PROCESSING',
+          order_status: 'PROCESSING',
+          payment_status: 'PAID',
+          paid_amount: 599900,
+        }),
+      ]),
+    )
+    fulfillmentListMock.mockResolvedValue(
+      pageOf([makeFulfillment({ carrier: 'SF', tracking_no: 'SF1' })]),
+    )
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(buttonLabels(wrapper)).not.toContain('发货')
+  })
+
+  it('a SHIPPED order offers 确认收货 and NOT 发货 (order_status is still PROCESSING, §31)', async () => {
+    listMock.mockResolvedValue(
+      pageOf([
+        makeOrder({
+          order_status: 'PROCESSING',
           payment_status: 'PAID',
           fulfillment_status: 'SHIPPED',
-          refundable_amount: 599900,
+          paid_amount: 599900,
         }),
       ]),
     )
@@ -166,16 +214,29 @@ describe('console Orders — row actions follow the frozen state machine', () =>
     expect(labels).not.toContain('取消')
     expect(wrapper.text()).toContain('不可取消')
   })
+
+  it('queries the fulfillment queue for outstanding packages only', async () => {
+    listMock.mockResolvedValue(pageOf([makeOrder({ order_status: 'PROCESSING', payment_status: 'PAID' })]))
+    const wrapper = mountView()
+    await flushPromises()
+
+    // The server's own filter is used rather than fetching everything and filtering locally.
+    expect(fulfillmentListMock).toHaveBeenCalledWith(
+      expect.objectContaining({ fulfillment_status: 'UNFULFILLED' }),
+    )
+    expect(wrapper.text()).toContain('未发货')
+  })
 })
 
 describe('console Orders — actions call the FROZEN task endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    fulfillmentListMock.mockResolvedValue(pageOf<Fulfillment>([]))
   })
 
   it('取消 calls orderApi.cancel (POST /orders/{no}/cancel) and refreshes the list', async () => {
     listMock.mockResolvedValue(pageOf([makeOrder()]))
-    cancelMock.mockResolvedValue(makeOrder({ status: 'CANCELLED' }))
+    cancelMock.mockResolvedValue(makeOrder({ order_status: 'CANCELLED' }))
 
     const wrapper = mountView()
     await flushPromises()
@@ -187,7 +248,7 @@ describe('console Orders — actions call the FROZEN task endpoints', () => {
     await flushPromises()
 
     expect(cancelMock).toHaveBeenCalledTimes(1)
-    expect(cancelMock).toHaveBeenCalledWith('NOVA20250101001', { reason: '商家取消' })
+    expect(cancelMock).toHaveBeenCalledWith('NV20260922000001', { reason: '商家取消' })
     // The list is re-read from the server rather than patched locally.
     expect(listMock.mock.calls.length).toBeGreaterThan(before)
   })
@@ -196,14 +257,14 @@ describe('console Orders — actions call the FROZEN task endpoints', () => {
     listMock.mockResolvedValue(
       pageOf([
         makeOrder({
-          status: 'PROCESSING',
+          order_status: 'PROCESSING',
           payment_status: 'PAID',
           fulfillment_status: 'SHIPPED',
-          refundable_amount: 599900,
+          paid_amount: 599900,
         }),
       ]),
     )
-    confirmReceiptMock.mockResolvedValue(makeOrder({ status: 'COMPLETED' }))
+    confirmReceiptMock.mockResolvedValue(makeOrder({ order_status: 'COMPLETED' }))
 
     const wrapper = mountView()
     await flushPromises()
@@ -213,31 +274,17 @@ describe('console Orders — actions call the FROZEN task endpoints', () => {
     await flushPromises()
 
     expect(confirmReceiptMock).toHaveBeenCalledTimes(1)
-    expect(confirmReceiptMock).toHaveBeenCalledWith('NOVA20250101001')
+    expect(confirmReceiptMock).toHaveBeenCalledWith('NV20260922000001')
   })
 
-  it('发货 resolves a fulfillment id first, then calls fulfillmentAdminApi.ship and NOT the order endpoint', async () => {
+  it('发货 uses the queue id, then calls fulfillmentAdminApi.ship with EXACTLY three fields', async () => {
     listMock.mockResolvedValue(
-      pageOf([makeOrder({ status: 'PROCESSING', payment_status: 'PAID', refundable_amount: 599900 })]),
+      pageOf([
+        makeOrder({ order_status: 'PROCESSING', payment_status: 'PAID', paid_amount: 599900 }),
+      ]),
     )
-    // The list payload has no fulfillment ids, so the view must fetch detail to get one.
-    detailMock.mockResolvedValue(
-      makeOrder({
-        status: 'PROCESSING',
-        payment_status: 'PAID',
-        shipments: [
-          {
-            id: 'ful-77',
-            order_no: 'NOVA20250101001',
-            carrier: '',
-            tracking_no: '',
-            fulfillment_status: 'UNFULFILLED',
-            items: [],
-          },
-        ],
-      }),
-    )
-    shipMock.mockResolvedValue({ id: 'ful-77', fulfillment_status: 'SHIPPED' })
+    fulfillmentListMock.mockResolvedValue(pageOf([makeFulfillment({ id: 77 })]))
+    shipMock.mockResolvedValue(makeFulfillment({ carrier: 'SF', tracking_no: 'SF123456789' }))
 
     const wrapper = mountView()
     await flushPromises()
@@ -246,63 +293,47 @@ describe('console Orders — actions call the FROZEN task endpoints', () => {
     await shipButton?.trigger('click')
     await flushPromises()
 
-    // The dialog opens against the resolved fulfillment.
-    expect(detailMock).toHaveBeenCalledWith('NOVA20250101001')
-    expect(wrapper.text()).toContain('ful-77')
+    // The dialog opens against the queue's numeric id.
+    expect(wrapper.text()).toContain('77')
 
-    // Fill the dialog's own inputs. Scoped to the modal on purpose: the filter bar also
-    // renders `input.nx-input`, so an unscoped selector would fill the wrong fields.
-    const modalInputs = wrapper.findAll('.o-list__modal input.nx-input')
-    expect(modalInputs).toHaveLength(2)
-    await modalInputs[0]?.setValue('顺丰速运')
-    await modalInputs[1]?.setValue('SF123456789')
+    // The carrier is a SELECT (§5: a carrier CODE, not free text), so only the tracking number
+    // is typed.
+    const carrierSelect = wrapper.find('.o-list__modal select.nx-input')
+    expect(carrierSelect.exists()).toBe(true)
+    await carrierSelect.setValue('SF')
+    const trackingInput = wrapper.find('.o-list__modal input.nx-input')
+    await trackingInput.setValue('SF123456789')
 
     const confirmShip = await findButton(wrapper, '确认发货')
     await confirmShip?.trigger('click')
     await flushPromises()
 
     expect(shipMock).toHaveBeenCalledTimes(1)
-    const [fulfillmentId, payload] = shipMock.mock.calls[0] as [string, Record<string, string>]
-    expect(fulfillmentId).toBe('ful-77')
-    expect(payload.carrier).toBe('顺丰速运')
+    const [fulfillmentId, payload] = shipMock.mock.calls[0] as [number, Record<string, unknown>]
+    // A NUMBER, exactly what `POST /fulfillments/{id}/ship` takes.
+    expect(fulfillmentId).toBe(77)
+    expect(payload.carrier).toBe('SF')
     expect(payload.tracking_no).toBe('SF123456789')
-    // Idempotency key present, and scoped to this fulfillment.
-    expect(payload.idempotency_key).toContain('ful-77')
-    // §110: only the fields the endpoint accepts are sent — no whole-object round trip.
-    expect(Object.keys(payload).sort()).toEqual(['carrier', 'idempotency_key', 'tracking_no'])
+    // §110: only the fields the endpoint accepts. NO `idempotency_key` — the server rejects it.
+    expect(Object.keys(payload).sort()).toEqual(['carrier', 'item_quantities', 'tracking_no'])
   })
 
-  it('does not open the ship dialog when the order has no unshipped fulfillment', async () => {
+  it('does not open the ship dialog when the queue reports nothing outstanding', async () => {
     listMock.mockResolvedValue(
-      pageOf([makeOrder({ status: 'PROCESSING', payment_status: 'PAID', refundable_amount: 599900 })]),
+      pageOf([
+        makeOrder({ order_status: 'PROCESSING', payment_status: 'PAID', paid_amount: 599900 }),
+      ]),
     )
-    detailMock.mockResolvedValue(
-      makeOrder({
-        status: 'PROCESSING',
-        payment_status: 'PAID',
-        // Already shipped: nothing left to fulfil.
-        shipments: [
-          {
-            id: 'ful-1',
-            order_no: 'NOVA20250101001',
-            carrier: '顺丰',
-            tracking_no: 'SF1',
-            fulfillment_status: 'SHIPPED',
-            items: [],
-          },
-        ],
-      }),
+    // Every package already shipped, so the queue is empty for this order.
+    fulfillmentListMock.mockResolvedValue(
+      pageOf([makeFulfillment({ fulfillment_status: 'SHIPPED', carrier: 'SF', tracking_no: 'SF1' })]),
     )
 
     const wrapper = mountView()
     await flushPromises()
 
-    const shipButton = await findButton(wrapper, '发货')
-    await shipButton?.trigger('click')
-    await flushPromises()
-
-    // No dialog, and no shipment request was attempted.
-    expect(wrapper.text()).not.toContain('确认发货')
+    // Nothing is offered for this row at all, and no shipment request was attempted.
+    expect(buttonLabels(wrapper)).not.toContain('发货')
     expect(shipMock).not.toHaveBeenCalled()
   })
 })
@@ -310,6 +341,7 @@ describe('console Orders — actions call the FROZEN task endpoints', () => {
 describe('console Orders — 403 from an action is handled, not crashed', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    fulfillmentListMock.mockResolvedValue(pageOf<Fulfillment>([]))
   })
 
   it('shows a permission notice when the server rejects the action with FORBIDDEN', async () => {
@@ -338,8 +370,8 @@ describe('console Orders — 403 from an action is handled, not crashed', () => 
     await cancelButton?.trigger('click')
     await flushPromises()
 
-    // The action was attempted, the page survived, and the notice is permission-specific
-    // rather than the raw server message.
+    // The action was attempted, the page survived, and the notice is permission-specific rather
+    // than the raw server message.
     expect(cancelMock).toHaveBeenCalledTimes(1)
     expect(errorSpy).toHaveBeenCalledTimes(1)
     const [title, message] = errorSpy.mock.calls[0] as [string, string]
@@ -353,6 +385,7 @@ describe('console Orders — 403 from an action is handled, not crashed', () => 
 describe('console Orders — §108 states', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    fulfillmentListMock.mockResolvedValue(pageOf<Fulfillment>([]))
   })
 
   it('renders the Empty state when the server returns no rows', async () => {

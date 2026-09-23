@@ -11,6 +11,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { afterSaleApi, orderApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
+import { refundableAmount } from '@/domain/orders/availability'
 import { fromMajorString, toMajorString } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
@@ -60,7 +61,14 @@ const {
   { immediate: false },
 )
 
-const refundable = computed(() => targetOrder.value?.refundable_amount ?? 0)
+/**
+ * The ceiling is DERIVED (`paid_amount - refunded_amount`), because the frozen order payload has
+ * no `refundable_amount` field. Reading it would yield `undefined`, and every bound check against
+ * `undefined` is false — the refund form would silently cap at zero.
+ */
+const refundable = computed(() =>
+  targetOrder.value ? refundableAmount(targetOrder.value) : 0,
+)
 
 onMounted(async () => {
   if (orderNoInput.value) {
@@ -104,7 +112,7 @@ async function submit(): Promise<void> {
     await afterSaleApi.apply({
       order_no: targetOrder.value.order_no,
       type: form.type,
-      items: targetOrder.value.snapshot.items.map((item) => ({
+      items: targetOrder.value.items.map((item) => ({
         order_item_id: item.id,
         quantity: item.quantity,
       })),

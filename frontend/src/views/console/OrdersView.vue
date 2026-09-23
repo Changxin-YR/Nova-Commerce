@@ -28,14 +28,14 @@ import { computed, reactive, ref } from 'vue'
 import { fulfillmentAdminApi, orderAdminApi, orderApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { buildOrderListParams, type OrderListFilters } from '@/domain/listParams'
-import { canShipOrder, orderActionBlockedReason, orderActionFlags } from '@/domain/orders/availability'
+import { orderActionBlockedReason, orderActionFlags } from '@/domain/orders/availability'
 import { useNotificationStore } from '@/stores/notification'
 import { normalizeError } from '@/api/error'
-import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
 import StatusChip from '@/components/ui/StatusChip.vue'
 import PriceText from '@/components/ui/PriceText.vue'
-import type { Order } from '@/types/domain'
+import type { OrderSummary } from '@/types/domain'
+import type { Fulfillment } from '@/types/frozen-contract'
 
 const notifications = useNotificationStore()
 
@@ -51,8 +51,43 @@ const filters = reactive<OrderListFilters>({
   page_size: 20,
 })
 
-const { data: pageData, status, error, execute, refresh } = useAsyncState(
-  () => orderAdminApi.list(buildOrderListParams(filters)),
+/**
+ * Fulfillments still outstanding, keyed by order number.
+ *
+ * WHY THIS REPLACED THE PER-ROW DETAIL LOOKUP:
+ *  - `OrderSummary` (the list payload) carries NO `items[]`/`shipments[]`. The contract splits list
+ *    rows from detail precisely so a 20-row page does not drag every order's line items across the
+ *    wire (§6), so the list cannot tell us a fulfillment id.
+ *  - The old code answered that by calling `orderAdminApi.detail()` per row — N extra round trips
+ *    before the operator could click anything — and it picked the package by
+ *    `fulfillment_status === 'UNFULFILLED'` rather than by the carrier.
+ *  - `GET /fulfillments/admin` (§5.2) is the frozen answer: one call returns every outstanding
+ *    package with its `order_no`, so it is also exactly the data the server uses to decide
+ *    shippability — including the `carrier` that says whether it has shipped.
+ *
+ * An order ABSENT from this map has nothing outstanding. That is a real state (fully shipped) and
+ * must read as "nothing to ship", not as a broken button.
+ */
+const unshippedByOrderNo = ref<Record<string, Fulfillment>>({})
+
+async function loadUnshippedFulfillments(): Promise<void> {
+  const page = await fulfillmentAdminApi.list({ fulfillment_status: 'UNFULFILLED', page_size: 100 })
+  const map: Record<string, Fulfillment> = {}
+  for (const item of page.items) {
+    // First outstanding package per order wins; shipping is per-package, not per-order.
+    if (!map[item.order_no]) map[item.order_no] = item
+  }
+  unshippedByOrderNo.value = map
+}
+
+const { data: pageData, status, error, execute } = useAsyncState(
+  async () => {
+    const [page] = await Promise.all([
+      orderAdminApi.list(buildOrderListParams(filters)),
+      loadUnshippedFulfillments(),
+    ])
+    return page
+  },
   { immediate: true },
 )
 
@@ -92,57 +127,26 @@ function changePage(delta: number): void {
 /* -- per-row action availability ------------------------------------------ */
 
 /**
- * Fulfillment id cache, filled lazily when an operator acts on a row.
+ * Row actions, computed from the order's four status fields AND the fulfillment's own `carrier`.
  *
- * `undefined` means "not looked up yet"; `''` means "looked up, nothing pending". Keeping
- * those distinct is what lets the row offer a lookup instead of hiding the action forever.
+ * The carrier is what decides "already shipped": it is `null` until the server ships the package
+ * (§5), so one that already carries a tracking number can never be offered a second time — the
+ * server would reject it with `FULFILLMENT_ALREADY_SHIPPED` (70 003).
  */
-const fulfillmentIds = ref<Record<string, string>>({})
-
-/**
- * Placeholder id used to ask the state machine a hypothetical question: "would shipping be
- * legal IF an unshipped fulfillment exists?". The value is never sent anywhere.
- */
-const PROBE_FULFILLMENT_ID = '__unresolved__'
-
-function flagsFor(order: Order) {
-  return orderActionFlags(order, fulfillmentIds.value[order.order_no] || undefined)
+function flagsFor(order: OrderSummary) {
+  return orderActionFlags(order, shipFulfillmentFor(order.order_no) ?? null)
 }
 
-/**
- * A row whose fulfillment id has not been looked up yet but which COULD ship once it is.
- *
- * Without this, shipping would be UNREACHABLE: the endpoint is fulfillment-keyed, the id is
- * fetched on demand, and hiding the action until an id exists leaves nothing to click to fetch
- * it. This keeps the action reachable while still refusing it for orders the state machine
- * excludes (unpaid, already shipped, terminal states).
- */
-function canResolveShipment(order: Order): boolean {
-  // Already resolved: `flagsFor` is authoritative.
-  if (fulfillmentIds.value[order.order_no]) return false
-  // Already looked up and found nothing pending.
-  if (fulfillmentIds.value[order.order_no] === '') return false
-  return canShipOrder(order, PROBE_FULFILLMENT_ID)
+/** The one outstanding fulfillment for an order, when the server reports any. */
+function shipFulfillmentFor(orderNo: string): Fulfillment | undefined {
+  return unshippedByOrderNo.value[orderNo]
 }
 
 function blockedReason(
   action: 'cancel' | 'confirmReceipt' | 'ship' | 'refund',
-  order: Order,
+  order: OrderSummary,
 ): string {
-  return orderActionBlockedReason(action, order, fulfillmentIds.value[order.order_no])
-}
-
-/**
- * Find the first fulfillment that has not shipped yet.
- * `Shipment.fulfillment_status` is the per-package state; UNFULFILLED means it is pending.
- */
-async function resolveUnshippedFulfillment(orderNo: string): Promise<string | undefined> {
-  const detail = await orderAdminApi.detail(orderNo)
-  const pending = detail.shipments.find(
-    (shipment) => shipment.fulfillment_status === 'UNFULFILLED',
-  )
-  fulfillmentIds.value = { ...fulfillmentIds.value, [orderNo]: pending?.id ?? '' }
-  return pending?.id
+  return orderActionBlockedReason(action, order, shipFulfillmentFor(order.order_no) ?? null)
 }
 
 /**
@@ -160,7 +164,7 @@ function reportActionFailure(title: string, e: unknown): void {
       normalized.traceId,
     )
     // Re-read: the server is the authority on what this session may see.
-    void refresh()
+    void execute()
     return
   }
   notifications.error(title, normalized.message, normalized.code, normalized.traceId)
@@ -195,43 +199,60 @@ async function confirmReceipt(orderNo: string): Promise<void> {
 }
 
 /* -- ship dialog ----------------------------------------------------------- */
-const shipTarget = ref<{ orderNo: string; fulfillmentId: string } | null>(null)
+const shipTarget = ref<{ orderNo: string; fulfillmentId: number } | null>(null)
 const shipForm = reactive({ carrier: '', tracking_no: '' })
 
-async function openShip(order: Order): Promise<void> {
-  busyOrderNo.value = order.order_no
-  try {
-    const fulfillmentId = fulfillmentIds.value[order.order_no] ?? (await resolveUnshippedFulfillment(order.order_no))
-    if (!fulfillmentId) {
-      // The server says nothing is awaiting shipment for this order.
-      notifications.warning('没有待发货的履约单', '该订单可能已全部发货，请刷新后确认。')
-      await execute()
-      return
-    }
-    shipTarget.value = { orderNo: order.order_no, fulfillmentId }
-    shipForm.carrier = ''
-    shipForm.tracking_no = ''
-  } catch (e) {
-    reportActionFailure('无法加载履约信息', e)
-  } finally {
-    busyOrderNo.value = ''
+/**
+ * Carrier CODES, not free text (§5). The contract is explicit that `carrier` is a code such as
+ * `"SF"`, so a free-text box would let an operator type anything and the server would store a
+ * value no downstream system recognises.
+ */
+const CARRIERS = [
+  { code: 'SF', label: '顺丰速运' },
+  { code: 'JD', label: '京东物流' },
+  { code: 'YTO', label: '圆通速递' },
+  { code: 'ZTO', label: '中通快递' },
+  { code: 'STO', label: '申通快递' },
+  { code: 'YD', label: '韵达速递' },
+  { code: 'EMS', label: '中国邮政' },
+] as const
+
+function openShip(order: OrderSummary): void {
+  const fulfillment = shipFulfillmentFor(order.order_no)
+  if (!fulfillment) {
+    // The server reports nothing outstanding for this order.
+    notifications.warning('没有待发货的履约单', '该订单可能已全部发货，请刷新后确认。')
+    return
   }
+  // The id comes straight from the queue: a NUMBER, exactly what the task endpoint takes.
+  shipTarget.value = { orderNo: order.order_no, fulfillmentId: fulfillment.id }
+  shipForm.carrier = ''
+  shipForm.tracking_no = ''
 }
 
 async function submitShip(): Promise<void> {
   const target = shipTarget.value
   if (!target) return
-  if (!shipForm.carrier.trim() || !shipForm.tracking_no.trim()) {
-    notifications.warning('请填写承运商与运单号')
+  if (!shipForm.carrier) {
+    notifications.warning('请选择承运商')
+    return
+  }
+  if (!shipForm.tracking_no.trim()) {
+    notifications.warning('请填写运单号')
     return
   }
   busyOrderNo.value = target.orderNo
   try {
+    /**
+     * EXACTLY three fields (§5, §110 mass-assignment guard). There is deliberately no
+     * `idempotency_key`: the server does not accept one, and the guard against shipping the same
+     * package twice is the fulfillment's own state — a retry answers
+     * `FULFILLMENT_ALREADY_SHIPPED` (70 003) rather than creating a second shipment.
+     */
     await fulfillmentAdminApi.ship(target.fulfillmentId, {
-      carrier: shipForm.carrier.trim(),
+      carrier: shipForm.carrier,
       tracking_no: shipForm.tracking_no.trim(),
-      // Idempotency key: a retried submit cannot create a second shipment (§70 003).
-      idempotency_key: `ship-${target.fulfillmentId}-${newTraceId()}`,
+      item_quantities: [],
     })
     notifications.success('发货成功')
     shipTarget.value = null
@@ -334,18 +355,20 @@ function stamp(iso: string): string {
               <td><code class="o-list__no">{{ order.order_no }}</code></td>
               <td>{{ stamp(order.created_at) }}</td>
               <td>
-                <span class="o-list__goods" :title="order.snapshot.items.map((i) => i.product_title).join('、')">
-                  {{ order.snapshot.items[0]?.product_title ?? '—' }}
-                  <em v-if="order.snapshot.items.length > 1" class="nx-muted">
-                    等 {{ order.snapshot.items.length }} 件
-                  </em>
+                <!--
+                  `OrderSummary` carries NO line items (§6) — that is the whole point of the
+                  list/detail split — so the goods cell cannot name a product here without an N+1
+                  detail fetch per row. It shows the order number instead of pretending.
+                -->
+                <span class="o-list__goods" :title="`订单 ${order.order_no}`">
+                  <em class="nx-muted">{{ order.order_no }}</em>
                 </span>
               </td>
-              <td><StatusChip :status="order.status" kind="order" dot /></td>
+              <td><StatusChip :status="order.order_status" kind="order" dot /></td>
               <td><StatusChip :status="order.payment_status" kind="payment" /></td>
               <td><StatusChip :status="order.fulfillment_status" kind="fulfillment" /></td>
               <td style="text-align: right">
-                <PriceText :amount="order.snapshot.payable_amount" size="sm" :grouping="false" />
+                <PriceText :amount="order.payable_amount" size="sm" :grouping="false" />
               </td>
               <td style="text-align: right">
                 <PriceText :amount="order.refunded_amount" size="sm" muted :grouping="false" />
@@ -353,27 +376,12 @@ function stamp(iso: string): string {
               <td>
                 <div class="o-list__actions">
                   <!--
-                    Every button is gated by the tested availability logic, and the disabled
-                    title explains WHY rather than silently hiding the action (§99 requirement:
-                    no entry point for a state that forbids it).
+                    Gated by the tested availability logic. The disabled/hint branch explains WHY
+                    rather than silently hiding the action (§99: no entry point for a state that
+                    forbids it, and no dead button either).
                   -->
                   <button
                     v-if="flagsFor(order).ship"
-                    type="button"
-                    class="nx-btn nx-btn--text"
-                    :disabled="busyOrderNo === order.order_no"
-                    @click="openShip(order)"
-                  >
-                    发货
-                  </button>
-
-                  <!--
-                    Until the row's fulfillment id is known the action is offered as a lookup
-                    rather than hidden: a shippable order must always have a way in. Both branches
-                    call the same handler, so only the label intent differs.
-                  -->
-                  <button
-                    v-else-if="canResolveShipment(order)"
                     type="button"
                     class="nx-btn nx-btn--text"
                     :disabled="busyOrderNo === order.order_no"
@@ -401,7 +409,7 @@ function stamp(iso: string): string {
                   </button>
 
                   <span
-                    v-if="!flagsFor(order).ship && !canResolveShipment(order)"
+                    v-if="!flagsFor(order).ship && !flagsFor(order).confirmReceipt"
                     class="o-list__hint"
                     :title="blockedReason('ship', order)"
                   >
@@ -452,7 +460,12 @@ function stamp(iso: string): string {
           </p>
           <label class="o-list__field">
             <span>承运商</span>
-            <input v-model="shipForm.carrier" class="nx-input" maxlength="60" placeholder="例如 顺丰速运" />
+            <select v-model="shipForm.carrier" class="nx-input">
+              <option value="">请选择</option>
+              <option v-for="c in CARRIERS" :key="c.code" :value="c.code">
+                {{ c.label }}（{{ c.code }}）
+              </option>
+            </select>
           </label>
           <label class="o-list__field">
             <span>运单号</span>
@@ -470,7 +483,7 @@ function stamp(iso: string): string {
             <button type="button" class="nx-btn" @click="shipTarget = null">取消</button>
           </div>
           <p class="nx-muted o-list__modal-note">
-            请求含幂等键，重复提交不会产生第二张履约单；数量校验由服务端在事务内完成。
+            请求仅含承运商、运单号与明细数量（§110）。重复提交不会产生第二张履约单：服务端以履约单自身状态为准，已发货会返回 70003。
           </p>
         </div>
       </div>

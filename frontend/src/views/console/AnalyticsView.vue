@@ -1,112 +1,133 @@
 <script setup lang="ts">
 /**
- * Analytics: KPI cards, trend chart, top products and the order funnel.
+ * Analytics: KPI cards, trend chart, ranked products and a summary table.
  *
- * Every chart goes through `sanitizeChartSpec` before rendering, exactly like agent
- * output does. That is deliberate: the console must not have a private, unvalidated
- * path into the renderer (§102).
+ * Every chart goes through `sanitizeChartSpec` before rendering, exactly like agent output does.
+ * That is deliberate: the console must not have a private, unvalidated path into the renderer
+ * (§102).
+ *
+ * FROZEN SHAPE (API_CONTRACT.md §8). The contract returns ONE envelope for EVERY analytics
+ * endpoint — `{metric, unit, period, series[{bucket,value}], summary, dimensions[]}` — so this
+ * page no longer has three unrelated shapes (`SalesTrend`, `TopProduct[]`, `OrderFunnelStage[]`).
+ * It has three envelopes, and the shared `unit` field decides how each number is rendered, so a
+ * `ratio` can never be drawn as money.
  */
 import { computed } from 'vue'
 import { analyticsApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
+import { checkMetricUnit, formatAnalyticsValue } from '@/domain/analytics/unit'
 import { sanitizeChartSpec } from '@/charts/sanitizeChartSpec'
 import StateView from '@/components/ui/StateView.vue'
 import ApexChart from '@/components/charts/ApexChart.vue'
+import PriceText from '@/components/ui/PriceText.vue'
+import type { AnalyticsEnvelope } from '@/types/frozen-contract'
 import type { ChartSpec } from '@/types/charts'
+
+const GRANULARITY = { granularity: 'day' } as const
 
 const {
   data: trend,
   status: trendStatus,
   error: trendError,
   execute: loadTrend,
-} = useAsyncState(() => analyticsApi.salesTrend({ granularity: 'day' }), { immediate: true })
+} = useAsyncState(() => analyticsApi.metric('sales.gmv', GRANULARITY), { immediate: true })
 
 const {
   data: topProducts,
   status: topStatus,
   execute: loadTop,
-} = useAsyncState(() => analyticsApi.topProducts({ limit: 10 }), { immediate: true })
+} = useAsyncState(() => analyticsApi.metric('product.performance', GRANULARITY), {
+  immediate: true,
+})
 
 const {
-  data: funnel,
+  data: orderCount,
   status: funnelStatus,
   execute: loadFunnel,
-} = useAsyncState(() => analyticsApi.orderFunnel(), { immediate: true })
+} = useAsyncState(() => analyticsApi.metric('sales.order_count', GRANULARITY), { immediate: true })
 
-const trendSpec = computed<ChartSpec | null>(() => {
-  const points = trend.value?.points ?? []
-  if (points.length === 0) return null
+/**
+ * Turn an envelope into a ChartSpec.
+ *
+ * The MONEY branch is the only one that touches `/100`, and it does so here at the render
+ * boundary — never on the stored value. `value_unit` follows the declared unit so a count series
+ * cannot be labelled as currency.
+ */
+function specFromEnvelope(
+  envelope: AnalyticsEnvelope | null | undefined,
+  options: { kind: 'line' | 'bar'; title: string },
+): ChartSpec | null {
+  if (!envelope || envelope.series.length === 0) return null
+  checkMetricUnit(envelope.metric, envelope.unit)
+  const isMoney = envelope.unit === 'minor_currency'
+  const isRatio = envelope.unit === 'ratio'
   const result = sanitizeChartSpec({
-    kind: 'line',
-    title: '销售趋势',
-    categories: points.map((point) => point.date),
-    series: [{ name: 'GMV', data: points.map((point) => point.value) }],
-    money: trend.value?.money ?? true,
-    value_unit: '元',
-  })
-  return result.ok ? result.spec : null
-})
-
-const topSpec = computed<ChartSpec | null>(() => {
-  const rows = topProducts.value ?? []
-  if (rows.length === 0) return null
-  const result = sanitizeChartSpec({
-    kind: 'bar',
-    title: '销量 TOP',
-    categories: rows.map((row) => row.title),
-    series: [{ name: '销量', data: rows.map((row) => row.sold_quantity) }],
-    value_unit: '件',
-  })
-  return result.ok ? result.spec : null
-})
-
-const funnelSpec = computed<ChartSpec | null>(() => {
-  const stages = funnel.value ?? []
-  if (stages.length === 0) return null
-  const LABELS: Record<string, string> = {
-    created: '创建',
-    paid: '支付',
-    shipped: '发货',
-    completed: '完成',
-  }
-  const result = sanitizeChartSpec({
-    kind: 'bar',
-    title: '订单漏斗',
-    categories: stages.map((stage) => LABELS[stage.stage] ?? stage.stage),
-    series: [{ name: '订单数', data: stages.map((stage) => stage.count) }],
-    value_unit: '单',
-  })
-  return result.ok ? result.spec : null
-})
-
-const topTableSpec = computed<ChartSpec | null>(() => {
-  const rows = topProducts.value ?? []
-  if (rows.length === 0) return null
-  const result = sanitizeChartSpec({
-    kind: 'table',
-    title: '热销商品明细',
-    columns: [
-      { key: 'title', title: '商品' },
-      { key: 'sold_quantity', title: '销量', align: 'right' },
-      { key: 'sales_amount', title: '销售额(分)', align: 'right' },
+    kind: options.kind,
+    title: options.title,
+    categories: envelope.series.map((point) => point.bucket),
+    series: [
+      {
+        name: envelope.metric,
+        data: envelope.series.map((point) => {
+          if (isMoney) return Math.round(point.value / 100)
+          if (isRatio) return Math.round(point.value * 1000) / 10
+          return point.value
+        }),
+      },
     ],
-    rows: rows.map((row) => ({
-      title: row.title,
-      sold_quantity: row.sold_quantity,
-      sales_amount: row.sales_amount,
-    })),
-    footnote: '销售额以整数分展示，避免浮点误差。',
+    money: isMoney,
+    value_unit: isMoney ? '元' : isRatio ? '%' : '',
+    footnote: `指标 ${envelope.metric}，粒度 ${envelope.period.granularity}。`,
   })
   return result.ok ? result.spec : null
+}
+
+const trendSpec = computed<ChartSpec | null>(() =>
+  specFromEnvelope(trend.value, { kind: 'line', title: 'GMV 趋势' }),
+)
+
+const topSpec = computed<ChartSpec | null>(() =>
+  specFromEnvelope(topProducts.value, { kind: 'bar', title: '商品表现' }),
+)
+
+const funnelSpec = computed<ChartSpec | null>(() =>
+  specFromEnvelope(orderCount.value, { kind: 'bar', title: '订单量趋势' }),
+)
+
+/**
+ * Ranked table rows, built from the envelope's OWN pairing of `series[bucket]` and
+ * `dimensions[].value`. No invented `TopProduct` shape is needed: the dimension labelled `SKU`
+ * (per §8's example) is the row label, and the bucket is the period.
+ */
+interface RankedRow {
+  label: string
+  bucket: string
+  raw: number
+  unit: AnalyticsEnvelope['unit']
+}
+
+const rankedRows = computed<RankedRow[]>(() => {
+  const envelope = topProducts.value
+  if (!envelope) return []
+  const dim = envelope.dimensions?.find((d) => d.key === 'sku_no' || d.key === 'product') ?? envelope.dimensions?.[0]
+  return envelope.series.map((point, index) => ({
+    label: index === 0 ? (dim?.value ?? dim?.label ?? '—') : '—',
+    bucket: point.bucket,
+    raw: point.value,
+    unit: envelope.unit,
+  }))
+})
+
+/** Unit-aware summary figure for the headline card. */
+const summaryDisplay = computed(() => {
+  const envelope = topProducts.value
+  if (!envelope) return null
+  return formatAnalyticsValue(envelope.summary.total, envelope.unit)
 })
 
 async function refresh(): Promise<void> {
   await Promise.all([loadTrend(), loadTop(), loadFunnel()])
 }
-
-const totalSales = computed(() =>
-  (topProducts.value ?? []).reduce((sum, row) => sum + row.sales_amount, 0),
-)
 </script>
 
 <template>
@@ -118,8 +139,16 @@ const totalSales = computed(() =>
 
     <div class="analytics__total nx-card">
       <div class="nx-card__body">
-        <p class="nx-muted">TOP 商品销售额合计</p>
-        <p class="analytics__total-value"><PriceText :amount="totalSales" size="xl" /></p>
+        <p class="nx-muted">{{ topProducts?.metric ?? 'product.performance' }} 合计</p>
+        <p class="analytics__total-value">
+          <PriceText
+            v-if="summaryDisplay?.kind === 'money'"
+            :amount="summaryDisplay.amount"
+            size="xl"
+          />
+          <template v-else-if="summaryDisplay">{{ summaryDisplay.text }}</template>
+          <template v-else>—</template>
+        </p>
       </div>
     </div>
 
@@ -137,7 +166,7 @@ const totalSales = computed(() =>
         <div class="nx-card__body">
           <StateView :state="topStatus" @retry="loadTop()">
             <ApexChart v-if="topSpec" :spec="topSpec" :height="300" />
-            <p v-else class="nx-muted">暂无销量数据。</p>
+            <p v-else class="nx-muted">暂无商品表现数据。</p>
           </StateView>
         </div>
       </section>
@@ -146,7 +175,7 @@ const totalSales = computed(() =>
         <div class="nx-card__body">
           <StateView :state="funnelStatus" @retry="loadFunnel()">
             <ApexChart v-if="funnelSpec" :spec="funnelSpec" :height="300" />
-            <p v-else class="nx-muted">暂无漏斗数据。</p>
+            <p v-else class="nx-muted">暂无订单量数据。</p>
           </StateView>
         </div>
       </section>
@@ -154,27 +183,29 @@ const totalSales = computed(() =>
 
     <section class="nx-card">
       <div class="nx-card__body">
-        <h3 class="nx-section-title">热销商品明细</h3>
-        <template v-if="topTableSpec?.rows">
-          <table class="nx-table">
-            <thead>
-              <tr>
-                <th v-for="column in topTableSpec.columns ?? []" :key="column.key" :style="{ textAlign: column.align ?? 'left' }">
-                  {{ column.title }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, index) in topTableSpec.rows" :key="index">
-                <td v-for="column in topTableSpec.columns ?? []" :key="column.key" :style="{ textAlign: column.align ?? 'left' }">
-                  {{ row[column.key] }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <p v-if="topTableSpec.footnote" class="nx-muted analytics__footnote">{{ topTableSpec.footnote }}</p>
-        </template>
+        <h3 class="nx-section-title">指标明细</h3>
+        <table v-if="rankedRows.length" class="nx-table">
+          <thead>
+            <tr>
+              <th>指标</th>
+              <th>时间桶</th>
+              <th style="text-align: right">数值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, index) in rankedRows" :key="index">
+              <td>{{ row.label }}</td>
+              <td>{{ row.bucket }}</td>
+              <td style="text-align: right">
+                {{ row.raw }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
         <p v-else class="nx-muted">暂无明细数据。</p>
+        <p class="nx-muted analytics__note">
+          数值保持服务端原始精度；单位由响应的 <code>unit</code> 字段决定（金额为整数分，比例为小数）。
+        </p>
       </div>
     </section>
   </div>
@@ -182,9 +213,8 @@ const totalSales = computed(() =>
 
 <style scoped lang="scss">
 .analytics {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  gap: 14px;
 
   &__head {
     display: flex;
@@ -193,19 +223,17 @@ const totalSales = computed(() =>
   }
 
   &__total-value {
-    margin: 6px 0 0;
-    font-size: 26px;
-    color: var(--nx-danger);
+    margin: 8px 0 0;
+    font-size: 28px;
   }
 
   &__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
+    gap: 14px;
   }
 
-
-  &__footnote {
+  &__note {
     margin: 10px 0 0;
     font-size: 11.5px;
   }

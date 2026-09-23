@@ -37,15 +37,18 @@ with only the three accepted fields (§110), and that a 403 is handled gracefull
 
 ### REMAINING — the other 8 console pages
 
+> **SUPERSEDED for the migrated pages.** `InventoryView`, `DashboardView` and `AnalyticsView` were
+> subsequently moved to the frozen contract (see "Frontend contract migration — DONE" at the end of
+> this file). `AfterSalesView`, `MarketingView`, `AiWorkspaceView`, `KnowledgeView` and
+> `SystemView` are still NOT wired to their availability modules — their contract migration status
+> is unchanged by the order/inventory/analytics work.
+
 Still on the pre-redesign markup (they render correctly through the compatibility aliases but
 are not dense tables, and are not wired to the availability modules):
 
 | Page | Needs |
 | --- | --- |
-| `InventoryView.vue` | dense table + `canAdjustInventory` / `validateAdjustment` + optimistic-lock conflict UX |
 | `AfterSalesView.vue` | dense table + `afterSaleActionFlags` / `validateRefundAmount` |
-| `DashboardView.vue` | KPI strip + ChartSpec chart on the dense grid |
-| `AnalyticsView.vue` | date-window filter bar via `buildAnalyticsParams` + charts |
 | `MarketingView.vue` | coupon/promotion tables (no frozen task endpoints exist — see report) |
 | `AiWorkspaceView.vue` | dense message blocks + pending-actions table via `pendingActionFlags` |
 | `KnowledgeView.vue` | doc table + `buildKnowledgeDocParams` + retrieval stages |
@@ -146,10 +149,11 @@ properties only; no component library was swapped (§6).
 
 ## Remaining (the aliases keep these visually coherent meanwhile)
 
-1. **Pricing not yet via `<PriceText>` in 7 files** (~37 call sites still on `formatMoney`):
-   `console/{DashboardView,AnalyticsView,InventoryView,AfterSalesView,MarketingView}.vue`,
-   `consumer/{AfterSalesView,AfterSaleDetailView}.vue`.
-   They still render correct amounts — this is a uniformity gap, not a bug.
+1. **Pricing not yet via `<PriceText>` in the views not covered by the contract migration.**
+   The migrated pages (`console/{Dashboard,Analytics,Inventory,Orders}`, `consumer/{Orders,OrderDetail}`)
+   now render every amount through `<PriceText>` or the unit-aware analytics formatter. The
+   remaining files listed below still use `formatMoney`; they render correct amounts, so this is a
+   uniformity gap, not a bug.
 2. **Console/secondary views still use the `.nx-card` + `.nx-pills` aliases** instead of the
    dense `.nx-block` / `.nx-table` / `.nx-tabs` markup:
    `console/{DashboardView,AnalyticsView,InventoryView,OrdersView,AfterSalesView,MarketingView,KnowledgeView,SystemView,AiWorkspaceView}.vue`,
@@ -163,7 +167,7 @@ floor shows clearly-labelled local preview rows (`tags: ['预览数据']`) ONLY 
 returns nothing, so the layout is reviewable without passing preview data off as server data.
 Delete that block once the catalog module lands.
 
-## API contract reconciliation (API_CONTRACT.md) — FOUNDATION DONE, MIGRATION PENDING
+## API contract reconciliation (API_CONTRACT.md) — MIGRATION COMPLETE
 
 The contract is now frozen. Reading it revealed that **my invented shapes were wrong**, not merely
 unconfirmed. That changes the remaining work from "8 pages" to "fix the foundation, then 8 pages".
@@ -200,9 +204,11 @@ unconfirmed. That changes the remaining work from "8 pages" to "fix the foundati
   (drops the worse `/orders/admin/orders` duplication); added `GET /fulfillments/admin`; `ship`
   now takes `number | string`.
 
-### THE MIGRATION THAT REMAINS (this is the real remaining work)
+### THE MIGRATION — COMPLETE (types -> availability -> views)
 
-Every consumer of the old `Order`/`Fulfillment` shape must move to the frozen one. Affected:
+Every consumer of the old `Order`/`Fulfillment` shape moved to the frozen one. **All of the
+following is DONE** — kept as the checklist it was executed against; the verified result, with gate
+output, is in the "Frontend contract migration — DONE" section at the end of this file:
 
 **Types/API layer**
 - `src/types/domain.ts` — `Order`, `OrderItem`, `OrderSnapshot`, `Shipment` become aliases/re-exports of
@@ -226,3 +232,90 @@ Every consumer of the old `Order`/`Fulfillment` shape must move to the frozen on
 
 **Recommended order**: types → API modules → availability modules + tests → views. Doing views first
 would mean editing them twice.
+
+---
+
+## Frontend contract migration — DONE (verified by gates)
+
+Migrated in the order the plan required — **(a) types -> (b) availability modules -> (c) views** —
+because doing views first means writing every view twice.
+
+**Gates, all four re-run on the migrated tree:**
+
+| Command | Result |
+| --- | --- |
+| `npx vue-tsc --noEmit` | EXIT=0 |
+| `npx vite build` | EXIT=0, `2381 modules transformed`, `built in 1.48s` |
+| `npx vitest run` | EXIT=0, `Test Files 17 passed (17)`, **`Tests 246 passed (246)`** (floor was 230) |
+| `npx eslint .` | EXIT=0 |
+
+### (a) Types + API layer — ONE shape per resource
+
+- **DELETED from `src/types/domain.ts`**: the invented `Order`, `OrderItem`, `OrderSnapshot` and
+  `Shipment`. They are gone rather than kept beside the frozen types, because two shapes for one
+  resource is how a silent integration bug starts — half the app keeps compiling against the old
+  one. `domain.ts` now **re-exports** the frozen shapes, and `OrderDetail as Order`, so
+  `import type { Order } from '@/types/domain'` still resolves to exactly one definition.
+- **DELETED from `src/types/api-contract.ts`**: `ShipRequest` (the endpoint accepts no
+  `idempotency_key`), and `AnalyticsOverview` / `SeriesPoint` / `SalesTrend` / `TopProduct` /
+  `OrderFunnelStage`. `SalesTrend.money: boolean` was the dangerous one: it made the unit a guess.
+- `src/api/order.ts`: `list` returns `Paged<OrderSummary>` (NOT a bare array), `detail` returns
+  `OrderDetail`, `ship` takes `number | string` and `ShipFulfillmentRequest`, and
+  `fulfillmentAdminApi.list` (the §5.2 queue) was added.
+- `src/api/inventory.ts`: `stock` returns `Paged<Inventory>`; `adjust` is no longer sku-keyed and
+  sends `{warehouse_id, sku_id, version, delta_available, reason}`; `preview` added.
+- `src/api/analytics.ts`: one `metric(metric, query)` call returning `AnalyticsEnvelope`.
+- `src/api/endpoints.ts`: `/inventory/adjustments`, `/inventory/adjustments/preview`,
+  `/analytics/admin/metrics/{metric}`.
+
+### (b) Availability modules — the rules the captain called out
+
+- `orders/availability.ts` reads **`order_status`** everywhere (the rename is a correctness fix:
+  `order.status` is `undefined`, so every `includes()` check returned false and the console would
+  have hidden EVERY action without throwing).
+- `canShipOrder(order, fulfillment)` now takes a **`Fulfillment`** and decides "not yet shipped"
+  from **`carrier === null`**, exposed as `isUnshippedFulfillment()`. A package that already carries
+  a tracking number can never be offered for shipping again (the server answers 70 003).
+- `inventory/availability.ts` uses the server's **`sellable_qty`** and never recomputes it. The
+  tests deliberately set `sellable_qty` inconsistent with `on_hand_qty - locked_qty`, so a
+  recomputing implementation fails them.
+- `refundableAmount(order)` = `paid_amount - refunded_amount`, derived in ONE place, because the
+  frozen payload has no `refundable_amount` (`undefined > 0` is `false`, which would silently
+  disable refunds).
+- Tests migrated in lockstep: **246 tests total**, including new coverage for `carrier === null`,
+  `findUnshippedFulfillment`, the derived refundable amount, and server-vs-recomputed sellable stock.
+
+### (c) Views
+
+| View | What changed |
+| --- | --- |
+| `console/OrdersView.vue` | Rows are `OrderSummary`; fulfillment ids come from the **queue** (`GET /fulfillments/admin`) instead of N per-row detail calls; carrier is a CODE `<select>`; the ship dialog sends exactly three fields and **no** `idempotency_key`. |
+| `console/InventoryView.vue` | `Inventory` fields (`sku_no` / `product_name` / `sku_name` / `on_hand_qty` / `locked_qty` / `sellable_qty`); adjust sends `delta_available` as a body field; live validation reason in the dialog. |
+| `console/DashboardView.vue` | Five metric calls, one envelope each; KPI goes through the unit-aware formatter (`minor_currency` -> `<PriceText>`, `count`/`ratio` -> text); chart converts minor->major only at the render boundary. |
+| `console/AnalyticsView.vue` | Three envelopes through one `specFromEnvelope()` helper; the invented `points`/`money` shapes are gone. |
+| `consumer/OrdersView.vue` | `Paged<OrderSummary>` (`?.items`), `order_status`, flat amounts, derived refundable. |
+| `consumer/OrderDetailView.vue` | `order.items` (not `snapshot.items`), flat amounts, masked receiver shown as-is (§94), derived refundable. |
+| `consumer/AfterSalesView.vue` | `order.items`, derived refundable. |
+| `console/__tests__/OrdersView.spec.ts` | Rebuilt on frozen fixtures + the queue mock; asserts the numeric fulfillment id and that the payload has exactly `carrier` / `item_quantities` / `tracking_no`. |
+
+### Two contract gaps found (NOT guessed)
+
+1. **`OrderSummary` carries no line items.** The console orders table and the consumer orders list
+   both rendered `order.snapshot.items`. On a frozen `OrderSummary` that is `undefined`; rendering
+   real lines needs one detail call PER ROW. Both views now show order-level figures and route to
+   the detail payload (which has `items[]`). If the list should show goods, the contract needs a
+   summary field (e.g. item count / first product name) — that is a backend decision, not a frontend
+   guess.
+2. **`cancel_reason` does not exist** on `OrderSummary`/`OrderDetail`, and `API_CONTRACT.md` §10
+   does not list it as intentionally unfrozen either. The "取消原因" lines were removed rather than
+   kept as decoration over a value the server never sends, and replaced with a comment at each site.
+
+### Assumptions (API_CONTRACT.md §10 leaves these open)
+
+- **Analytics query parameter names**: the window is sent as `from` / `to` / `granularity`,
+  mirroring the `period` keys the response DOES freeze. Only the request side is assumed; the
+  response envelope is authoritative.
+- **Analytics route**: a metric path segment at `/analytics/admin/metrics/{metric}`. §8 froze the
+  envelope and the five metric NAMES, not the route. Changing this touches one function.
+- **Inventory movement shape** (`InventoryMovement`) stays module-local: §10 does not freeze it and
+  it is display-only.
