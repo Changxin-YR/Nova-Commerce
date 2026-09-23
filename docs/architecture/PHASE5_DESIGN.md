@@ -283,28 +283,54 @@ passes a naive test while destroying the audit value.
 `delivered_at`, `package_count` int default 1, `remark` varchar(500) NULL.
 
 `fulfillment_items`: `fulfillment_id` FK RESTRICT, `order_item_id` FK RESTRICT,
-`product_name` varchar(200), `sku_name` varchar(200), `quantity` bigint CHECK
-`quantity > 0`. `UNIQUE (fulfillment_id, order_item_id)` so one package cannot list
-the same line twice (a duplicate would let a single package over-ship a line while
-each row looks valid).
+`sku_id` FK RESTRICT to `product_skus` (NOT NULL), `product_name` varchar(200),
+`sku_name` varchar(200), `quantity` bigint CHECK `quantity > 0`.
+`UNIQUE (fulfillment_id, order_item_id)` so one package cannot list the same line
+twice (a duplicate would let a single package over-ship a line while each row looks
+valid).
 
-> **CORRECTED during the build - there is no `sku_id` column, and this document
-> originally said there was.** The authoritative column list is REQ-FUL-002 /
-> section 45: `fulfillment_id, order_item_id, quantity`. The captain wrote `sku_id
-> FK RESTRICT` into an earlier version of this section and then ruled that it should
-> be stored; data-layer refused the change and cited REQ-FUL-002, which is the
-> machine-readable baseline, and they were right. The ruling was withdrawn.
->
-> `sku_id` is still a **required field of the frozen section 5 wire shape**, so it
-> is *derived* on the read path from `order_item_id -> order_items.sku_id`. That
-> reads a snapshot table, not the live catalogue, so INV-014 is untouched, and it
-> costs nothing on the order read path: `to_detail` builds the map from
-> `order.items`, which the loading query has already fetched. A duplicated key
-> would have been a second place for a shipping error to disagree with itself -
-> the same reason `order_items` snapshots rather than joins.
->
-> The general lesson, since this is the second contradiction of its kind in this
-> document: `PROJECT_BASELINE.yaml` wins over anything written here.
+### 5.4a The `sku_id` column: what happened, and why it is here
+
+This item took **five exchanges**, three reversals from the captain, and two members
+implementing contradicted instructions. It is recorded at this length because the
+reasoning is more useful than the outcome, and because the next reader will otherwise
+find a comment somewhere saying the opposite.
+
+**The column exists.** It is NOT NULL, FK'd to `product_skus`, indexed, supplied by
+both insert sites (`FulfillmentService.create_shell` and `_create_residual_package`),
+and backfilled from `order_items` for pre-existing rows during the migration.
+
+**The wrong argument, held for most of the phase:** that `REQ-FUL-002`
+(`fulfillment_items: fulfillment_id, order_item_id, quantity`) *forbids* `sku_id`.
+It does not. It enumerates **required** columns, not an exhaustive set - the table
+also carries `id`, `created_at`, `updated_at`, `product_name` and `sku_name`, and
+**none of those five appear in that requirement either**. Nobody objected to them,
+correctly, because the requirement says what must exist. The captain withdrew the
+column ruling on this misreading, then argued the misreading back at the data-layer
+for four rounds. **A requirement list is not a prohibition, and "it is not in the
+list" is not a finding.**
+
+**The argument that does have force, and the answer to it:** a stored `sku_id` is a
+duplicate of a fact reachable through `order_item_id`, so it is a second place for a
+shipping error to disagree with itself. That is true - and it applies identically to
+`product_name` and `sku_name`, which this table already copies, for the two reasons
+this table copies anything: a historical shipment must not be rewritten by a later
+product edit, and the console's fulfillment queue must not need a join to render a
+page. `sku_id` is the third field of the same snapshot, and the FK to `product_skus`
+is what stops it disagreeing.
+
+**Operational note from the migration**, contributed by the data-layer and better than
+what was specified: a plain `ADD COLUMN ... NOT NULL` **fails** on this server when the
+table already holds rows (`@@sql_mode` includes `STRICT_TRANS_TABLES`). The working
+sequence is declare-nullable, backfill from `order_items`, then `ALTER ... MODIFY NOT
+NULL`. An empty-table-only migration would have passed review and failed on any real
+database.
+
+**And the process lesson, which is the captain's:** three reversals came from sending
+instructions composed from stale context. `API_CONTRACT.md` section 15.8 and the
+protocol in section 13.2a exist to stop exactly that, and they were written for
+everyone else. Before sending an instruction that changes a decision, re-read the
+commit that made it.
 
 Business rule: the **sum of shipped quantities per `order_item_id` across all
 fulfillments of an order must never exceed that line's `quantity`**
