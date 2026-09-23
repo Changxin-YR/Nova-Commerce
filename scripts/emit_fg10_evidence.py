@@ -72,7 +72,7 @@ JSON_OUT = ROOT / "artifacts" / "evidence" / "integration" / "fg10_workflow.json
 #: pytest's own per-test verbose line, e.g.
 #: ``tests/integration/order/test_order_workflow.py::test_x PASSED [ 50%]``.
 #: Outcomes are read from pytest's report rather than our own bookkeeping.
-_OUTCOME_RE = re.compile(r"^\S+::(\S+)\s+(PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)")
+_OUTCOME_RE = re.compile(r"^\S+::(.+)\s+(PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)(?:\s|$)")
 #: The trailing ``===== 8 passed in 1.23s =====`` banner.
 _SUMMARY_RE = re.compile(r"^=+ (.*?) =+$")
 

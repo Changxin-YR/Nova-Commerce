@@ -36,7 +36,7 @@ stdout, stderr = proc.stdout or "", proc.stderr or ""
 # Parse the real per-test outcomes out of pytest's own report.
 assertions = []
 for line in stdout.splitlines():
-    match = re.match(r"^\S+::(\S+)\s+(PASSED|FAILED|ERROR|SKIPPED)", line.strip())
+    match = re.match(r"^\S+::(.+)\s+(PASSED|FAILED|ERROR|SKIPPED)(?:\s|$)", line.strip())
     if match:
         name, outcome = match.group(1), match.group(2)
         assertions.append({
