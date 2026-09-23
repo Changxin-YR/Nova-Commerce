@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from app.api.v1 import health
-from app.api.v1.router import api_router, register_module_routers
+from app.api.v1.router import build_api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -209,8 +209,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Infra probes at the frozen paths of §130 ...
     app.include_router(health.router, prefix="/health", tags=["health"])
     # ... and the versioned API surface.
-    register_module_routers()
-    app.include_router(api_router, prefix=resolved.API_V1_PREFIX)
+    _api_router = build_api_router()
+    app.include_router(_api_router, prefix=resolved.API_V1_PREFIX)
 
     _tighten_openapi(app)
     return app

@@ -254,25 +254,22 @@ class Order(Base, PkMixin, TimestampMixin, MerchantScopedMixin, VersionMixin):
     #: 20 rows, and lazy loading there is the N+1 that shows up as a slow page
     #: only once somebody has 20 orders in the list.
     #:
-    #: ``cascade="all, delete-orphan"`` plus ``passive_deletes=True``: the cascade
-    #: is what lets an order in a test fixture be removed cleanly, and
-    #: ``passive_deletes`` tells SQLAlchemy to let the database's own ``ON DELETE``
-    #: rule do it instead of loading every child to delete it one by one. Neither
-    #: path is reachable from the API - orders are never hard-deleted - so this is
-    #: about cleanup code not becoming a full-table load.
+    #: ``cascade="all, delete-orphan"``, no ``passive_deletes`` - verified: an ORM
+    #: ``session.delete(order)`` succeeds because ``selectin`` has already loaded the
+    #: children and the cascade deletes them, while a raw ``DELETE FROM orders`` on an
+    #: order that has items is refused with errno 1451 by the ``RESTRICT`` FKs below.
+    #: Deliberate: history cannot vanish by accident, but fixtures can still remove one.
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order",
         lazy="selectin",
         order_by="OrderItem.id",
         cascade="all, delete-orphan",
-        passive_deletes=True,
     )
     status_logs: Mapped[list[OrderStatusLog]] = relationship(
         back_populates="order",
         lazy="selectin",
         order_by="OrderStatusLog.id",
         cascade="all, delete-orphan",
-        passive_deletes=True,
     )
 
     # -- derived ---------------------------------------------------------

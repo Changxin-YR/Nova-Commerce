@@ -336,9 +336,17 @@ Steps, in this order:
 5. `payable = original − promotion − coupon + shipping`.
 
 `allocate_pro_rata(total, weights)` must guarantee `sum(result) == total`, `total == 0`
-→ all zeros, and remainder to the last non-... (last element of the sequence, even when
-it is zero-weight — deterministic beats clever). It is unit-tested with weights that do
-not divide evenly, including `(1,1,1)`/100 and `(2,2,3)`-style cases.
+→ all zeros, and `0 <= result[i] <= weights[i]` for every line. The remainder is handed
+out **one minor unit at a time, walking backwards from the last line and skipping
+zero-weight lines**. For every ordinary cart this is exactly the frozen rule "the
+remainder is absorbed by the last item"; the backward walk only diverges when the last
+line cannot absorb the remainder without exceeding its own weight, and the literal rule
+there would drive a line's `payable_amount` negative (weights `(1,1,0)`, total `1`) —
+which the `amounts_non_negative` CHECK rejects. The rule is deterministic and
+single-valued; it was reviewed and adopted after the implementation flagged the
+inconsistency in the first draft of this line. It is unit-tested with weights that do
+not divide evenly, including `(1,1,1)`/100 and `(2,2,3)`-style cases and the
+zero-weight tail.
 
 `build_price_snapshot` asserts `sum(item.payable_amount) == cart.payable_amount` and
 raises `PricingInvariantError` if not. INV-006 is enforced by the algorithm *and* this
@@ -383,12 +391,19 @@ Transaction body, in order (the §27 rule generalised: **decide inside the lock*
 2. Validate + snapshot the address (`AddressService.get` — own address only).
 3. Load SKUs + product + primary image; refuse non-ACTIVE SKUs / non-PUBLISHED products.
 4. Price via `PricingService` (no client numbers anywhere).
-5. `SELECT ... FOR UPDATE` every inventory row, **sorted by sku_id ascending** (deadlock
-   avoidance), via `InventoryService.reserve` with movement keys
-   `order-lock:{user_id}:{client_request_id}:{sku_id}`.
-6. Insert the order (temporary unique `order_no`, flush, then stamp
-   `NV{YYYYMMDD}{id:06d}`), insert items, insert the create status log.
-7. Assert INV-006 in-transaction; assert `item_count`/`first_item_name`.
+5. Insert the order row (temporary unique `order_no`, flush, then stamp
+   `NV{YYYYMMDD}{id:06d}`) **before** reserving stock. This ordering is deliberate:
+   it gives every ORDER_LOCK movement a real `reference_id=order.id`, so the ledger can
+   name the order that locked the unit (INV-007). An order that fails a later step is
+   rolled back together with the reservation, so no orphan row survives.
+6. `SELECT ... FOR UPDATE` every inventory row, **sorted by sku_id ascending** (deadlock
+   avoidance), via `InventoryService.reserve(warehouse_id=..., reference_id=order.id,
+   idempotency_key=f"order-lock:{user_id}:{client_request_id}:{sku_id}")`. Resolve the
+   warehouse per line as `WarehouseRepository.get_default(merchant_id=sku_merchant_id)`
+   and pass it explicitly: the service's own default search is not merchant-scoped and
+   would pick the lowest-id warehouse across merchants.
+7. Insert items and the create status log; assert INV-006 in-transaction; assert
+   `item_count`/`first_item_name`.
 8. Mark the idempotency record COMPLETED with a **non-sensitive** response snapshot
    (`order_no`, `payable_amount`, `created_at` only).
 9. Single commit owned by this workflow; on any exception roll back everything (stock

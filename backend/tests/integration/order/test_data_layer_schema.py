@@ -54,7 +54,7 @@ from app.modules.order.enums import (
     ORDER_STATUSES,
     PAYMENT_STATUSES,
 )
-from app.modules.order.models import Order, OrderItem
+from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.shared.db.session import configure_database, get_session_factory
 
 pytestmark = pytest.mark.integration
@@ -377,7 +377,35 @@ def _raises_rejection(db, statement: str, params: dict[str, Any] | None = None) 
     """
     with pytest.raises((IntegrityError, OperationalError)) as caught, db.begin_nested():
         db.execute(text(statement), params or {})
-    return str(caught.value)
+    # Return both: the message carries the constraint NAME, the number carries the
+    # MySQL errno - and the number is what differs between a CHECK and a unique key.
+    orig = getattr(caught.value, 'orig', None)
+    errno = orig.args[0] if orig is not None and orig.args else None
+    return f'[errno {errno}] {caught.value}'
+
+
+MYSQL_CHECK_VIOLATION = 3819
+MYSQL_DUPLICATE_KEY = 1062
+MYSQL_FOREIGN_KEY_VIOLATION = 1451
+
+
+def _assert_check_violation(message: str, constraint: str) -> None:
+    """Assert the rejection was a CHECK (errno 3819) naming `constraint`.
+
+    Two separate assertions on purpose, because they can fail independently:
+
+    * the **errno** proves *which* database mechanism refused the row. A
+      violated CHECK is errno 3819 and arrives as `OperationalError`; a
+      duplicate unique key is 1062 and a violated foreign key is 1451, both as
+      `IntegrityError`. Asserting only on the message would let a test that
+      means "the CHECK refused this" pass because a *different* mechanism did.
+    * the **constraint name** proves the *specific rule* that fired, since a
+      row can violate more than one and MySQL reports whichever it evaluates
+      first.
+    """
+    assert f"[errno {MYSQL_CHECK_VIOLATION}]" in message, message
+    assert constraint in message, message
+    assert "Check constraint" in message, message
 
 
 _PHASE4_MIGRATION_PATH = (
@@ -635,7 +663,7 @@ class TestOrderCheckConstraintsEnforced:
                 "hash": "0" * 64,
             },
         )
-        assert "ck_orders_payable_consistent" in message
+        _assert_check_violation(message, "ck_orders_payable_consistent")
 
     def test_negative_amount_is_rejected(self, db, seeded) -> None:
         """A negative money column is refused by ``ck_orders_amounts_non_negative``.
@@ -651,7 +679,7 @@ class TestOrderCheckConstraintsEnforced:
             "UPDATE orders SET payable_amount = -1 WHERE id = :order_id",
             {"order_id": order_id},
         )
-        assert "ck_orders_amounts_non_negative" in message
+        _assert_check_violation(message, "ck_orders_amounts_non_negative")
 
     def test_unknown_order_status_is_rejected(self, db, seeded) -> None:
         message = _raises_rejection(
@@ -669,7 +697,7 @@ class TestOrderCheckConstraintsEnforced:
                 "hash": "0" * 64,
             },
         )
-        assert "ck_orders_status_valid" in message
+        _assert_check_violation(message, "ck_orders_status_valid")
 
     def test_shipped_is_not_a_valid_order_status(self, db, seeded) -> None:
         """``SHIPPED`` belongs to ``fulfillment_status``, not to ``order_status``.
@@ -697,7 +725,7 @@ class TestOrderCheckConstraintsEnforced:
                 "hash": "0" * 64,
             },
         )
-        assert "ck_orders_payment_status_valid" in message
+        _assert_check_violation(message, "ck_orders_payment_status_valid")
 
     def test_duplicate_client_request_id_for_same_user_is_rejected(self, db, seeded) -> None:
         """The second idempotency guard is a constraint, not a convention."""
@@ -717,6 +745,7 @@ class TestOrderCheckConstraintsEnforced:
                 "hash": "0" * 64,
             },
         )
+        assert f"[errno {MYSQL_DUPLICATE_KEY}]" in message, message
         assert "uq_orders_user_client_request" in message
 
     def test_duplicate_order_no_for_same_merchant_is_rejected(self, db, seeded) -> None:
@@ -736,6 +765,7 @@ class TestOrderCheckConstraintsEnforced:
                 "hash": "0" * 64,
             },
         )
+        assert f"[errno {MYSQL_DUPLICATE_KEY}]" in message, message
         assert "uq_orders_merchant_order_no" in message
 
     def test_orders_are_immutable_snapshots_by_column_set(self, db) -> None:
@@ -780,7 +810,7 @@ class TestOrderItemCheckConstraintsEnforced:
                 "sku_id": seeded["sku_id"],
             },
         )
-        assert "ck_order_items_quantity_positive" in message
+        _assert_check_violation(message, "ck_order_items_quantity_positive")
 
     def test_allocated_discount_must_equal_promotion_plus_coupon(self, db, seeded) -> None:
         """One leg of INV-006, pinned per row."""
@@ -799,7 +829,7 @@ class TestOrderItemCheckConstraintsEnforced:
                 "sku_id": seeded["sku_id"],
             },
         )
-        assert "ck_order_items_allocated_consistent" in message
+        _assert_check_violation(message, "ck_order_items_allocated_consistent")
 
     def test_item_payable_must_equal_original_minus_allocated(self, db, seeded) -> None:
         """Only ``ck_order_items_payable_consistent`` is violated here.
@@ -824,7 +854,7 @@ class TestOrderItemCheckConstraintsEnforced:
                 "sku_id": seeded["sku_id"],
             },
         )
-        assert "ck_order_items_payable_consistent" in message
+        _assert_check_violation(message, "ck_order_items_payable_consistent")
 
     def test_duplicate_sku_in_one_order_is_rejected(self, db, seeded) -> None:
         """Lines are merged before pricing, so per-SKU uniqueness is an invariant."""
@@ -844,6 +874,7 @@ class TestOrderItemCheckConstraintsEnforced:
                 "sku_id": seeded["sku_id"],
             },
         )
+        assert f"[errno {MYSQL_DUPLICATE_KEY}]" in message, message
         assert "uq_order_items_order_sku" in message
 
     def test_negative_allocated_discount_is_rejected(self, db, seeded) -> None:
@@ -868,7 +899,7 @@ class TestOrderItemCheckConstraintsEnforced:
                 "sku_id": seeded["sku_id"],
             },
         )
-        assert "ck_order_items_amounts_non_negative" in message
+        _assert_check_violation(message, "ck_order_items_amounts_non_negative")
 
 
 class TestStatusLogCheckConstraintsEnforced:
@@ -885,7 +916,7 @@ class TestStatusLogCheckConstraintsEnforced:
             "updated_at) VALUES (:order_id, 'NV-X', 'SHIPPED', 'SYSTEM', NOW(3), NOW(3))",
             {"order_id": order_id},
         )
-        assert "ck_order_status_logs_to_status_valid" in message
+        _assert_check_violation(message, "ck_order_status_logs_to_status_valid")
 
     def test_unknown_from_status_is_rejected(self, db, seeded) -> None:
         order_id = insert_order(db, seeded)
@@ -896,7 +927,7 @@ class TestStatusLogCheckConstraintsEnforced:
             "NOW(3), NOW(3))",
             {"order_id": order_id},
         )
-        assert "ck_order_status_logs_from_status_valid" in message
+        _assert_check_violation(message, "ck_order_status_logs_from_status_valid")
 
     def test_unknown_operator_type_is_rejected(self, db, seeded) -> None:
         order_id = insert_order(db, seeded)
@@ -906,7 +937,7 @@ class TestStatusLogCheckConstraintsEnforced:
             "updated_at) VALUES (:order_id, 'NV-X', 'PENDING_PAYMENT', 'ROBOT', NOW(3), NOW(3))",
             {"order_id": order_id},
         )
-        assert "ck_order_status_logs_operator_valid" in message
+        _assert_check_violation(message, "ck_order_status_logs_operator_valid")
 
 
 class TestIdempotencyTableConstraints:
@@ -941,6 +972,7 @@ class TestIdempotencyTableConstraints:
             "created_at, updated_at) VALUES ('order:create', :key, :hash, 'IN_PROGRESS', NOW(3), NOW(3))",
             params,
         )
+        assert f"[errno {MYSQL_DUPLICATE_KEY}]" in message, message
         assert "uq_scope_idempotency_key" in message
 
     def test_same_key_in_a_different_scope_is_allowed(self, db) -> None:
@@ -970,7 +1002,7 @@ class TestIdempotencyTableConstraints:
             "NOW(3), NOW(3))",
             {"hash": "0" * 64},
         )
-        assert "ck_idempotency_records_status_valid" in message
+        _assert_check_violation(message, "ck_idempotency_records_status_valid")
 
 
 # ---------------------------------------------------------------------------
@@ -1427,6 +1459,310 @@ class TestOrderStatusLogRepository:
             "CLOSED",
         ]
         assert logs.count_for_order(int(order.id)) == 3
+
+
+class TestOrderNumberPlaceholderScheme:
+    """The insert-placeholder / flush / stamp scheme from design section 7.
+
+    ``order_no`` embeds the auto-increment id (``NV<YYYYMMDD><id:06d>``), which
+    cannot be known before the row is flushed - so the workflow writes a temporary
+    unique value first and overwrites it. These tests pin the properties that
+    scheme depends on, because they are easy to get wrong in a way that only shows
+    up under concurrency.
+    """
+
+    def test_a_32_char_placeholder_fits_and_is_accepted(self, db, seeded) -> None:
+        """``uuid4().hex`` is exactly 32 chars; the column is ``VARCHAR(32)``.
+
+        There is no format CHECK on ``order_no`` (asserted below), so a placeholder
+        is accepted. It sits exactly at the column limit rather than comfortably
+        inside it, which is why the length is asserted rather than assumed - a
+        longer placeholder would be rejected or truncated under strict mode, and
+        that would surface later as a confusing duplicate-key error.
+        """
+        placeholder = "a" * 32
+        assert len(placeholder) == 32
+        assert insert_order(db, seeded, order_no=placeholder) > 0
+
+    def test_no_format_constraint_exists_on_order_no(self, db) -> None:
+        """No ``CHECK`` constrains the shape of ``order_no``.
+
+        Worth testing explicitly: if one existed, the placeholder scheme would be
+        rejected and the workflow would fail for a reason unrelated to the order.
+        The only constraints on the identifier are ``NOT NULL`` and
+        ``UNIQUE (merchant_id, order_no)``.
+        """
+        clauses = [
+            row[0]
+            for row in db.execute(
+                text(
+                    "SELECT cc.CHECK_CLAUSE FROM information_schema.TABLE_CONSTRAINTS tc "
+                    "JOIN information_schema.CHECK_CONSTRAINTS cc "
+                    "  ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA "
+                    " AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME "
+                    "WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.CONSTRAINT_TYPE = 'CHECK' "
+                    "  AND tc.TABLE_NAME = 'orders'"
+                )
+            ).all()
+        ]
+        assert not [clause for clause in clauses if "order_no" in clause]
+
+    def test_stamping_over_the_placeholder_is_a_plain_update(self, db, seeded) -> None:
+        """Overwriting the placeholder keeps the row valid and unique.
+
+        This is the step the workflow performs after ``flush()``: the row is dirty
+        but uncommitted, so nothing else can observe the placeholder, and the
+        unique index is satisfied by the final value.
+
+        Note that ``{id:06d}`` is a **minimum** width, not a maximum. The stamped
+        value is 16 characters only while the id has at most 6 digits; at 7 digits
+        it is 17, and still well inside ``VARCHAR(32)``. So the format degrades
+        gracefully rather than truncating - but it is worth knowing, because a test
+        that pinned ``len == 17`` against a *real* auto-increment id would fail
+        purely because this test database has a lot of history in it.
+        """
+        order_id = insert_order(db, seeded, order_no="b" * 32)
+        stamped = "NV20260923000042"
+        # 2 (prefix) + 8 (YYYYMMDD) + 6 (padded id) = 16 characters.
+        assert len(stamped) == 16
+        db.execute(
+            text("UPDATE orders SET order_no = :order_no WHERE id = :order_id"),
+            {"order_no": stamped, "order_id": order_id},
+        )
+        persisted = db.execute(
+            text("SELECT order_no FROM orders WHERE id = :order_id"),
+            {"order_id": order_id},
+        ).scalar_one()
+        assert persisted == stamped
+
+        # The real format must fit the column for any id this database can hand out.
+        assert len(f"NV20260923{order_id:06d}") <= 32
+
+    def test_placeholder_uniqueness_is_scoped_to_the_merchant(self, db) -> None:
+        """The unique key is ``(merchant_id, order_no)``, not ``order_no`` alone.
+
+        Recorded because it is why a temporary value is safe at all: two concurrent
+        creates in *different* merchants may hold the same placeholder without
+        colliding, while two in the same merchant cannot.
+        """
+        index_columns = db.execute(
+            text(
+                "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) "
+                "FROM information_schema.STATISTICS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' "
+                "AND INDEX_NAME = 'uq_orders_merchant_order_no'"
+            )
+        ).scalar_one()
+        assert index_columns == "merchant_id,order_no"
+
+
+class TestOrderItemsRelationship:
+    """``Order.items`` is ``selectin``, so reading it is not an N+1 surprise."""
+
+    def test_items_are_loaded_with_the_order_not_lazily(self, db, seeded) -> None:
+        """Accessing ``order.items`` after a repository read issues no extra query.
+
+        ``lazy="selectin"`` loads the collection as part of the read - one bounded
+        extra ``SELECT ... WHERE order_id IN (...)`` - as opposed to
+        ``lazy="select"``, where a 20-row order list becomes 21 queries. Asserted by
+        counting statements rather than by reading the model, because what matters
+        is behaviour inside a workflow transaction.
+        """
+        from sqlalchemy import event
+
+        from app.modules.order.repository import OrderRepository
+
+        order_id = insert_order(db, seeded)
+        insert_item(db, seeded, order_id)
+
+        statements: list[str] = []
+        engine = db.get_bind()
+
+        def _listener(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", _listener)
+        try:
+            order = OrderRepository(db).get_by_order_no(
+                "NV20260923000001", user_id=seeded["user_id"]
+            )
+            assert order is not None
+            before = len(statements)
+            loaded = order.items
+            after = len(statements)
+        finally:
+            event.remove(engine, "before_cursor_execute", _listener)
+
+        assert len(loaded) == 1
+        assert after == before, "reading order.items issued an extra query"
+
+    def test_items_for_returns_the_snapshot_rows_only(self, db, seeded) -> None:
+        """``items_for`` selects ``order_items`` and never joins the catalogue."""
+        from app.modules.order.repository import OrderRepository
+
+        order_id = insert_order(db, seeded)
+        insert_item(db, seeded, order_id, product_name="Frozen Product Name", unit_price=299900)
+
+        items = OrderRepository(db).items_for(order_id)
+        assert len(items) == 1
+        assert items[0].product_name == "Frozen Product Name"
+        assert items[0].unit_price == 299900
+
+    def test_add_status_log_persists_a_built_row(self, db, seeded) -> None:
+        """``add_status_log`` accepts an already-constructed log row."""
+        from app.modules.order.repository import OrderRepository
+
+        insert_order(db, seeded)
+        order = OrderRepository(db).get_by_order_no(
+            "NV20260923000001", user_id=seeded["user_id"]
+        )
+        assert order is not None
+
+        log = OrderStatusLog(
+            order_id=order.id,
+            order_no=order.order_no,
+            from_status=None,
+            to_status="PENDING_PAYMENT",
+            operator_type="SYSTEM",
+        )
+        saved = OrderRepository(db).add_status_log(log)
+        assert saved.id is not None
+
+
+class TestOrderDeletionPolicy:
+    """``session.delete(order)`` works; a raw ``DELETE FROM orders`` does not.
+
+    That asymmetry is deliberate, and it is what the relationships' cascade
+    settings have to deliver:
+
+    * ``order_items.order_id`` and ``order_status_logs.order_id`` are
+      ``ON DELETE RESTRICT``, because an order is a financial record - history must
+      not vanish by accident, and a raw statement that would orphan it is refused;
+    * ``Order.items`` / ``Order.status_logs`` carry ``cascade="all, delete-orphan"``
+      and **no** ``passive_deletes``, so an explicit ORM delete removes the children
+      first and then the parent.
+
+    These tests exist because ``passive_deletes=True`` was the original setting and
+    it does not work against ``RESTRICT``: it suppresses exactly the child deletes
+    that the database is *not* going to perform on its own, so whether a delete
+    succeeded depended on whether the collections happened to be loaded. In real
+    use it raised ``IntegrityError 1451``. See the note on ``Order.items``.
+    """
+
+    def test_orm_delete_removes_children_before_the_parent(self, db, seeded) -> None:
+        """Children are deleted explicitly, then the parent.
+
+        The statement order is asserted rather than merely "it succeeded": a
+        passing delete could also come from a database cascade, and there is no
+        cascade rule here - so the order of statements is the actual evidence that
+        the ORM did the work.
+        """
+        from sqlalchemy import event
+
+        from app.modules.order.repository import OrderRepository
+
+        order_id = insert_order(db, seeded)
+        insert_item(db, seeded, order_id)
+        insert_status_log(db, order_id)
+
+        order = OrderRepository(db).get(order_id)
+        assert order is not None
+        assert len(order.items) == 1
+        assert len(order.status_logs) == 1
+
+        statements: list[str] = []
+        engine = db.get_bind()
+
+        def _listener(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(" ".join(statement.split()))
+
+        event.listen(engine, "before_cursor_execute", _listener)
+        try:
+            db.delete(order)
+            db.flush()
+        finally:
+            event.remove(engine, "before_cursor_execute", _listener)
+
+        deletes = [s for s in statements if s.upper().startswith("DELETE")]
+        assert len(deletes) == 3, deletes
+        assert deletes[0].startswith("DELETE FROM order_items")
+        assert deletes[1].startswith("DELETE FROM order_status_logs")
+        assert deletes[2].startswith("DELETE FROM orders")
+
+        assert db.get(Order, order_id) is None
+
+    def test_orm_delete_works_when_children_were_never_loaded(self, db, seeded) -> None:
+        """The regression case: an order whose collections are not in the session.
+
+        This is the scenario that made ``passive_deletes=True`` fail. The children
+        are written directly, so the identity map never holds them; the delete must
+        still succeed. With ``passive_deletes=True`` this is where
+        `IntegrityError 1451` was raised - on whichever FK the engine reached
+        first.
+        """
+        order_id = insert_order(db, seeded)
+        insert_item(db, seeded, order_id)
+        insert_status_log(db, order_id)
+
+        order = db.get(Order, order_id)
+        assert order is not None
+        # The selectin loader brings both collections in, so drop them again: the
+        # fixture must be exactly "an order the session knows, without its children".
+        order.__dict__.pop("items", None)
+        order.__dict__.pop("status_logs", None)
+        assert "items" not in order.__dict__
+        assert "status_logs" not in order.__dict__
+
+        db.delete(order)
+        db.flush()
+
+        assert db.get(Order, order_id) is None
+        for table in ("order_items", "order_status_logs"):
+            remaining = db.execute(
+                text(f"SELECT COUNT(*) FROM {table} WHERE order_id = :order_id"),
+                {"order_id": order_id},
+            ).scalar_one()
+            assert remaining == 0, f"{table} rows were orphaned"
+
+    def test_raw_delete_is_refused_by_the_database(self, db, seeded) -> None:
+        """Bypassing the ORM cannot delete an order - ``RESTRICT`` says no.
+
+        The policy in one assertion: removing order history has to be a
+        deliberate, ORM-mediated act rather than a stray statement.
+        """
+        order_id = insert_order(db, seeded)
+        insert_item(db, seeded, order_id)
+
+        message = _raises_rejection(
+            db, "DELETE FROM orders WHERE id = :order_id", {"order_id": order_id}
+        )
+        assert f"[errno {MYSQL_FOREIGN_KEY_VIOLATION}]" in message, message
+        assert "foreign key constraint fails" in message.lower()
+
+        assert (
+            db.execute(
+                text("SELECT COUNT(*) FROM orders WHERE id = :order_id"),
+                {"order_id": order_id},
+            ).scalar_one()
+            == 1
+        )
+
+    def test_raw_delete_of_a_childless_order_succeeds(self, db, seeded) -> None:
+        """Negative control for the test above.
+
+        Without this, the RESTRICT assertion would also pass if *every* raw delete
+        failed for an unrelated reason - a mistyped table name, say. An order with
+        no children has nothing to restrict it, so the database permits the delete.
+        """
+        order_id = insert_order(db, seeded)
+        db.execute(text("DELETE FROM orders WHERE id = :order_id"), {"order_id": order_id})
+        assert (
+            db.execute(
+                text("SELECT COUNT(*) FROM orders WHERE id = :order_id"),
+                {"order_id": order_id},
+            ).scalar_one()
+            == 0
+        )
 
 
 class TestRepositoryConfirmsNoWriteFromReads:

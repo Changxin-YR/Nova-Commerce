@@ -3,28 +3,36 @@
 Every module contributes one router; this file only composes them. It contains
 no logic of its own, which keeps the interface layer thin (spec §17) and makes
 the public surface auditable in one place.
+
+**One app, one router.** ``build_api_router()`` returns a fresh aggregate per
+application instance. The first version owned a module-global router and appended
+to it on every call; since ``create_app()`` legitimately runs more than once in a
+process (the test suite builds an HTTP client per test), that registered every
+module again on each call - duplicate OpenAPI ``operationId``s (which REQ-API-005
+generated types key off) and a route table that grew with the number of tests.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1 import health
 
-api_router = APIRouter()
-
-api_router.include_router(health.router, prefix="/health")
-
-
-def register_module_routers() -> None:
-    """Attach each bounded context's router.
+def build_api_router() -> APIRouter:
+    """Compose the ``/api/v1`` surface for **one** application instance.
 
     Imported lazily and defensively so that a partially-implemented module
     cannot stop the application from starting - during phased delivery it is
     normal for ``identity`` to exist while ``knowledge`` does not yet. Once a
     module is present it is wired in with no further edits here.
+
+    Health is deliberately absent: ``/health/live`` and ``/health/ready`` live
+    outside ``/api/v1`` (spec section 130) and the app factory mounts them there.
+    Adding them here as well would expose a second, undocumented
+    ``/api/v1/health/*`` surface.
     """
     from importlib import import_module
+
+    api_router = APIRouter()
 
     module_prefixes: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("app.modules.identity.api", "/auth", ("public", "users", "addresses", "admin")),
@@ -60,5 +68,7 @@ def register_module_routers() -> None:
             tag = f"{prefix.strip('/')}:{submodule}"
             api_router.include_router(router, prefix=prefix, tags=[tag])
 
+    return api_router
 
-__all__ = ["api_router", "register_module_routers"]
+
+__all__ = ["build_api_router"]
