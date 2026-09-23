@@ -644,3 +644,88 @@ None of these was catchable by a build:
 The common shape: **a wrong field name reads as `undefined`, and `undefined` fails quietly
 in exactly the direction that hides capability.** That is why the contract now carries
 shapes rather than only paths.
+
+---
+
+## 15. Pending rulings and a collaboration hazard
+
+### 15.1 Two list endpoints must be frozen (ruling made, contract not yet updated)
+
+`PUT /system/roles/{id}/permissions` and `POST /system/users/{user_id}/roles` are frozen,
+but **there is no LIST route for roles or users anywhere in the contract**. `Role.id` is
+the *input* to that write, so with no way to enumerate roles the client cannot discover an
+id to update.
+
+**This is the same gap section 5.2 closed for fulfillments** (`ship` needs a fulfillment
+id, so `GET /fulfillments/admin` was frozen). The frontend correctly stopped rather than
+guessing, and the ruling is:
+
+Freeze `GET /system/roles` and `GET /system/users`, subject to three conditions:
+
+1. Both use the paged envelope of section 3, never a bare array.
+2. `GET /system/roles` returns only roles visible to the current merchant -
+   `merchant_id = current OR merchant_id IS NULL` (system roles are global). **The filter
+   is a server-side authorization decision, not a client-side convenience.**
+3. Role editing is a **review flow, never a toggle grid.** The four server obligations in
+   section 13.4 (wholesale replacement, refuse a change lowering an `is_write` tool's
+   `risk_level`, refuse `is_grantable = false`, audit the before/after set) mean the UI must
+   show what is about to change before confirming. The coupon/promotion preview-then-confirm
+   pattern is the template.
+
+**Who writes it:** whoever holds `docs/` in the active session. The captain at the time of
+this handoff could not, because a second agent was editing that file (see 15.3).
+
+### 15.2 A corrected lesson - recorded because the wrong version is worse than none
+
+A search returned zero hits on `HANDOFF.md` and the conclusion drawn was "the text is not
+there". It was there (five places). The first explanation offered was a relative-path
+problem, which was **wrong**:
+
+```
+-Pattern 'refundable_amount|bridge' -SimpleMatch   -> 0 hits   <- the bad command
+-Pattern 'refundable_amount|bridge'                -> 5 hits
+-Pattern 'refundable_amount' -SimpleMatch          -> 3 hits
+Resolve-Path HANDOFF.md -> C:\...\store\HANDOFF.md          <- path was fine
+```
+
+The real cause is that **`-SimpleMatch` disables regex, so `|` is matched as a literal
+pipe** - the pattern became the single literal string `refundable_amount|bridge`, which
+appears nowhere.
+
+This is recorded at length because **the plausible-but-wrong explanation pointed at a fix
+that would not have prevented a recurrence**: an absolute path does not rescue a pattern
+being treated as a literal. The two durable lessons are:
+
+1. `-SimpleMatch` turns `|` into a literal. Know which mode your search is in.
+2. **Never report a search result without the command that produced it.** Zero hits looks
+   exactly like genuinely absent, and acting on a false zero means re-writing text that
+   already exists.
+
+The first attempt at this diagnosis was made by the captain and corrected by a teammate -
+which is the system working, not failing.
+
+### 15.3 Collaboration hazard - one working tree, two agents
+
+A second agent began Phase 4 in the same working directory while the first was still
+committing. A `git add -A` then swept that agent's in-flight work into an unrelated commit
+(`f637336`), producing a commit whose message described one thing and whose contents were
+another. It was corrected in `49a8b27`.
+
+**Never take a whole-tree snapshot while another agent is editing.** Stage the paths you
+own, one at a time. If two agents must work in parallel, give them separate worktrees or
+separate clones - not one directory.
+
+### 15.4 Frontend state at this handoff
+
+- **295 tests, four gates green**, tree clean at `db7fed9`.
+- Promotion creation is **done**: per-type discriminated `rule_config`, rates in basis
+  points, explicit `scope`, `preview_token` required in the type so a single-submit create
+  **cannot be written**, conflicts rendered rather than treated as an error.
+- The duplicate local `Promotion` in `api/marketing.ts` is **deleted**; the compiler named
+  the three view renames, which is the payoff for migrating types before views.
+- Role editor: **blocked** on 15.1, deliberately unbuilt rather than guessed.
+- `knowledgeAdminApi.createBase` is **unwired** - the Knowledge page can list bases, upload,
+  reprocess and archive but cannot create one, so a fresh deployment has nothing to operate
+  on and no UI way to fix that. Smallest remaining visible hole.
+- **No e2e coverage and no end-to-end evidence.** Everything is verified at the type and
+  API-module-mock level only, because the twelve module backends are incomplete.
