@@ -114,7 +114,7 @@ def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
     return f"{module}.{type(obj).__name__}()"
 
 
-def include_object(
+def include_object(  # noqa: ARG001 - signature is fixed by the Alembic API
     obj: object,
     name: str | None,
     type_: str,
