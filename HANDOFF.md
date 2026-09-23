@@ -1228,3 +1228,94 @@ Then read, in this order: `PROJECT_BASELINE.yaml` (the Phase 6 requirements),
 `docs/handoff/phase5-*.md` files. Phase 6 is **Marketing + Analytics + Outbox**, and its
 first task is the outbox seam - marked, unmoved, and waiting in two places:
 `CreateOrderWorkflow` step 9 and `PaymentSuccessWorkflow` step 10.
+
+
+---
+
+## 19. Session handoff - Phase 6 outbox landed (increment 1)
+
+> **This section is the only current statement of state.** Everything above is
+> historical: section 18 describes Phase 5 at `ecf361f`, and its 18.1 line
+> "`HEAD = ecf361f`, pushed" is no longer true. Read this section first, then
+> `docs/handoff/phase6-outbox.md` for the increment in full (design argument,
+> teardown obligation, traps, and what Phase 6 still owes).
+
+### 19.1 Repository state
+
+* `main` is **3 commits ahead of `origin/main` (`17e1184`)** and they are
+  **NOT pushed**:
+  * `075e293` - phase6 outbox: transaction-joining writer, publisher, and the
+    three wired seams
+  * `cb62f4a` - outbox tests: the suite, the false-collision guard, and the
+    teardown obligation
+  * `b190ea3` - docs: the outbox seam is wired, and the position claim is
+    corrected
+* Working tree **clean**.
+* `pytest tests` -> **1137 passed, 0 failed** (1102 pre-existing + 35 new).
+* `ruff check --no-cache app tests migrations` -> clean.
+* `alembic current` -> `507bb852a092` (head); `alembic check` -> no new
+  operations.
+* `docker compose --env-file .env -f ops/docker-compose.yml ps` -> 5/5 healthy.
+* `scripts/residue.py` -> `residue: 0`.
+
+### 19.2 What landed
+
+The transactional outbox (**spec §49 / REQ-CON-003**, `pytest` gate FG-08's
+phase): the `outbox_messages` table, `backend/app/shared/outbox/` (contract,
+writer, publisher), and the three marked seams now **wired rather than
+commented** - `CreateOrderWorkflow` step 9, `PaymentSuccessWorkflow` step 10,
+`RefundWorkflow` step 7. 35 integration tests on real MySQL.
+
+Phase 6 as a whole is **Marketing + Analytics + Outbox**; only the outbox landed.
+Marketing (§39 promotions, §40 coupon lifecycle) and Analytics are untouched
+- see `docs/handoff/phase6-outbox.md` section 5.
+
+### 19.3 Open, in priority order
+
+1. **Nothing is pushed.** Three verified commits sit only on this machine.
+2. **FG-11 and FG-12 evidence are stale.** Both artifacts watch `backend/app`,
+   which this increment changed; re-emit from a **clean tree after the last
+   commit**, never before (`gate_evidence.emit` records a dirty caveat
+   otherwise).
+3. **Independent verification did not complete.** Task `t2` was interrupted. The
+   18 mutation checks that exist are the **author's own** - useful, not
+   independent. Do not report this as independently verified.
+4. **No multi-worker publisher test.** `FOR UPDATE SKIP LOCKED` is asserted by
+   reading the code, not by two publishers racing.
+5. **FG-11 clause 8 is masked.** Moving the payment emit block above its guards
+   does **not** redden FG-11 on its own, because `enqueue`'s aggregate dedup
+   absorbs the duplicate. Measured (via a real `ALTER TABLE` that replaced the
+   unique with one on `idempotency_key`). Facts about test sensitivity, not a
+   licence to move the block.
+6. **§50 remnants**: a Celery app + beat entry point wrapping
+   `run_publish_cycle`, a real transport, and the reconciliation jobs.
+7. `scripts/residue.py` still checks only one direction (18.5 item 4) and cannot
+   see a missing index.
+
+### 19.4 One deliberate departure from the seam text
+
+The outbox dedup anchor is `UNIQUE (event_type, aggregate_type, aggregate_id)` -
+the **aggregate identity** - and **not** the emitter's idempotency key, even
+though the seam comments asked for the key. An emitter key is only unique inside
+its own scope (per user, per merchant, per provider), so a global unique on it
+silently drops a legitimate second event; a lost event is invisible while a
+duplicate is loud. The key is still stored and indexed as traceability. The full
+argument is in `backend/app/shared/db/models/outbox.py` - if you disagree, say so
+explicitly rather than reverting it quietly.
+
+### 19.5 Traps that cost time here (read before editing)
+
+* **`core.autocrlf=true`.** A Python text-mode write translates `\n` to `\r\n`,
+  which rewrote two whole files (374 spurious bytes) while a *text* diff reported
+  zero differences. Restore mutated files with byte writes and verify with a byte
+  hash plus `git diff --stat`.
+* **Some committed files contain GBK mojibake** (`\u6402` where `§` was meant)
+  - it is in the **blob**, not editor damage. A `§`-based search/replace fails
+  against those lines. Do not "fix" a tool that did nothing.
+* **One `nova` schema, no per-process isolation.** Serialise `pytest` runs; two
+  concurrent runs fail on rows a fixture just committed, and the failing set
+  moves between runs.
+* **The teardown obligation keeps arriving.** `outbox_messages.merchant_id` is a
+  RESTRICT FK, so any cleanup that deletes a merchant must delete its outbox rows
+  first or fail with errno 1451. It is fixed for the suites that exist; a new
+  suite that deletes a merchant inherits the problem.
