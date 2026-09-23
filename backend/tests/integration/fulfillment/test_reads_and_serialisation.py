@@ -63,8 +63,7 @@ def _ship(session, commerce: Commerce, fulfillment_id: int, quantity: int):
 # ---------------------------------------------------------------------------
 def test_the_unshipped_serialised_shape_is_the_frozen_one(session, commerce: Commerce) -> None:
     shell = _shell(session, commerce)
-    service = FulfillmentService(session)
-    wire = to_fulfillment(shell, service.sku_by_line_for_orders([commerce.order_id]))
+    wire = to_fulfillment(shell)
 
     assert set(wire.model_dump()) == {
         "id",
@@ -97,7 +96,7 @@ def test_the_unshipped_serialised_shape_is_the_frozen_one(session, commerce: Com
         "quantity",
     }
     assert line.order_item_id == commerce.order_item_id
-    # Resolved through the order line, because the table does not store it.
+    # Read straight off the row's own stored snapshot column.
     assert line.sku_id == commerce.sku_id
     assert line.product_name == "Nova Phone 15 Pro"
     assert line.quantity == 3
@@ -106,8 +105,7 @@ def test_the_unshipped_serialised_shape_is_the_frozen_one(session, commerce: Com
 def test_the_serialised_timestamp_is_the_frozen_encoding(session, commerce: Commerce) -> None:
     """``API_CONTRACT`` section 2: UTC, milliseconds, literal ``Z``."""
     shell = _shell(session, commerce)
-    service = FulfillmentService(session)
-    wire = to_fulfillment(shell, service.sku_by_line_for_orders([commerce.order_id]))
+    wire = to_fulfillment(shell)
     created = wire.model_dump(mode="json")["created_at"]
 
     assert created.endswith("Z"), created
@@ -118,8 +116,7 @@ def test_the_serialised_timestamp_is_the_frozen_encoding(session, commerce: Comm
 def test_the_shipped_serialised_shape_carries_the_parcel_facts(session, commerce: Commerce) -> None:
     shell = _shell(session, commerce)
     shipped = _ship(session, commerce, shell.id, quantity=3)
-    service = FulfillmentService(session)
-    wire = to_fulfillment(shipped, service.sku_by_line_for_orders([commerce.order_id]))
+    wire = to_fulfillment(shipped)
 
     assert wire.carrier == "JD"
     assert wire.tracking_no == f"JD-{commerce.marker}"
@@ -187,7 +184,6 @@ def test_the_admin_queue_is_paged_and_enveloped(session, commerce: Commerce) -> 
         page=1,
         page_size=20,
         total=page.total,
-        sku_by_line=FulfillmentService(session).sku_by_line_for_orders([row.order_id for row in page.rows]),
     )
     dumped = wire.model_dump(mode="json")
     assert set(dumped) == {"items", "meta"}

@@ -48,5 +48,4 @@ def list_order_shipments(
 ) -> dict:
     service = FulfillmentService(session)
     rows = service.get_for_order_no(principal=principal, order_no=order_no)
-    sku_by_line = service.sku_by_line_for_orders([row.order_id for row in rows])
-    return envelope(data=[to_fulfillment(row, sku_by_line).model_dump(mode="json") for row in rows])
+    return envelope(data=[to_fulfillment(row).model_dump(mode="json") for row in rows])

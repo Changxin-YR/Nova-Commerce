@@ -29,10 +29,8 @@ test double that models only the columns.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
-from app.core.errors import InternalError
 from app.modules.fulfillment.schemas import (
     FulfillmentItemOut,
     FulfillmentOut,
@@ -46,7 +44,7 @@ __all__ = [
 ]
 
 
-def _item_out(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentItemOut:
+def _item_out(row: Any) -> FulfillmentItemOut:
     """One shipped line.
 
     ``product_name``/``sku_name`` come from the fulfillment row's own snapshot, not
@@ -54,61 +52,34 @@ def _item_out(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentItemOut:
     product renamed after shipping must not retitle a package that is already in
     transit (INV-014, applied to the goods-out side).
 
-    ## ``sku_id`` is DERIVED through the order line - there is no column, and none is coming
+    ## ``sku_id`` is a stored snapshot column, read straight off the row
 
-    ``fulfillment_items`` does not store ``sku_id``: REQ-FUL-002 in
-    ``PROJECT_BASELINE.yaml`` freezes its columns as ``fulfillment_id, order_item_id,
-    quantity``, and duplicating a key reachable through ``order_items`` would create a
-    second place for one fact to be wrong - a package line whose ``sku_id`` disagreed
-    with the order line it claims to be part of is a shipping error nobody can detect.
-    The frozen wire shape still requires the field (``API_CONTRACT`` section 5,
-    ``FulfillmentItemOut``), so it is **derived here** from ``order_item_id``.
+    ``fulfillment_items.sku_id`` was ruled in, out, and back in during Phase 5; the
+    final ruling is the column, and ``models.py`` records the reasoning. The decisive
+    argument is the snapshot-table one: these rows already store ``product_name`` and
+    ``sku_name`` as values, so carrying a line's names but not the id they came from
+    was the one genuinely inconsistent combination. ``order_item_id`` remains the
+    authoritative link (INV-014); the id sits beside the names so a reader never needs
+    a second query.
 
-    That derivation reads ``order_items``, which is itself a snapshot table, so INV-014
-    is untouched: nothing about a shipped parcel depends on the live catalogue.
-
-    **This is the permanent design, not a workaround awaiting a schema change.** The
-    captain withdrew ``PHASE5_DESIGN`` section 5.4's ``sku_id FK RESTRICT`` and ruled
-    that the baseline wins, so a later reader must not "restore" the column; doing so
-    would contradict REQ-FUL-002 and re-open a settled question. There is deliberately
-    no ``getattr(row, "sku_id", None)`` fallback: one path, so the derivation cannot
-    silently bypass itself.
-
-    ``sku_by_line`` is passed in rather than looked up per row because the list
-    endpoint would otherwise run one query per line - the N+1 that only becomes
-    visible on an order that shipped in five packages with four lines each. The caller
-    loads one mapping per page, which is the same rule the order module's
-    ``_fulfillment_out`` follows for ``shipments[]``, and both raise the same way when
-    a line is missing from the map.
+    An earlier revision derived it here from a ``sku_by_line`` map the caller built for
+    the whole page. That was correct but no longer necessary - and it was not free: it
+    cost one extra query per page and classified a caller's missing map as
+    ``InternalError``, the same error reserved for a package line pointing at an order
+    line that is not on the order. With the column, this function reads one attribute
+    and cannot be handed incomplete input.
     """
-    sku_id = sku_by_line.get(row.order_item_id)
-    if sku_id is None:
-        # A package line referencing an order line that is not on the order. The FKs
-        # make it impossible for a real row, so this is corruption rather than an input
-        # problem, and it is raised rather than emitted as ``null``: ``sku_id`` is
-        # required by a frozen shape, so a null would be a silent contract violation on
-        # the console's read path. Matches ``order/serializers.py::_fulfillment_out``,
-        # which raises the same code with the same reason - the two read paths must not
-        # disagree about what a broken row does.
-        raise InternalError(
-            "a fulfillment item references an order line that is not on the order",
-            context={
-                "fulfillment_id": getattr(row, "id", None),
-                "order_item_id": row.order_item_id,
-                "mapped_lines": len(sku_by_line),
-            },
-        )
     return FulfillmentItemOut(
         id=row.id,
         order_item_id=row.order_item_id,
-        sku_id=sku_id,
+        sku_id=row.sku_id,
         product_name=row.product_name,
         sku_name=row.sku_name,
         quantity=row.quantity,
     )
 
 
-def to_fulfillment(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentOut:
+def to_fulfillment(row: Any) -> FulfillmentOut:
     """Project one fulfillment ORM row into the frozen shape.
 
     ``carrier``/``tracking_no``/``shipped_at`` are ``None`` until shipped and are
@@ -116,8 +87,7 @@ def to_fulfillment(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentOut:
     "no tracking number" from "an empty tracking number", and a placeholder would
     erase that distinction on the wire.
     """
-    mapping: Mapping[int, int] = sku_by_line
-    items = [_item_out(line, mapping) for line in (getattr(row, "items", None) or ())]
+    items = [_item_out(line) for line in (getattr(row, "items", None) or ())]
     return FulfillmentOut(
         id=row.id,
         order_id=row.order_id,
@@ -139,7 +109,6 @@ def to_page(
     page: int,
     page_size: int,
     total: int,
-    sku_by_line: Mapping[int, int],
 ) -> FulfillmentPageOut:
     """The paged envelope payload of section 3 (``items`` + ``meta``).
 
@@ -147,19 +116,13 @@ def to_page(
     because ``total`` is the count *before* the page slice - deriving it from
     ``len(rows)`` would silently report every page as the last one.
 
-    ``sku_by_line`` covers **every line on the page**, resolved in one query by the
-    caller, and is a **required** parameter rather than one defaulting to ``None``.
 
-    That is deliberate. Defaulting it would have made the signature advertise an
-    optional dependency the body cannot honour: an omitted map resolves to "no line
-    has a SKU", which raises the same ``InternalError`` reserved for genuine
-    corruption - a package line pointing at an order line that is not on the order.
-    The caller's real mistake (forgetting the map) would then be reported as a data
-    defect, which is the most expensive kind of wrong error to debug. Requiring it
-    makes that mistake a ``TypeError`` at the call site, where the fix is obvious.
+    It takes no ``sku_by_line`` map: each item now carries its own ``sku_id`` column,
+    so a page costs no extra query for it. An earlier revision required the caller to
+    build a page-wide map - correct, but it cost one query per page and turned a
+    caller's forgotten map into an ``InternalError`` that blamed the data.
     """
-    mapping: Mapping[int, int] = sku_by_line
     return FulfillmentPageOut(
-        items=[to_fulfillment(row, mapping) for row in rows],
+        items=[to_fulfillment(row) for row in rows],
         meta=page_meta(page=page, page_size=page_size, total=total),
     )

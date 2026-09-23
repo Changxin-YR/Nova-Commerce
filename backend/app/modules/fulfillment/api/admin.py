@@ -75,14 +75,12 @@ def list_admin_fulfillments(
         page=page,
         page_size=page_size,
     )
-    sku_by_line = service.sku_by_line_for_orders([row.order_id for row in result.rows])
     return envelope(
         data=to_page(
             result.rows,
             page=page,
             page_size=page_size,
             total=result.total,
-            sku_by_line=sku_by_line,
         ).model_dump(mode="json")
     )
 
@@ -114,5 +112,4 @@ def ship_fulfillment(
 ) -> dict:
     service = FulfillmentService(session)
     fulfillment = service.ship(principal=principal, fulfillment_id=fulfillment_id, payload=payload)
-    sku_by_line = service.sku_by_line_for_orders([fulfillment.order_id])
-    return envelope(data=to_fulfillment(fulfillment, sku_by_line).model_dump(mode="json"))
+    return envelope(data=to_fulfillment(fulfillment).model_dump(mode="json"))
