@@ -30,7 +30,6 @@ which outcome each call took, rather than pinning one.
 from __future__ import annotations
 
 import threading
-import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
@@ -46,7 +45,7 @@ from app.modules.order.service import OrderService
 from app.modules.order.workflow import OrderLineInput
 from app.shared.db.session import get_session_factory
 
-from ..integration.order.conftest import (
+from .conftest import (
     OPENING_STOCK,
     Shop,
     movements_for,
@@ -211,8 +210,10 @@ def test_concurrent_creates_against_scarce_stock_reserve_exactly_what_exists(sho
     finally:
         session.close()
 
-    barrier = threading.Barrier(CONCURRENT_CALLERS)
     callers = 6
+    # The barrier needs exactly as many parties as there are threads - a mismatch
+    # deadlocks the whole test until the timeout breaks it.
+    barrier = threading.Barrier(callers)
 
     def attempt(index: int) -> str:
         session = get_session_factory()()
