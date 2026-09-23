@@ -1,11 +1,17 @@
 <script setup lang="ts">
 /**
- * Product detail: gallery, SKU picker, quantity, add-to-cart / buy-now.
+ * Product detail — the commerce two-column convention:
  *
- * Stock is DISPLAY ONLY. `available_stock` comes from the server for UX; the real
- * check happens at order creation, where `INSUFFICIENT_STOCK` (40000) is enforced
- * inside the transaction. The UI must therefore still handle that error even when the
- * button looked enabled.
+ *   [ gallery + thumbnails ] [ price block, SKU chips, quantity, 加购/立即购买 ]
+ *
+ * The SKU selector is a chip grid: every spec combination is visible at once, out-of-stock
+ * combinations are visibly disabled AND non-clickable, and the selected combination is
+ * outlined in brand red. This is the affordance shoppers expect; a dropdown would hide
+ * what is actually available.
+ *
+ * STOCK IS DISPLAY ONLY. `available_stock` comes from the server for UX; the binding check
+ * happens inside the order transaction, which is why the error path for
+ * `INSUFFICIENT_STOCK` (40000) is handled even when the button looked enabled.
  */
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -13,9 +19,9 @@ import { catalogApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useCartStore } from '@/stores/cart'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import StateView from '@/components/ui/StateView.vue'
+import PriceText from '@/components/ui/PriceText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,7 +35,7 @@ const { data: product, status, error, execute } = useAsyncState(
   { immediate: true },
 )
 
-const selectedSkuId = ref<string>('')
+const selectedSkuId = ref('')
 const quantity = ref(1)
 const activeImage = ref(0)
 const submitting = ref(false)
@@ -39,19 +45,45 @@ const selectedSku = computed(() => skus.value.find((sku) => sku.id === selectedS
 const images = computed(() => product.value?.images ?? [])
 const currentImage = computed(() => images.value[activeImage.value] ?? images.value[0] ?? null)
 
-/** Sellable quantity as reported by the server (not a client-side stock computation). */
+/** Sellable quantity as reported by the server — not a client stock computation. */
 const maxQuantity = computed(() => Math.max(1, selectedSku.value?.available_stock ?? 1))
 const soldOut = computed(() => (selectedSku.value?.available_stock ?? 0) <= 0)
+const currentPrice = computed(() => selectedSku.value?.price_amount ?? product.value?.min_price_amount ?? 0)
+const listPrice = computed(
+  () => selectedSku.value?.original_price_amount ?? product.value?.original_price_amount,
+)
 
-// Default to the first available SKU once the product loads.
+/** Default to the first in-stock combination once the product loads. */
 function ensureSkuSelected(): void {
   if (selectedSkuId.value) return
   const first = skus.value.find((sku) => (sku.available_stock ?? 0) > 0) ?? skus.value[0]
   if (first) selectedSkuId.value = first.id
 }
-
-// The product arrives asynchronously, so seed the SKU selection when it lands.
 watch(product, ensureSkuSelected, { immediate: true })
+
+/** Flatten a SKU's specs into the chip label: "深空黑 / 256GB". */
+function skuLabel(sku: { specs: Record<string, string> }): string {
+  const values = Object.values(sku.specs)
+  return values.length > 0 ? values.join(' / ') : '默认规格'
+}
+
+const specGroups = computed(() => {
+  const groups = new Map<string, string[]>()
+  for (const sku of skus.value) {
+    for (const [key, value] of Object.entries(sku.specs)) {
+      const list = groups.get(key) ?? []
+      if (!list.includes(value)) list.push(value)
+      groups.set(key, list)
+    }
+  }
+  return [...groups.entries()]
+})
+
+const SERVICE_NOTES = [
+  '正品保障：官方授权渠道发货',
+  '极速发货：仓库实时库存校验',
+  '无忧退换：7 天无理由（以售后政策为准）',
+]
 
 async function addToCart(): Promise<void> {
   if (!selectedSku.value || soldOut.value) return
@@ -68,30 +100,35 @@ async function addToCart(): Promise<void> {
 }
 
 async function buyNow(): Promise<void> {
-  // Buy-now still goes through the server-side cart/order preview: the client never
-  // invents a price or an order. `cart.error` is store state (already unwrapped by
-  // Pinia), not a ref.
+  // Buy-now still goes through the server-side preview: the client never invents a price.
   await addToCart()
   if (!cart.error) await router.push({ name: 'cart' })
 }
 </script>
 
 <template>
-  <div class="nx-container product">
+  <div class="nx-container pdetail">
     <StateView :state="status" :error="error" @retry="execute()">
-      <div v-if="product" class="product__layout">
-        <div class="product__gallery">
-          <div class="product__stage">
-            <img v-if="currentImage" :src="currentImage.url" :alt="currentImage.alt ?? product.title" />
+      <div v-if="product" class="pdetail__main">
+        <!-- gallery ------------------------------------------------------ -->
+        <div class="pdetail__gallery">
+          <div class="pdetail__stage">
+            <img
+              v-if="currentImage"
+              :src="currentImage.url"
+              :alt="currentImage.alt ?? product.title"
+              class="pdetail__image"
+            />
             <span v-else class="nx-muted">暂无图片</span>
           </div>
-          <div v-if="images.length > 1" class="product__thumbs">
+
+          <div v-if="images.length > 1" class="pdetail__thumbs">
             <button
               v-for="(image, index) in images"
               :key="image.id"
               type="button"
-              class="product__thumb"
-              :class="{ 'product__thumb--active': index === activeImage }"
+              class="pdetail__thumb"
+              :class="{ 'pdetail__thumb--active': index === activeImage }"
               @click="activeImage = index"
             >
               <img :src="image.url" :alt="`图片 ${index + 1}`" />
@@ -99,120 +136,152 @@ async function buyNow(): Promise<void> {
           </div>
         </div>
 
-        <div class="product__info">
-          <h1 class="nx-page-title">{{ product.title }}</h1>
-          <p v-if="product.subtitle" class="nx-muted">{{ product.subtitle }}</p>
+        <!-- buy box ------------------------------------------------------ -->
+        <div class="pdetail__buy">
+          <h1 class="pdetail__title">{{ product.title }}</h1>
+          <p v-if="product.subtitle" class="pdetail__subtitle">{{ product.subtitle }}</p>
 
-          <div class="product__price">
-            <span class="nx-money product__price-main">
-              {{ formatMoney(selectedSku?.price_amount ?? product.min_price_amount) }}
-            </span>
-            <span
-              v-if="selectedSku?.original_price_amount ?? product.original_price_amount"
-              class="product__price-original"
-            >
-              {{ formatMoney(selectedSku?.original_price_amount ?? product.original_price_amount ?? 0) }}
-            </span>
+          <!-- price block on the tinted panel -->
+          <div class="pdetail__pricebox">
+            <PriceText :amount="currentPrice" :original-amount="listPrice" size="xl" />
+            <p class="pdetail__pricehint">
+              <span v-if="listPrice" class="pdetail__save">
+                立省
+                <PriceText :amount="Math.max(0, listPrice - currentPrice)" size="sm" />
+              </span>
+              <span class="nx-muted">价格为整数分展示；下单时价格快照锁定</span>
+            </p>
           </div>
 
-          <div v-if="skus.length" class="product__skus">
-            <p class="product__label">选择规格</p>
-            <div class="product__sku-list">
+          <!-- SKU chips -------------------------------------------------- -->
+          <dl v-if="skuGroups.length" class="pdetail__specs">
+            <div v-for="[key, values] in specGroups" :key="key">
+              <dt>{{ key }}</dt>
+              <dd>
+                <span v-for="value in values" :key="value" class="pdetail__specvalue">{{ value }}</span>
+              </dd>
+            </div>
+          </dl>
+
+          <div v-if="skus.length" class="pdetail__skus">
+            <p class="pdetail__label">选择规格</p>
+            <div class="pdetail__skugrid">
               <button
                 v-for="sku in skus"
                 :key="sku.id"
                 type="button"
-                class="product__sku"
+                class="pdetail__sku"
                 :class="{
-                  'product__sku--active': sku.id === selectedSkuId,
-                  'product__sku--disabled': (sku.available_stock ?? 0) <= 0,
+                  'pdetail__sku--active': sku.id === selectedSkuId,
+                  'pdetail__sku--disabled': (sku.available_stock ?? 0) <= 0,
                 }"
                 :disabled="(sku.available_stock ?? 0) <= 0"
+                :title="(sku.available_stock ?? 0) <= 0 ? '该规格缺货' : undefined"
                 @click="selectedSkuId = sku.id"
               >
-                <span v-for="(value, key) in sku.specs" :key="key" class="product__sku-spec">
-                  {{ value }}
-                </span>
-                <span class="product__sku-price">{{ formatMoney(sku.price_amount) }}</span>
+                <span class="pdetail__skulabel">{{ skuLabel(sku) }}</span>
+                <PriceText :amount="sku.price_amount" size="sm" />
+                <span v-if="(sku.available_stock ?? 0) <= 0" class="pdetail__skuoos">缺货</span>
               </button>
             </div>
           </div>
 
-          <div class="product__quantity">
-            <p class="product__label">数量</p>
-            <div class="product__quantity-control">
-              <button type="button" class="nx-btn" :disabled="quantity <= 1" @click="quantity -= 1">−</button>
-              <input v-model.number="quantity" type="number" min="1" :max="maxQuantity" class="product__quantity-input" />
-              <button
-                type="button"
-                class="nx-btn"
-                :disabled="quantity >= maxQuantity"
-                @click="quantity += 1"
-              >
-                +
-              </button>
+          <!-- quantity --------------------------------------------------- -->
+          <div class="pdetail__qty">
+            <p class="pdetail__label">数量</p>
+            <div class="pdetail__qtyrow">
+              <div class="qty">
+                <button type="button" class="qty__btn" :disabled="quantity <= 1" @click="quantity -= 1">−</button>
+                <input v-model.number="quantity" type="number" min="1" :max="maxQuantity" class="qty__input" />
+                <button
+                  type="button"
+                  class="qty__btn"
+                  :disabled="quantity >= maxQuantity"
+                  @click="quantity += 1"
+                >
+                  +
+                </button>
+              </div>
               <span class="nx-muted">
                 {{ soldOut ? '该规格暂时缺货' : `可售 ${selectedSku?.available_stock ?? 0} 件` }}
               </span>
             </div>
           </div>
 
-          <div class="product__actions">
+          <!-- dual CTA: orange outline + solid red ----------------------- -->
+          <div class="pdetail__actions">
             <button
               type="button"
-              class="nx-btn nx-btn--primary"
+              class="nx-btn nx-btn--outline nx-btn--lg"
               :disabled="submitting || soldOut"
               @click="addToCart()"
             >
               加入购物车
             </button>
-            <button type="button" class="nx-btn" :disabled="submitting || soldOut" @click="buyNow()">
+            <button
+              type="button"
+              class="nx-btn nx-btn--primary nx-btn--lg"
+              :disabled="submitting || soldOut"
+              @click="buyNow()"
+            >
               立即购买
             </button>
           </div>
 
-          <p class="nx-muted product__note">
-            库存以提交订单时服务器校验为准；下单价格在创建订单时快照，后续改价不影响已有订单。
+          <ul class="pdetail__services">
+            <li v-for="note in SERVICE_NOTES" :key="note">{{ note }}</li>
+          </ul>
+
+          <p class="nx-muted pdetail__disclaimer">
+            库存以提交订单时服务器校验为准；下单价格快照保存，后续改价不影响已有订单。
           </p>
         </div>
       </div>
 
-      <section v-if="product?.description" class="product__description">
-        <h2 class="nx-section-title">商品详情</h2>
-        <p>{{ product.description }}</p>
+      <!-- description block ------------------------------------------------- -->
+      <section v-if="product?.description" class="nx-block pdetail__desc">
+        <div class="nx-block__head">
+          <h2 class="nx-block__title">商品详情</h2>
+        </div>
+        <div class="nx-block__body">
+          <p class="pdetail__desctext">{{ product.description }}</p>
+        </div>
       </section>
     </StateView>
   </div>
 </template>
 
 <style scoped lang="scss">
-.product {
-  &__layout {
+.pdetail {
+  &__main {
     display: grid;
-    grid-template-columns: minmax(280px, 420px) 1fr;
-    gap: 28px;
+    grid-template-columns: 400px 1fr;
+    gap: 20px;
+    padding: 20px;
+    background: var(--nx-surface);
+    border: 1px solid var(--nx-border);
   }
 
+  /* -- gallery ----------------------------------------------------------- */
   &__stage {
     display: flex;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 1 / 1;
+    height: 400px;
     background: var(--nx-surface-stage);
-    border-radius: var(--nx-radius-card);
-    overflow: hidden;
+    border: 1px solid var(--nx-border);
+  }
 
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
+  &__image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 
   &__thumbs {
     display: flex;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 6px;
+    margin-top: 8px;
   }
 
   &__thumb {
@@ -220,7 +289,6 @@ async function buyNow(): Promise<void> {
     height: 56px;
     padding: 2px;
     border: 1px solid var(--nx-border);
-    border-radius: 10px;
     background: var(--nx-surface);
     cursor: pointer;
 
@@ -231,126 +299,236 @@ async function buyNow(): Promise<void> {
     }
 
     &--active {
-      border-color: var(--nx-primary);
+      border-color: var(--nx-brand);
     }
   }
 
-  &__price {
+  /* -- buy box ----------------------------------------------------------- */
+  &__title {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  &__subtitle {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--nx-brand);
+  }
+
+  &__pricebox {
+    margin: 12px 0;
+    padding: 10px 12px;
+    background: var(--nx-surface-sunken);
+    border: 1px solid var(--nx-border);
+  }
+
+  &__pricehint {
     display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0 0;
+    font-size: 12px;
+  }
+
+  &__save {
+    display: inline-flex;
     align-items: baseline;
-    gap: 10px;
-    margin: 14px 0;
+    gap: 4px;
+    color: var(--nx-brand);
   }
 
-  &__price-main {
-    font-size: 26px;
-    color: var(--nx-danger);
+  &__specs {
+    margin: 12px 0;
+    font-size: 12px;
+
+    > div {
+      display: flex;
+      gap: 10px;
+      padding: 4px 0;
+    }
+
+    dt {
+      flex: 0 0 60px;
+      color: var(--nx-text-muted);
+    }
+
+    dd {
+      display: flex;
+      gap: 12px;
+      margin: 0;
+    }
   }
 
-  &__price-original {
-    font-size: 14px;
-    color: var(--nx-text-muted);
-    text-decoration: line-through;
+  &__specvalue {
+    color: var(--nx-text-secondary);
   }
 
   &__label {
-    margin: 0 0 8px;
-    font-size: 13px;
-    font-weight: 600;
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: var(--nx-text-muted);
   }
 
-  &__sku-list {
-    display: flex;
-    flex-wrap: wrap;
+  &__skugrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 8px;
   }
 
   &__sku {
+    position: relative;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 8px 10px;
     border: 1px solid var(--nx-border-strong);
-    border-radius: var(--nx-radius-control);
     background: var(--nx-surface);
-    color: var(--nx-text);
     font-family: inherit;
-    font-size: 13px;
+    text-align: left;
     cursor: pointer;
 
+    &:hover:not(:disabled) {
+      border-color: var(--nx-brand);
+    }
+
     &--active {
-      border-color: var(--nx-primary);
-      color: var(--nx-primary);
-      background: var(--nx-primary-soft);
+      border-color: var(--nx-brand);
+      box-shadow: inset 0 0 0 1px var(--nx-brand);
     }
 
+    /* Disabled is visually obvious AND not clickable. */
     &--disabled {
-      opacity: 0.45;
+      border-style: dashed;
+      background: var(--nx-surface-sunken);
       cursor: not-allowed;
-      text-decoration: line-through;
+      opacity: 0.7;
     }
   }
 
-  &__sku-spec::after {
-    content: '·';
-    margin-left: 6px;
-    color: var(--nx-text-muted);
+  &__skulabel {
+    font-size: 12px;
+    color: var(--nx-text);
   }
 
-  &__sku-spec:last-of-type::after {
-    content: '';
+  &__skuoos {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 0 3px;
+    background: var(--nx-text-muted);
+    color: #fff;
+    font-size: 12px;
+    line-height: 14px;
   }
 
-  &__quantity {
-    margin: 18px 0;
+  &__qty {
+    margin: 14px 0;
   }
 
-  &__quantity-control {
+  &__qtyrow {
     display: flex;
     align-items: center;
-    gap: 8px;
-  }
-
-  &__quantity-input {
-    width: 64px;
-    height: 32px;
-    padding: 0 8px;
-    border: 1px solid var(--nx-border-strong);
-    border-radius: var(--nx-radius-control);
-    background: var(--nx-surface);
-    color: var(--nx-text);
-    text-align: center;
-    font-family: inherit;
+    gap: 12px;
   }
 
   &__actions {
     display: flex;
     gap: 10px;
-    margin-top: 20px;
+    margin-top: 16px;
   }
 
-  &__note {
-    margin-top: 14px;
-    max-width: 52ch;
-  }
+  &__services {
+    margin: 16px 0 0;
+    padding: 10px 0 0;
+    border-top: 1px dashed var(--nx-border);
+    list-style: none;
 
-  &__description {
-    margin-top: 36px;
-    padding-top: 20px;
-    border-top: 1px solid var(--nx-border);
-
-    p {
-      max-width: 80ch;
+    li {
+      padding: 2px 0;
       color: var(--nx-text-secondary);
-      font-size: 14px;
-      white-space: pre-wrap;
+      font-size: 12px;
+
+      &::before {
+        content: '·';
+        margin-right: 6px;
+        color: var(--nx-brand);
+        font-weight: 700;
+      }
+    }
+  }
+
+  &__disclaimer {
+    margin: 12px 0 0;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  &__desc {
+    margin-top: 14px;
+  }
+
+  &__desctext {
+    margin: 0;
+    max-width: 90ch;
+    color: var(--nx-text-secondary);
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+}
+
+/* -- quantity stepper: square, hairline-joined ----------------------------- */
+.qty {
+  display: flex;
+  border: 1px solid var(--nx-border-strong);
+
+  &__btn {
+    width: 28px;
+    height: 30px;
+    border: none;
+    background: var(--nx-surface-sunken);
+    color: var(--nx-text);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--nx-brand);
+    }
+
+    &:disabled {
+      color: var(--nx-text-muted);
+      cursor: not-allowed;
+    }
+  }
+
+  &__input {
+    width: 48px;
+    height: 30px;
+    border: none;
+    border-left: 1px solid var(--nx-border-strong);
+    border-right: 1px solid var(--nx-border-strong);
+    background: var(--nx-surface);
+    color: var(--nx-text);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: center;
+
+    &:focus {
+      outline: none;
     }
   }
 }
 
-@media (max-width: 820px) {
-  .product__layout {
+@media (max-width: 900px) {
+  .pdetail__main {
     grid-template-columns: 1fr;
+  }
+
+  .pdetail__stage {
+    height: 300px;
   }
 }
 </style>

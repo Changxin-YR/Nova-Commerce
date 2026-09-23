@@ -114,12 +114,12 @@ def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
     return f"{module}.{type(obj).__name__}()"
 
 
-def include_object(  # noqa: ARG001 - signature is fixed by the Alembic API
-    obj: object,
+def include_object(
+    obj: object,  # noqa: ARG001 - required by the Alembic hook signature
     name: str | None,
     type_: str,
     reflected: bool,
-    compare_to: object,
+    compare_to: object,  # noqa: ARG001 - required by the Alembic hook signature
 ) -> bool:
     """Exclude objects Alembic should not manage.
 
