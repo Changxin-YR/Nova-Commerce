@@ -30,7 +30,15 @@ GATE = Gate(
     # it - a gate that runs a subset of its own tests is a gate with a silent hole.
     test_target="tests/integration/refund",
     extra_targets=("tests/concurrency/test_refund_concurrency.py",),
-    marker="integration",
+    # "integration or concurrency", not "integration". The refund gate's concurrency
+    # probe is marked `concurrency` (the project's own vocabulary: integration =
+    # needs real infrastructure, concurrency = real parallel load against real MySQL),
+    # so `-m integration` DESELECTED it and the artifact reported PASS with 12
+    # assertions while the race for the last refundable amount was never exercised.
+    # Found by the verifier reading the artifact's own assertion list against the t6
+    # brief, which named that probe explicitly. FG-09 is marked the same way, so this
+    # is also the consistent choice.
+    marker="integration or concurrency",
     relevant_paths=(
         "backend/app",
         "backend/migrations",

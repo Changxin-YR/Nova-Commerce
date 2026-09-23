@@ -3,17 +3,17 @@
   "name": "Refund Invariants",
   "mandatory": true,
   "spec": "REQ-AFS-002 / section 46 - total refunded <= paid amount; item refund <= item payable amount; mandatory condition 3 of section 147",
-  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/refund tests/concurrency/test_refund_concurrency.py -v --no-header -p no:cacheprovider -m integration",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/refund tests/concurrency/test_refund_concurrency.py -v --no-header -p no:cacheprovider -m integration or concurrency",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T10:33:59.948299+00:00",
-  "duration_ms": 7538,
+  "timestamp": "2026-09-23T10:36:48.677261+00:00",
+  "duration_ms": 8559,
   "exit_code": 0,
-  "summary": "12 passed, 1 deselected in 5.69s",
+  "summary": "13 passed in 6.48s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "5f1574c03dc752c7c18312363e3def68b5c33c82\n",
-    "subject": "Phase 5 (verifier): final refund-gate adjustments at freeze\n",
+    "revision": "624a51ef9aee566ad1f173c572b52d4d9d237224\n",
+    "subject": "DDL artifact: LIKE copies CHECKs (renamed); AS SELECT copies none - correct an over-general claim\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -22,8 +22,11 @@
     ],
     "relevant_paths_dirty": false,
     "relevant_paths_dirty_files": [],
-    "other_paths_dirty": false,
-    "other_paths_dirty_files": []
+    "other_paths_dirty": true,
+    "other_paths_dirty_files": [
+      " M backend/tests/integration/aftersales/test_refund_workflow.py",
+      " M scripts/emit_fg12_evidence.py"
+    ]
   },
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
@@ -100,6 +103,12 @@
     },
     {
       "name": "test_the_workflow_revalidates_the_caps_against_locked_rows",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_concurrent_refunds_of_the_last_claimable_amount_settle_once",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true
