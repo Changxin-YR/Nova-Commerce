@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from app.core.errors import InternalError
 from app.modules.fulfillment.schemas import (
     FulfillmentItemOut,
     FulfillmentOut,
@@ -77,12 +78,30 @@ def _item_out(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentItemOut:
     endpoint would otherwise run one query per line - the N+1 that only becomes
     visible on an order that shipped in five packages with four lines each. The caller
     loads one mapping per page, which is the same rule the order module's
-    ``_fulfillment_out`` follows for ``shipments[]``.
+    ``_fulfillment_out`` follows for ``shipments[]``, and both raise the same way when
+    a line is missing from the map.
     """
+    sku_id = sku_by_line.get(row.order_item_id)
+    if sku_id is None:
+        # A package line referencing an order line that is not on the order. The FKs
+        # make it impossible for a real row, so this is corruption rather than an input
+        # problem, and it is raised rather than emitted as ``null``: ``sku_id`` is
+        # required by a frozen shape, so a null would be a silent contract violation on
+        # the console's read path. Matches ``order/serializers.py::_fulfillment_out``,
+        # which raises the same code with the same reason - the two read paths must not
+        # disagree about what a broken row does.
+        raise InternalError(
+            "a fulfillment item references an order line that is not on the order",
+            context={
+                "fulfillment_id": getattr(row, "id", None),
+                "order_item_id": row.order_item_id,
+                "mapped_lines": len(sku_by_line),
+            },
+        )
     return FulfillmentItemOut(
         id=row.id,
         order_item_id=row.order_item_id,
-        sku_id=sku_by_line[row.order_item_id],
+        sku_id=sku_id,
         product_name=row.product_name,
         sku_name=row.sku_name,
         quantity=row.quantity,
