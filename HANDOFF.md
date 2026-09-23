@@ -965,187 +965,211 @@ requirements), `docs/architecture/ORDER_WORKFLOW.md`, and start Phase 5.
 
 ---
 
-## 18. Session handoff - Phase 5 in flight (payment / fulfillment / after-sales / refund)
+﻿## 18. Session handoff - Phase 5 CLOSED, start Phase 6 here
 
-> Written mid-phase, deliberately, because the team's contexts were filling. **Read
-> 18.1 (state), 18.3 (measurement protocol) and 18.6 (remaining work) before
-> touching anything.** Section 18.3 is the one that will waste your afternoon if
-> you skip it.
+> Written at the end of Phase 5 for the next conversation. **Read 18.1 (state),
+> 18.2 (what is proven) and 18.5 (what is still open) first.** Section 18.4 is the
+> measurement protocol; it is the part of this phase that cost the most to learn.
 
 ### 18.1 Repository state
 
-* `HEAD = a01271e`, **pushed** - `origin/main == local`. The remote was switched
-  from HTTPS to SSH (`git@github.com:Changxin-YR/Nova-Commerce.git`) because HTTPS
-  to github.com:443 was intermittently unreachable; SSH authenticates as
-  `Changxin-YR` and works. `git push` over HTTPS is no longer the fallback anyone
-  should reach for - if a push fails, check `ssh -T git@github.com` first.
-* Twelve Phase 5 commits since `e6c0557`. Current top of the stack:
-  `a01271e` (captain), `7bb877d` (fulfillment), `104ef26` (data layer),
-  `9b01fbf` (payment), `6e3d6be`, `2e02614`, `1c1a72c`, `a785744`, `85e12d7`,
-  `c9eaac3`, `f0d564e`, `8601bb3`.
-* `pytest tests` reached **1082 passed / 0 failed** at `7bb877d`, then
-  **1034 passed / 0 failed excluding after-sales** at `a01271e` while
-  `tests/integration/aftersales/conftest.py` was mid-refactor. See 18.6 item 1.
-* `ruff check app tests migrations` clean. `alembic check` clean,
-  `alembic current = 3f1ae2c55c54 (head)`, all seven Phase 5 tables present.
-* `docker compose ps` = 5/5 healthy.
-* Frontend: `npm test` 292 passed, `vue-tsc --noEmit` clean, `vite build` green.
-* **Known local artifact:** `c9eaac3` is a four-file partial commit from a
-  concurrent `git reset`; `a785744` is the real data-layer commit. Both are
-  pushed. Not squashed (rewriting history under four writers is the bigger risk);
-  it is a history wart, not a content problem.
+* `HEAD = ecf361f`, **pushed**, `main...origin/main` clean (no ahead/behind), working
+  tree clean.
+* **85 commits** since Phase 4's `e6c0557`.
+* `pytest tests` -> **1102 passed, 0 failed**.
+* `ruff check --no-cache app tests migrations` -> clean. **Use `--no-cache`**: a cached
+  run reported zero while three errors were live, and it cost two people a round trip.
+* `alembic current` -> `3f1ae2c55c54` (head); `alembic check` -> no new operations.
+* `docker compose --env-file .env -f ops/docker-compose.yml ps` -> 5/5 healthy.
+* The remote is **SSH** (`git@github.com:Changxin-YR/Nova-Commerce.git`). HTTPS to
+  github.com:443 is intermittent here; if a push hangs, check `ssh -T git@github.com`
+  before troubleshooting anything else.
 
-### 18.2 What Phase 5 delivered
+### 18.2 Both mandatory gates PASS
 
-| Domain | Modules | Committed |
+```
+FG-11  artifacts/evidence/concurrency/fg11_payment_idempotency.json
+       verdict=PASS  11 assertions  rev=0e2b0ec   relevant_paths_dirty=False
+FG-12  artifacts/evidence/integration/fg12_refund_invariants.json
+       verdict=PASS  13 assertions  rev=62cad40   relevant_paths_dirty=False
+```
+
+What they prove:
+
+* **FG-11** - ten concurrent deliveries of ONE provider event on real MySQL produce
+  exactly one payment confirmation, one `ORDER_DEDUCT` per line, one fulfillment shell,
+  one `PENDING_PAYMENT -> PROCESSING` log, and one `PROCESSED` callback row. Plus the
+  negative controls: a *distinct* event id against a settled payment, a CLOSED attempt,
+  an unsigned delivery, and an amount mismatch.
+* **FG-12** - four modules: the three refund caps against the **live** tables (a
+  violating UPDATE inside a SAVEPOINT, errno 3819, the real constraint name, and a
+  byte-identical re-read on a **separate** connection), the workflow caps that have no
+  database mirror, the fulfillment quantity guard at full width and across two packages,
+  and the two-thread race for the last refundable amount.
+
+Both artifacts record a revision AND assert the paths they depend on were clean at it.
+**Re-emit after the last code commit, never before** - see 18.4.
+
+Also read `artifacts/evidence/integration/phase5_ddl_verification.md` sections 6 and 9:
+its own "what this does not prove" section is more useful than its findings.
+
+### 18.3 What Phase 5 delivered
+
+| Domain | Modules | Endpoints |
 |---|---|---|
-| payment | `payments` + `payment_callbacks`, `PaymentSuccessWorkflow`, `/payments/{customer,callbacks,admin}` | yes |
-| fulfillment | `fulfillments` + `fulfillment_items`, ship path, multi-package, `/fulfillments/*` | yes |
-| data layer | six tables, one migration, DDL verification, shared seed | yes |
-| after-sales | claims + `RefundWorkflow` + `/after-sales/*` | **NO - untracked** |
+| payment | `payments` + `payment_callbacks`, `PaymentSuccessWorkflow`, provider HMAC + payload filtering | 6 |
+| fulfillment | `fulfillments` + `fulfillment_items`, shell, ship, multi-package | 3 |
+| after-sales | claims + `RefundWorkflow` + both caps | 8 |
+| data layer | six tables, one migration, DDL read-back, shared seed, residue tool | - |
 
-Frozen contract surface: `API_CONTRACT.md` section 15 (payment object + callback
-HMAC contract, fulfillment queue, after-sale/refund objects, the two caps) and
-section 15.8 (`refundable_amount` on the order list rows).
+Frozen surfaces: `API_CONTRACT.md` section 15 (payment object, callback contract,
+fulfillment queue, after-sale/refund objects, the caps) and section 15.8
+(`refundable_amount` on the order list rows). Internal contract: `PHASE5_DESIGN.md`.
 
-### 18.3 MEASUREMENT PROTOCOL - read this before you trust any number
+Per-member handoffs, each written by its author for exactly this purpose:
 
-Full text in `docs/architecture/PHASE5_DESIGN.md` section 13. The short version,
-because every item cost a real hour:
+* `docs/handoff/phase5-payment-workflow.md`
+* `docs/handoff/phase5-data-layer.md`
+* `docs/handoff/phase5-after-sales.md`
+* `docs/handoff/phase5-contract-contradictions.md` - read this before implementing
+  anything from `PROJECT_BASELINE.yaml`; it names two baseline/design divergences and,
+  more usefully, states the boundary of what it checked.
 
-1. **One test process at a time.** Two `pytest` runs against the shared MySQL
-   produce errors that do not exist. A concurrent pair turned a 3.5-second FG-11
-   gate into a 60-second run with 3 deadlock failures - which looked exactly like a
-   flaky gate and was my own contention.
-2. **The suite is database-state dependent.** Same code, back to back:
-   `1072 passed / 0 failed` on a cleared DB, `10 failed / 3 errors` on a dirty one.
-   A failing test skips its teardown, and orphaned default warehouses shadow
-   merchant-scoped resolution. **Run `scripts/db_residue_report.py` first and record
-   the counts with the reading.** This produced false failures for three people.
-3. **A failure must be re-confirmed in isolation before it is believed** - and the
-   opposite error also happened: six failing fulfillment tests were blamed on
-   residue when the real cause was a genuine flush-ordering defect. **Suspect the
-   code first, the database second, and check both.**
-4. **Every defect report names `git rev-parse --short HEAD`**, and you re-run at
-   HEAD before telling another owner their file is broken. Five reports were filed
-   against the same pre-commit snapshot today.
-5. **Evidence is emitted from a clean tree only.** `scripts/gate_evidence.py`
-   records the revision and refuses a PASS when the tested paths are dirty.
+### 18.4 MEASUREMENT PROTOCOL - read this before you trust any number
 
-### 18.4 Gate status - BOTH MANDATORY GATES PASS
+Full text in `PHASE5_DESIGN.md` section 13. It exists because this phase produced a
+day's worth of false signals, every one of them honest:
 
-    FG-11  artifacts/evidence/concurrency/fg11_payment_idempotency.json
-           verdict=PASS  11 assertions  exit 0   revision recorded, relevant paths clean
-    FG-12  artifacts/evidence/integration/fg12_refund_invariants.json
-           verdict=PASS  12 assertions  exit 0   revision recorded, relevant paths clean
+1. **One test process at a time.** Four `pytest` processes on one `nova` schema produced
+   failures on rows a fixture had *just committed*. The tell is that **the failing set
+   moves between runs** and the tests pass in isolation - a deterministic bug does not
+   behave that way.
+2. **The migration can be downgraded mid-run.** One observed reading showed every Phase 5
+   table MISSING with `alembic current` at Phase 4's revision, surfacing as
+   `1146 Table 'nova.payments' doesn't exist`. That looks like a catastrophic code fault
+   and is not. **Check `alembic current` before any re-run.**
+3. **The suite is database-state dependent.** Same code: `1102 passed / 0 failed` on a
+   clean DB, `10 failed / 3 errors` on a dirty one, because a failing test skips its
+   teardown. Run `python scripts/residue.py` first and quote its line with the number -
+   and note that `residue: 0` is only meaningful alongside the concurrency state.
+4. **A defect report carries: the commit, the file hash, the path, and only then a
+   traceback if the hashes match.** `Get-FileHash <file> -Algorithm MD5` distinguishes
+   *different revision* from *different file*; four reports against one module were
+   settled in one exchange by that comparison alone. If you cannot reproduce your own
+   finding at HEAD, **say so and drop it** - a stale report costs the owner the same turn
+   whether or not it carries a caveat.
+5. **Reversal instructions need `git grep` for CONSUMERS, not just the symbol.** The
+   symbol existing tells you it is implemented; the consumers tell you whether removal is
+   a one-file edit or a coordinated multi-module one. Acting without that check is how
+   five reversals on one column produced two invalidated gate emissions and a schema
+   repair.
+6. **A correlation that CONFIRMS your theory is when to be most suspicious.** Two people
+   with the most evidence misattributed a real defect this phase - once to database
+   residue, once to a stale cache - because the correlation pointed the same way as the
+   hypothesis.
+7. **A file that contributes zero tests is invisible.** Check `--collect-only` against the
+   files on disk; one probe this phase was named so pytest would not collect it even by
+   name, and its three cases "passed" while measuring nothing. And a guard never observed
+   failing is a guard nobody has shown works: mutate it.
 
-FG-11 drives ten concurrent deliveries of one provider event on real MySQL. FG-12 runs
-the verifier's four modules - the three live-table caps, the workflow caps that have no
-database mirror, the fulfillment quantity guard, and the two-thread race for the last
-claimable amount - and it runs all four because a gate that runs a subset of its own
-tests is a gate with a silent hole.
+### 18.5 What is still open
 
-Both artifacts assert that the paths each gate depends on were **clean** at the revision
-they record, so each is a claim about an identifiable tree rather than about whatever
-was in the working directory.
+**Known, measured, worth fixing early:**
 
-**Emit them only with the other writers stopped.** Section 13.6b: four concurrent
-`pytest` processes on one schema produce failures on rows a fixture has just created,
-and an emitter running through that would record interference as a defect.
+1. **`purge_shop`'s delete order can raise `1451`.** `after_sale_items.order_item_id` ->
+   `order_items.id` is `RESTRICT`, and an intermittent
+   `(1451, ... fk_after_sale_items_order_item_id_order_items)` was measured when
+   `tests/integration/commerce` and `tests/integration/aftersales` ran in one process
+   (4 runs: 36 / 1 failed / 2 failed / 36). **I could not reproduce it in 3 further
+   runs**, so treat it as intermittent rather than fixed: if a full-suite run shows 1-2
+   errors that vanish on re-run, check this first.
+   The fix is data-layer's file: audit `purge_shop` so every child of `order_items` and
+   `orders` is deleted before its parent (`after_sale_items`, `refunds`,
+   `fulfillment_items`, `order_status_logs`). Do **not** act on
+   `phase5-data-layer.md` section 8 as written - it points at the FG-12 probes, and the
+   verifier showed those are insulated (function-scoped shop, fresh merchant per test)
+   and 10/10 stable.
+2. **Per-process schema isolation.** Nothing isolates the database between concurrent
+   runs; the freeze window is currently the only protection. A distinct
+   `MYSQL_DATABASE` per process, or serialised runs, is the durable fix and the
+   highest-value infrastructure change available.
+3. **Two caps have no database mirror**: the per-line cumulative refund cap, and
+   `after_sales.refunded_amount <= approved_amount`. A defect there raises no database
+   error, which is why they get adversarial probes.
 
----
+**Documentation:**
 
-#### Original plan, kept for the reasoning
+4. **`REQ-PAY-001` wording.** The baseline says `payments: payment_no UNIQUE`; the schema
+   scopes it to `(merchant_id, payment_no)`, which is correct for a multi-merchant
+   deployment. Correct the baseline wording rather than adding a redundant global unique.
+5. **`c9eaac3` is a 4-file partial commit** from a concurrent `git reset`; `a785744` is
+   the real one. A history wart, pushed, not squashed - rewriting history under four
+   writers was judged the bigger risk.
 
-### 18.4 Gate status
+**Limits of the evidence, stated by its own authors:**
 
-* **FG-11 (mandatory) - green, evidence NOT yet valid.** The gate passes and was
-  re-run 5/5 in isolation. The artifact currently on disk reports FAIL for one
-  honest reason: the tested paths were dirty relative to the revision. It was also
-  originally emitted from a revision later found flaky (deadlocks in teardown).
-  **Re-emit from a clean tree at the final commit** -
-  `python scripts/emit_fg11_evidence.py`.
-* **FG-12 (mandatory) - not yet read.** It waits on after-sales' suite and the
-  verifier's independent test. The verifier has already refused the existing
-  `phase5_ddl_verification.md` section 7 controls as FG-12 evidence, **correctly**:
-  they exercise synthetic twins, so they would stay green if the live tables
-  lacked the caps. The approved construction is a violating `UPDATE` against the
-  **live** table inside a SAVEPOINT, asserting errno 3819 and the real constraint
-  name, with the row re-read on a separate connection.
+6. FG-12's concurrency probe has passed 10 consecutive runs; FG-11's gate 6/6. Neither
+   has been run hundreds of times or with parallel processes, so flakiness is *bounded,
+   not eliminated*.
+7. No real (non-MOCK) payment provider is exercised; `API_CONTRACT.md` section 15.7
+   leaves that unfrozen.
+8. The DDL evidence's negative controls use twins for the *clause*; the live-table
+   enforcement claim comes from the verifier's module. Both are needed, and the artifact
+   labels which is which.
 
-### 18.5 Two contract contradictions found, and the sweep that will find the rest
+### 18.6 Decisions that must not be re-opened silently
 
-The design document and the baseline disagree in at least four places, and each
-one cost a round trip to adjudicate: `aftersales/enums.py` ownership, the
-`payment/models.py` ownership row, the carrier vocabulary, and `sku_id`.
+Each of these cost real turns to settle. If you disagree with one, say so explicitly and
+say what changes - do not "tidy" it.
 
-**The rule, now recorded in the design doc: `PROJECT_BASELINE.yaml` outranks
-`PHASE5_DESIGN.md`.** The `sku_id` case is the instructive one - the design listed
-`sku_id FK RESTRICT`, REQ-FUL-002 does not, data-layer refused the column and was
-right. `sku_id` is a *response* field, derived on the read path from
-`order_items.sku_id` (a snapshot table, so INV-014 is untouched, and free because
-`to_detail` uses the already-loaded `order.items`). One resolution path, no
-fallback.
-
-A mechanical diff of the baseline's Phase 5 REQ-* entries against the design and
-the contract was approved as the last read-only task of the phase; its output goes
-to `docs/handoff/phase5-contract-contradictions.md`. **Check whether that file
-exists before assuming the reconciliation is done.**
-
-### 18.6 Remaining work, priority-ordered
-
-1. **After-sales' `conftest.py` blocks collection of the whole suite**
-   (`ImportError: load_claim`, `available_stock`). Nothing can be measured until it
-   is fixed. Then: the three cap tests must assert **which cap** refused
-   (`REFUND_EXCEEDS_PAID_AMOUNT` 80004 vs `REFUND_EXCEEDS_ITEM_AMOUNT` 80005),
-   `refunds.py` has a dead store at ~line 170, and `aftersales/enums.py` should
-   re-export the carrier list from `fulfillment/enums.py`.
-2. **DB isolation (t8)** - make a test's seed self-cleaning **on failure**
-   (`addfinalizer`), scoped to the rows it created, plus the read-only residue
-   report. Proof: run the suite twice and show the second reading equals the first.
-   Worth more than anything else on this list, because without it no reading is
-   trustworthy.
-3. **FG-12**: after-sales green -> verifier's live-table gate test -> I emit
-   `artifacts/evidence/integration/fg12_refund_invariants.json`.
-4. **t7 leftovers**: `test_seed_smoke.py` was never restored, so `paid_order` - the
-   helper that drives the **real** payment path and that design section 12 promises
-   every Phase 5 test uses - is referenced only by its own definition. Nothing
-   exercises it.
-5. **Commit after-sales** (all of `app/modules/aftersales/**` and its tests are
-   untracked) and re-run ruff.
-6. Freeze -> clean tree -> emit FG-11 and FG-12 -> write the closing section ->
-   push.
-
-### 18.7 Decisions that must not be re-opened silently
-
-* **`fulfillment_items` has no `sku_id` column** (REQ-FUL-002). Derived on read.
-* **`fulfillment_status` is a rollup over all packages and shipping never moves
-  `order_status`.** "Can this be shipped?" reads `fulfillment_status`.
+* **`fulfillment_items.sku_id` EXISTS** and both read paths read the column.
+  `REQ-FUL-002` enumerates **required** columns, not an exhaustive set - it also omits
+  `id`, `created_at`, `updated_at`, `product_name` and `sku_name`, which the table has.
+  Two paths deriving it while the column existed was the one genuinely bad state; one
+  rule in both modules is the settled one.
+* **The baseline outranks `PHASE5_DESIGN.md`.** The design is the captain's working
+  document; the baseline is the machine-readable contract.
+* **A refund does NOT write `orders.fulfillment_status`.** A returned parcel was
+  delivered *earlier*, by a delivery fact; the refund writing `DELIVERED` would be money
+  movement asserting a logistics fact (section 31's axis separation).
 * **An approved after-sale claim does NOT move `orders.after_sale_status`** - only
-  `RefundWorkflow` does, because that axis is money, not a business claim.
-* **Refund per-line shares are weighted by each line's REMAINING capacity**, not by
-  its original payable. The design text said otherwise and was wrong.
-* **Mock payment surfaces are `{dev, test}` only** - `AppEnv` has no `demo`, and an
-  unreachable member in a security guard was removed rather than added.
-* **The router mounts sub-modules at the module prefix**; each sub-router spells
-  its own sub-path. Changing that breaks every frozen route.
-* **`created` evidence is a claim about a revision** - see 18.3 item 5.
+  `RefundWorkflow` does, because that axis is money.
+* **Shipping never moves `order_status`.** "Can this be shipped?" reads
+  `fulfillment_status`, which is a rollup over all packages.
+* **Per-line refund shares are weighted by each line's REMAINING capacity**, and the
+  split must partition the refund (`sum(shares) == amount`). The design text said
+  otherwise and was wrong.
+* **`REFUND_EXCEEDS_PAID_AMOUNT` (80004) is unreachable through the workflow** -
+  `sum(line.payable) == payment.paid_amount` makes cap 2 imply it. Do not write a gate
+  assertion expecting 80004 from that path; assert the identity that makes it
+  unreachable, plus the inclusive boundary (`refunded == paid` is ACCEPTED).
+* **`CHECK` constraints are hand-written and Alembic cannot see their changes.** After
+  any schema edit, read `information_schema.CHECK_CONSTRAINTS` (join
+  `TABLE_CONSTRAINTS` - `CHECK_CONSTRAINTS` has no `TABLE_NAME` on MySQL 8.4) rather than
+  trusting a migration exit code.
+* **`ALTER TABLE` implicitly commits** and a savepoint cannot roll it back. A DDL
+  meta-control belongs on a table the test owns outright.
+* **Mock payment surfaces are `{dev, test}` only.** `AppEnv` has no `demo` member.
 
-### 18.8 First commands for the new conversation
+### 18.7 First commands for the new conversation
 
 ```powershell
 cd C:\Users\27363\Desktop\store
 git log --oneline -6
-git status --short
-ssh -T git@github.com                          # SSH is the working remote
+git status -sb                                   # confirm in sync with origin
+ssh -T git@github.com                            # SSH is the working remote
 cd backend
-& ..\.venv\Scripts\python.exe ..\scripts\db_residue_report.py   # record the DB state
-& ..\.venv\Scripts\python.exe -m pytest tests -q                # note the counts, with the residue
-& ..\.venv\Scripts\python.exe -m ruff check app tests migrations
+& ..\.venv\Scripts\python.exe -m alembic current          # is the schema at head?
+& ..\.venv\Scripts\python.exe ..\scripts\residue.py       # record this line with any reading
+& ..\.venv\Scripts\python.exe -m pytest tests -q          # expect ~1102 passed
+& ..\.venv\Scripts\python.exe -m ruff check --no-cache app tests migrations
 & ..\.venv\Scripts\python.exe -m alembic check
 cd .. ; docker compose --env-file .env -f ops/docker-compose.yml ps
 ```
 
-Then read: this section, `docs/architecture/PHASE5_DESIGN.md` section 13, any file
-in `docs/handoff/`, and `artifacts/evidence/integration/phase5_ddl_verification.md`
-sections 6 and 9 (its own honest limits).
+Then read, in this order: `PROJECT_BASELINE.yaml` (the Phase 6 requirements),
+`docs/architecture/API_CONTRACT.md` (section 15 for what Phase 5 froze),
+`docs/architecture/PHASE5_DESIGN.md` section 13, this section, and the four
+`docs/handoff/phase5-*.md` files. Phase 6 is **Marketing + Analytics + Outbox**, and its
+first task is the outbox seam - marked, unmoved, and waiting in two places:
+`CreateOrderWorkflow` step 9 and `PaymentSuccessWorkflow` step 10.
