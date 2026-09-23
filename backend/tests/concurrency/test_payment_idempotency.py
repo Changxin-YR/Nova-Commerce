@@ -52,6 +52,7 @@ from dataclasses import dataclass
 
 import pytest
 from sqlalchemy import event, select, text
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.core.errors import ErrorCode
@@ -95,6 +96,71 @@ LINE_QUANTITIES = (2, 3)
 UNIT_PRICES = (1999, 2999)
 
 PASSWORD = "Correct-Horse-Battery-9"
+
+
+#: How many times a fixture-level transaction is retried when MySQL resolves a lock-order
+#: conflict by killing it. See :func:`_retry_on_deadlock`.
+_FIXTURE_ATTEMPTS = 4
+
+#: MySQL error numbers that mean "this transaction lost a lock race and must be restarted".
+#: 1213 is a deadlock victim; 1205 is the lock-wait timeout. Both are *transient*: the
+#: statements of the losing transaction are rolled back, so the caller's response is to run
+#: the whole unit of work again, which is exactly what a real API client does.
+_TRANSIENT_LOCK_ERRORS = (1213, 1205)
+
+
+def _retry_on_deadlock(operation, *, what: str, attempts: int = _FIXTURE_ATTEMPTS):
+    """Run ``operation`` in its own transaction, retrying on a MySQL lock conflict.
+
+    ## Why this is needed at all, and why it is not papering over a defect
+
+    This file's fixture writes and deletes rows while other suites' rows and indexes are
+    live in the same schema. InnoDB resolves a lock-order conflict by choosing a victim and
+    raising 1213 - the connection is expected to restart the transaction, which is why the
+    server's own message says "try restarting transaction". Under that load the fixture
+    deadlocked on an ``INSERT INTO inventories``; earlier the teardown deadlocked on a
+    ``DELETE``. Both are properties of shared InnoDB state, not of the payment logic.
+
+    The retry is at the *operation* level rather than around individual statements because
+    a deadlock rolls back the whole transaction: re-running one statement would leave the
+    rest undone, which is how a retry turns into silent corruption.
+
+    It cannot mask a broken assertion. The gate's own assertions run after this helper has
+    already returned a committed fixture, and a retry can only reach a state the database
+    permits - if two settlements really did apply, the assertions that count effects would
+    still see two.
+
+    Each attempt gets a **fresh marker**, so a partially written attempt cannot collide with
+    the next one on ``uq_orders_merchant_order_no`` or the fixture's unique identifiers.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    last: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return operation(attempt)
+        except OperationalError as exc:
+            origin = getattr(exc, "orig", None)
+            if origin is None or origin.args[0] not in _TRANSIENT_LOCK_ERRORS:
+                raise
+            last = exc
+            time.sleep(0.15 * attempt)
+        except IntegrityError as exc:
+            # A duplicate key on the *fixture's* own unique identifier means the previous
+            # attempt's rows are still present (the rollback of a deadlocked transaction
+            # can leave nothing, but a flush that succeeded before the deadlock may have
+            # been committed by a sibling). Retrying with a fresh marker resolves it; a
+            # duplicate that is not ours is re-raised by the same check on the last try.
+            origin = getattr(exc, "orig", None)
+            if origin is None or origin.args[0] != 1062:
+                raise
+            last = exc
+            time.sleep(0.15 * attempt)
+
+    assert last is not None
+    raise RuntimeError(
+        f"{what} did not complete after {attempts} attempts; the last failure was {last!r}"
+    )
 
 
 def _payload(*, payment_no: str, order_no: str, amount: int, transaction_no: str) -> dict:
@@ -180,7 +246,7 @@ def engine():
     return configure_database()
 
 
-def _seed(marker: str) -> Gate:
+def _seed_once(marker: str) -> Gate:
     """Create and **commit** one order with a reserved, in-flight payment attempt.
 
     Committed rather than rolled back on purpose: the worker threads open their own
@@ -437,7 +503,6 @@ def _purge(gate: Gate) -> None:
     ``warehouses``, ``fulfillments`` RESTRICTs on ``orders``, and a reflection-driven
     order would be correct by luck on one schema and wrong on the next.
     """
-    from sqlalchemy.exc import OperationalError
 
     factory = get_session_factory()
     statements = (
@@ -473,41 +538,100 @@ def _purge(gate: Gate) -> None:
          {"merchant_id": gate.merchant_id}),
     )
 
-    last: OperationalError | None = None
-    for attempt in (1, 2, 3):
+    def run(_attempt: int) -> None:
         session = factory()
         try:
             for sql, params in statements:
                 session.execute(text(sql), params)
             session.commit()
-            return
-        except OperationalError as exc:
-            session.rollback()
-            # 1213 is a deadlock victim; 1205 is the lock-wait timeout. Both mean "this
-            # transaction lost a race, restart it", and both are expected in a suite that
-            # runs ten threads against one database.
-            if getattr(exc, "orig", None) is None or exc.orig.args[0] not in (1213, 1205):
-                raise
-            last = exc
-            time.sleep(0.1 * attempt)
         finally:
             session.close()
 
-    # Three attempts, all deadlocked. Raising the last one is better than swallowing it:
-    # a suite that leaves rows behind makes the *next* run behave differently, and a
-    # difference nobody can attribute is worse than a failure somebody can read.
-    if last is not None:
-        raise last
+    # The retry lives in `_retry_on_deadlock` rather than in a loop here, so the fixture's
+    # write side and its cleanup side cannot drift apart: both are the same "restart the
+    # transaction on 1213/1205" contract, and two copies would be two places to get wrong.
+    _retry_on_deadlock(run, what=f"FG-11 teardown of {gate.marker}")
+
+
+def _purge_orphan_marker(marker: str) -> None:
+    """Delete the merchant row a **failed** seed attempt may have left behind.
+
+    ``_seed`` retries with a fresh marker, which is what stops a half-written attempt from
+    colliding with its successor - but a merchant row can be committed before the conflict
+    that killed the rest of its transaction, and the gate fixture holds no object for an
+    attempt that failed. So orphans are found by the code the seed stamps on them
+    (``FG11<marker>``, bounded to the column's 24 characters) and deleted when no order was
+    written under them.
+
+    Why this is more than tidiness: ``test_the_gate_fixture_is_isolated`` asserts exactly one
+    order for the fixture's merchant. A leftover merchant would not fail that assertion
+    directly, but any future assertion counting merchants, users or products for the run
+    would see a number that depends on whether an earlier attempt happened to deadlock - and
+    a suite whose second run differs from its first is a suite nobody trusts.
+
+    Deliberately narrow: it deletes the merchant only, and only when ``orders`` is empty for
+    it. A merchant that owns rows is left alone, because that shape means the seed got far
+    enough for ``_purge`` to have something to work with, and guessing at an unknown partial
+    state is how a cleanup helper deletes a neighbouring test's data.
+    """
+    factory = get_session_factory()
+    code = f"FG11{marker}"[:24]
+
+    def run(_attempt: int) -> None:
+        session = factory()
+        try:
+            merchant_id = session.execute(
+                text("SELECT id FROM merchants WHERE code = :code"), {"code": code}
+            ).scalar()
+            if merchant_id is None:
+                return
+            has_orders = session.execute(
+                text("SELECT COUNT(*) FROM orders WHERE merchant_id = :m"), {"m": merchant_id}
+            ).scalar()
+            if int(has_orders or 0) == 0:
+                session.execute(
+                    text("DELETE FROM merchants WHERE id = :m"), {"m": merchant_id}
+                )
+            session.commit()
+        finally:
+            session.close()
+
+    _retry_on_deadlock(run, what=f"FG-11 orphan cleanup for {marker}")
+
+
+def _seed() -> tuple[Gate, list[str]]:
+    """Seed one gate, retrying on a transient lock conflict with a **fresh marker**.
+
+    A fresh marker per attempt is what makes the retry safe: the identifiers (``order_no``,
+    ``payment_no``, merchant code) embed it, so a half-written attempt cannot collide with
+    its successor on ``uq_orders_merchant_order_no`` or the fixture's own uniques.
+
+    The markers tried are returned alongside the gate because a **failed** attempt may have
+    committed its merchant row before the conflict killed the rest of its transaction - and
+    a marker whose rows are left behind would make the next run's counts differ from this
+    one's. The caller purges every attempted marker, not just the successful one.
+    """
+    markers: list[str] = []
+
+    def attempt_seed(attempt: int) -> Gate:
+        marker = f"{uuid.uuid4().hex[:8].upper()}A{attempt}"
+        markers.append(marker)
+        return _seed_once(marker)
+
+    gate_obj = _retry_on_deadlock(attempt_seed, what="FG-11 seed")
+    return gate_obj, markers
 
 
 @pytest.fixture
 def gate(engine) -> Iterator[Gate]:
-    marker = uuid.uuid4().hex[:8].upper()
-    seeded = _seed(marker)
+    seeded, attempted_markers = _seed()
     try:
         yield seeded
     finally:
         _purge(seeded)
+        for marker in attempted_markers:
+            if marker != seeded.marker:
+                _purge_orphan_marker(marker)
 
 
 # ---------------------------------------------------------------------------
