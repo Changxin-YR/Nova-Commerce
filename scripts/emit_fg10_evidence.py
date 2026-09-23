@@ -51,9 +51,17 @@ PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
 #: The frozen FG-10 target, owned by the order-flow implementer (task t3). This
 #: emitter deliberately does not create it: a gate that supplies its own test is
 #: no longer an independent check.
-TEST_FILE = BACKEND / "tests" / "integration" / "order" / "test_order_workflow.py"
+#:
+#: FROZEN AS A DIRECTORY, not a single module. PHASE4_DESIGN section 11 described the
+#: FG-10 core as one module, but the implementation split it across several
+#: (test_create_order, test_inv006_allocation, test_idempotency, test_status_transitions,
+#: test_reads, test_http_smoke, test_data_layer_schema, test_db_constraints_are_enforced).
+#: Targeting the directory is the stricter choice: every integration module on real
+#: MySQL contributes its assertions to the gate, so a module that is added later cannot
+#: silently sit outside FG-10.
+TEST_FILE = BACKEND / "tests" / "integration" / "order"
 #: Repo-relative form for the recorded command, so the artifact is readable.
-TEST_TARGET = "tests/integration/order/test_order_workflow.py"
+TEST_TARGET = "tests/integration/order"
 
 #: PROJECT_BASELINE.yaml names this exact path as the FG-10 proof.
 XML_OUT = ROOT / "artifacts" / "evidence" / "integration" / "fg10_workflow.xml"
@@ -195,8 +203,8 @@ def main(argv: list[str] | None = None) -> int:
         "--test-target",
         default=TEST_TARGET,
         help=(
-            "pytest target, relative to backend/ (default: the frozen FG-10 test module). "
-            "Use this if the implementer's module lands under a different name."
+            "pytest target, relative to backend/ (default: the frozen FG-10 directory). "
+            "Use this to override, e.g. to re-run one module in isolation."
         ),
     )
     parser.add_argument(
