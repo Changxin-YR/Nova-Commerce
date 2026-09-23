@@ -234,6 +234,36 @@ class FulfillmentService:
         repository's ``UNIQUE (merchant_id, fulfillment_no)`` cannot catch that (the
         second row would have a different identifier), so the guard is here.
 
+        A retry that *raised* instead of returning would be worse, not stricter: the
+        settlement retry would roll back the replayed deduction and leave a paid order
+        holding locked stock with no package.
+
+        ## The guard is check-then-act, so this method takes the order lock itself
+
+        "Is there a shell?" and "insert one" are two statements, and no constraint
+        covers the gap: a partial unique index (one ``UNFULFILLED`` row per order) is
+        not expressible in MySQL 8, and ``uq_fulfillments_merchant_fulfillment_no``
+        cannot help because two racing inserts carry *different* identifiers. Without
+        serialisation two callers both read "no shell" and both insert - **measured:
+        8 concurrent calls produced 8 shells and 8 item rows for one order.**
+
+        It was previously serialised only by the payment workflow's
+        ``SELECT ... FOR UPDATE`` on the order row, i.e. by a lock taken in *another
+        module*. That holds for the settlement path (FG-11 exercises it under 10-way
+        concurrency) but it is an invisible precondition: any future caller - an admin
+        repair path, a re-ship tool, a data migration - that did not happen to lock the
+        order first would silently create duplicate packages, and nothing would reject
+        them.
+
+        So the lock is taken **here**, on the order row, which makes the guard correct
+        on its own terms rather than on its caller's discipline. It is a re-entrant
+        no-op for the settlement path, which already holds that exact row lock in the
+        same transaction (the lock is owned by the transaction, not the statement), so
+        the hot path pays nothing and the wrong caller becomes impossible rather than
+        merely discouraged. Locking the order first also matches the aggregate's own
+        order: the order is the parent, and taking it before any child row keeps
+        lock acquisition one-directional.
+
         ``warehouse_id`` is required and non-nullable on the table: it is the
         reconciliation target for the stock ledger (INV-007), and a package that
         cannot name its warehouse cannot be reconciled against the deduction. The
@@ -250,6 +280,11 @@ class FulfillmentService:
                 "a fulfillment shell needs at least one order line",
                 context={"order_no": order.order_no},
             )
+
+        # Serialise every caller of this method on the order row before deciding
+        # anything (HANDOFF section 7: decide inside the lock, not before it). See the
+        # docstring for why this belongs here rather than in the caller.
+        self._lock_order(order.id)
 
         existing = self._unshipped_shell_for(order.id)
         if existing is not None:
@@ -487,6 +522,24 @@ class FulfillmentService:
         return FulfillmentPage(rows=rows, total=total)
 
     # -- internals -------------------------------------------------------
+    def _lock_order(self, order_id: int) -> None:
+        """Take ``SELECT ... FOR UPDATE`` on the order row for this transaction.
+
+        Called by ``create_shell`` before its check-then-act guard, so concurrent
+        callers are serialised whether or not they took the lock themselves. A
+        re-entrant no-op when the caller already holds it, because row locks belong to
+        the transaction rather than to the statement - which is why this is safe to add
+        under the settlement path.
+
+        Deliberately re-reads the row rather than trusting the ``order`` instance the
+        caller passed: an uncommitted or stale instance is not evidence that the
+        database agrees, and the point of the lock is to make the *database's* view
+        authoritative for the duplicate check that follows.
+        """
+        from app.modules.order.repository import OrderRepository
+
+        OrderRepository(self._session).get(order_id, for_update=True)
+
     def _unshipped_shell_for(self, order_id: int) -> Fulfillment | None:
         """The order's existing ``UNFULFILLED`` shell, if it has one.
 
