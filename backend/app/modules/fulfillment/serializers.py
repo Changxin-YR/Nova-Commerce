@@ -108,7 +108,7 @@ def _item_out(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentItemOut:
     )
 
 
-def to_fulfillment(row: Any, sku_by_line: Mapping[int, int] | None = None) -> FulfillmentOut:
+def to_fulfillment(row: Any, sku_by_line: Mapping[int, int]) -> FulfillmentOut:
     """Project one fulfillment ORM row into the frozen shape.
 
     ``carrier``/``tracking_no``/``shipped_at`` are ``None`` until shipped and are
@@ -116,7 +116,7 @@ def to_fulfillment(row: Any, sku_by_line: Mapping[int, int] | None = None) -> Fu
     "no tracking number" from "an empty tracking number", and a placeholder would
     erase that distinction on the wire.
     """
-    mapping: Mapping[int, int] = sku_by_line or {}
+    mapping: Mapping[int, int] = sku_by_line
     items = [_item_out(line, mapping) for line in (getattr(row, "items", None) or ())]
     return FulfillmentOut(
         id=row.id,
@@ -139,7 +139,7 @@ def to_page(
     page: int,
     page_size: int,
     total: int,
-    sku_by_line: Mapping[int, int] | None = None,
+    sku_by_line: Mapping[int, int],
 ) -> FulfillmentPageOut:
     """The paged envelope payload of section 3 (``items`` + ``meta``).
 
@@ -148,9 +148,17 @@ def to_page(
     ``len(rows)`` would silently report every page as the last one.
 
     ``sku_by_line`` covers **every line on the page**, resolved in one query by the
-    caller.
+    caller, and is a **required** parameter rather than one defaulting to ``None``.
+
+    That is deliberate. Defaulting it would have made the signature advertise an
+    optional dependency the body cannot honour: an omitted map resolves to "no line
+    has a SKU", which raises the same ``InternalError`` reserved for genuine
+    corruption - a package line pointing at an order line that is not on the order.
+    The caller's real mistake (forgetting the map) would then be reported as a data
+    defect, which is the most expensive kind of wrong error to debug. Requiring it
+    makes that mistake a ``TypeError`` at the call site, where the fix is obvious.
     """
-    mapping: Mapping[int, int] = sku_by_line or {}
+    mapping: Mapping[int, int] = sku_by_line
     return FulfillmentPageOut(
         items=[to_fulfillment(row, mapping) for row in rows],
         meta=page_meta(page=page, page_size=page_size, total=total),
