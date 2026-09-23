@@ -31,6 +31,7 @@ import { useAsyncState } from '@/composables/useAsyncState'
 import { useAiThreadStore } from '@/stores/aiThread'
 import { useNotificationStore } from '@/stores/notification'
 import { pendingActionBlockedReason, pendingActionFlags } from '@/domain/governance/availability'
+import { canCancelAgentRun, runActionBlockedReason } from '@/domain/agent/availability'
 import { normalizeError } from '@/api/error'
 import { AGENT_TABS, type AgentName } from '@/config/app'
 import StateView from '@/components/ui/StateView.vue'
@@ -79,6 +80,43 @@ const {
   error: runsError,
   execute: loadRuns,
 } = useAsyncState(() => agentApi.runs({ page: 1, page_size: 20 }), { immediate: false })
+
+/**
+ * Cancel a live agent run.
+ *
+ * This closes a real gap: `API_CONTRACT.md` §4 freezes `POST /agent/runs/{run_id}/cancel` and
+ * `agentApi.cancelRun` has existed since the scaffold, but NOTHING called it — a frozen task endpoint
+ * with no entry point. Availability comes from the tested `canCancelAgentRun`, so the row never offers
+ * a cancel on a terminal run.
+ *
+ * §104: the server re-validates. A 403 means this UI and the server disagreed about permission, which
+ * is a real case (a role revoked mid-session) and is reported rather than crashing the page.
+ */
+const busyRunId = ref('')
+
+async function cancelRun(runId: string): Promise<void> {
+  busyRunId.value = runId
+  try {
+    await agentApi.cancelRun(runId)
+    notifications.success('已请求取消运行')
+    await loadRuns()
+  } catch (e) {
+    const normalized = normalizeError(e)
+    if (normalized.forbidden) {
+      notifications.error(
+        '权限不足',
+        '服务端拒绝了该操作：界面权限与服务端不一致，请刷新后重试或联系管理员。',
+        normalized.code,
+        normalized.traceId,
+      )
+      await loadRuns()
+    } else {
+      notifications.error('取消失败', normalized.message, normalized.code, normalized.traceId)
+    }
+  } finally {
+    busyRunId.value = ''
+  }
+}
 
 const {
   data: toolsData,
@@ -357,6 +395,7 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
             <th>Token</th>
             <th>成本</th>
             <th>开始时间</th>
+            <th style="width: 120px">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -371,6 +410,24 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
             <span v-else>—</span>
           </td>
             <td>{{ new Date(run.started_at).toLocaleString() }}</td>
+            <td>
+              <!--
+                Gated by `canCancelAgentRun`, so a terminal run shows an explanation instead of a
+                button whose only outcome is a server rejection.
+              -->
+              <button
+                v-if="canCancelAgentRun(run.status)"
+                type="button"
+                class="nx-btn nx-btn--text"
+                :disabled="busyRunId === run.id"
+                @click="cancelRun(run.id)"
+              >
+                {{ run.status === 'WAITING_APPROVAL' ? '取消待审批' : '取消运行' }}
+              </button>
+              <span v-else class="ai__hint" :title="runActionBlockedReason('cancel', run.status)">
+                {{ run.status === 'CANCELLED' ? '已取消' : '已结束' }}
+              </span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -379,6 +436,11 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
 </template>
 
 <style scoped lang="scss">
+.ai__hint {
+  color: var(--nx-text-muted);
+  font-size: 11.5px;
+}
+
 .ai {
   &__tabs {
     display: flex;

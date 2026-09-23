@@ -1,7 +1,6 @@
 # HANDOFF — READ THIS FIRST
 
-> **Snapshot:** commit `e34ee66` (plus the commit that adds this section, which is documentation-only —
-> no code changed, so the gate outputs below still apply).
+> **Snapshot:** the commit that last touched this file (see `git log -- frontend/REDESIGN_STATUS.md`).
 > Everything below the `---` line is chronological history. This block is the entry point.
 
 ## 1. State in one screen
@@ -11,17 +10,18 @@ Four gates, all run on this exact tree (literal output):
 | Command | Output | Exit |
 | --- | --- | --- |
 | `npx vue-tsc --noEmit` | *(no output)* | 0 |
-| `npx vite build` | `✓ 2385 modules transformed` `✓ built in 5.73s` | 0 |
-| `npx vitest run` | `Test Files 20 passed (20)` / `Tests 285 passed (285)` | 0 |
+| `npx vite build` | `✓ 2386 modules transformed` `✓ built in 1.74s` | 0 |
+| `npx vitest run` | `Test Files 21 passed (21)` / `Tests 292 passed (292)` | 0 |
 | `npx eslint .` | *(no output)* | 0 |
 
 `git status --porcelain` → empty.
 
-**Done:** all 22 routes, the whole `API_CONTRACT.md` migration (types → availability → views), the §11
-addenda, and all 10 console pages on the dense 京麦 pattern.
+**Done:** all 22 routes, the whole `API_CONTRACT.md` migration (types → availability → views), the
+§11 addenda, all 10 console pages on the dense 京麦 pattern, the §12.1 coupon preview→create flow, and
+`agentApi.cancelRun` (§4's frozen task endpoint) is now wired.
 
-**Not done:** two flows are blocked on contract detail (see §3), and there is a frozen task endpoint
-with no UI at all (§2, `agentApi.cancelRun` — the most actionable item here).
+**Not done:** the §13 shapes are transcribed into `frozen-contract.ts` but **not yet consumed** by any
+view — promotion creation and role/permission editing are the two flows that need them (§3).
 
 ## 2. The five console pages
 
@@ -31,27 +31,34 @@ with no UI at all (§2, `agentApi.cancelRun` — the most actionable item here).
 | `console/KnowledgeView.vue` | DONE | bases, documents (keyword + paging), upload, **reprocess**, **archive**, retrieval debug, evaluation, PROCESSING auto-poll | `knowledgeAdminApi.createBase` (no UI to create a knowledge base); no document detail view |
 | `console/MarketingView.vue` | DONE | coupon list, **coupon preview → create**, promotion list, **publish/unpublish** | **promotion CREATE** (blocked — §3.1); `marketingApi.myCoupons` / `claim` (no consumer coupon-center page) |
 | `console/SystemView.vue` | DONE | health `ready`/`live`, dependency table w/ criticality, audit list (filter + paging) | **role/permission editing** (blocked — §3.2); the `system.rolePermissions` / `system.userRoles` endpoints exist in `endpoints.ts` but have **no API function and no UI** |
-| `console/AiWorkspaceView.vue` | DONE | agent runs list, tools, pending actions approve/reject, SSE streaming (5 tabs) | **`agentApi.cancelRun` — a FROZEN task endpoint (§4) with no UI**; `agentApi.run` (single run), `agentApi.threads`, `agentApi.chat` (streaming is used instead) |
+| `console/AiWorkspaceView.vue` | DONE | agent runs list, **run cancel / cancel-pending-approval** (was a frozen endpoint with no caller), tools, pending actions approve/reject, SSE streaming (5 tabs) | `agentApi.run` (single run detail), `agentApi.threads`, `agentApi.chat` (streaming is used instead) |
 
 The 5 views that were "pre-redesign markup" at the start of t4 all render filter bar → hairline
 `.nx-table` → pager, with `StateView` covering all five §108 states, and every row action gated by a
 pure tested availability module rather than an inline status check.
 
-## 3. Blocked on contract detail (reported, NOT guessed)
+## 3. What §13 unblocked, and the migration it still needs
 
-`API_CONTRACT.md` §12 froze these PATHS but defined **no response shape** for any of them. §4 names the
-types — `PromotionPreview`, `Promotion`, `CouponPreview`, `CouponTemplate`, `Role`, `User` — and none
-of those six shapes exists anywhere in the document:
+`API_CONTRACT.md` §13 froze the six shapes §12 had left undefined. **All six are now transcribed into
+`src/types/frozen-contract.ts` and re-exported from `src/types/domain.ts`** — additively, so nothing
+broke. Consuming them is the remaining work:
 
-1. **Promotion creation** — needs the promotion **rule** shape. `Promotion.rule` is currently
-   `Record<string, unknown>` (a local assumption in `src/api/marketing.ts`), and a form cannot be
-   built on that.
-2. **Role / permission editing** — needs `Role` / `User` shapes **plus** the §12.2 semantics (the
-   server must refuse a change that lowers a write tool's `risk_level` without separate audited
-   approval). §12.2 exists specifically so the forbidden operation is not one checkbox away; building
-   the UI before the rule has a concrete shape would re-create exactly that.
+1. **Promotion creation** — the rule shape is now concrete: `promotion_type`
+   (`DIRECT_DISCOUNT` | `PERCENT_DISCOUNT` | `FULL_REDUCTION`) discriminates `rule_config`, rates are
+   **basis points** (never floats), and `scope` is explicit (`all_products: true` rather than inferred
+   from empty arrays). Build the form against `PromotionRuleConfig` and the preview→create flow against
+   `PromotionPreview.preview_token` — the coupon flow in `MarketingView.vue` is the working template,
+   including the compile-time token requirement.
+2. **Role / permission editing** — `Role` / `User` / `RolePermission` are frozen, including
+   `is_grantable`. The write is `PUT /system/roles/{id}/permissions` with the **complete explicit set**
+   plus `reason` (`UpdateRolePermissionsRequest`). §13.4 attaches four server-side obligations a
+   checkbox UI cannot express, so the client must render a **review step**, never a casual toggle.
 
-Both are documented in §12.3's own terms: *the rule was frozen and the interface was not.*
+**MIGRATION HAZARD, read before touching marketing:** `src/api/marketing.ts` still carries a LOCAL,
+invented `Promotion` (`type`, `rule: Record<string, unknown>`, `start_at`/`end_at`). §13 supersedes it.
+`MarketingView.vue` reads `promotion.type` / `.start_at` / `.end_at`, which become `promotion_type` /
+`starts_at` / `ends_at`. Two shapes for one resource is exactly the defect this codebase removed once
+for `Order` — delete the local one in the same commit that migrates the view, not after.
 
 ## 4. Every assumption made (consolidated)
 
@@ -66,8 +73,10 @@ All of these are §10 territory and are marked as assumptions in the code as wel
    that one field list reconciled.
 2. **`CouponPreviewResult`** — §12.1 freezes the endpoints, not the `CouponPreview` shape. Narrow
    local view model: `preview_token` (stated as certain by §12.1) plus the echoed request fields.
-3. **Promotion shape + lifecycle** (`DRAFT`/`ACTIVE`/`ENDED`, the local `Promotion` interface) is
-   unfrozen, so both the vocabulary and the transitions are assumptions.
+3. **Promotion shape + lifecycle** — **NO LONGER AN ASSUMPTION.** §13 froze the shape; see §3 above.
+   The transitional state is that the frozen `Promotion` type exists but `src/api/marketing.ts` still
+   exports a local, invented one, so the two currently coexist. That is a known, tracked migration, not
+   a settled design.
 4. **Analytics QUERY parameter names** — sent as `from` / `to` / `granularity`, mirroring the `period`
    keys the RESPONSE does freeze. Response envelope is authoritative; only the request side is assumed.
 5. **Analytics route** — `/analytics/admin/metrics/{metric}`. §8 froze the envelope and the 5 metric
@@ -101,16 +110,18 @@ fallback spec cases — do not leave a silent second source of truth for money i
 
 ## 6. Next steps (in priority order)
 
-1. **Wire `agentApi.cancelRun`.** §4 freezes `POST /agent/runs/{run_id}/cancel` and the API function
-   exists, but no view calls it — a frozen task endpoint with no entry point. `AgentRunStatus` already
-   has `CANCELLED`, and the §108 agent states already include `cancelled`, so the surface exists.
-2. **Decide §3**: either freeze the six response shapes, or approve narrow assumed view models. The
-   role/permission case should wait for a shape — its semantic risk is much higher than the coupon one.
+1. **Promotion creation**, consuming §13.1/§13.2 (`PromotionRuleConfig` discriminated by
+   `promotion_type`, `PromotionPreview.preview_token`). Also **replace the local `Promotion`** in
+   `src/api/marketing.ts` in the same commit — see the migration hazard in §3.
+2. **Role / permission editing**, consuming §13.4. The request is frozen
+   (`UpdateRolePermissionsRequest`: complete set + reason); the four server-side obligations mean the UI
+   must be a review flow, not a toggle grid.
 3. **Wire the remaining frozen-but-unused surface** if it is wanted: `inventoryAdminApi.movements`,
    `catalogApi.categories` / `brands`, `catalogAdminApi.upsertSku`, `knowledgeAdminApi.createBase`,
-   `governanceApi.pendingAction`. *(Measured: a script audit of `src/api` exports against all
-   `src/views` + `src/components` + `src/stores` references found 13 unwired functions; those five are
-   the ones with a plausible UI home.)*
+   `governanceApi.pendingAction`, `agentApi.run` / `threads`. *(Measured by script audit of `src/api`
+   exports against all `src/views` + `src/components` + `src/stores` references; re-run it after any
+   wiring — it is the cheapest way to find a frozen endpoint with no caller, which is how
+   `agentApi.cancelRun` was found.)*
 4. **Retire the `.nx-card` / `.nx-pill` compatibility aliases** once nothing references them
    (73 + 17 occurrences across 15 files at last count) — cosmetic, not a defect.
 5. **Delete the home-floor preview block** (`tags: ['预览数据']`) in `HomeView.vue` once the catalog
@@ -118,8 +129,10 @@ fallback spec cases — do not leave a silent second source of truth for money i
 
 ## 7. Problems found but NOT handled
 
-- **`agentApi.cancelRun` has no UI** (item 6.1) — the only frozen task endpoint in this repo with no
-  entry point. Found by script audit, not fixed.
+- ~~**`agentApi.cancelRun` has no UI**~~ — **FIXED.** Found by script audit and wired with a tested
+  availability module (`src/domain/agent/availability.ts`, 7 tests: a run is cancellable while `RUNNING`
+  or `WAITING_APPROVAL`, never once terminal). Keep auditing: it is the only method that found a frozen
+  endpoint with no caller.
 - **Persistent test-noise:** `user-event`/`jsdom` emit `Failed to resolve component` warnings in some
   view specs; harmless, but a genuinely missing global component registration would be hidden by them.
   Not investigated.

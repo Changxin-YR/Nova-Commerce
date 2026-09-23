@@ -270,3 +270,231 @@ export interface AnalyticsEnvelope {
   summary: AnalyticsSummary
   dimensions?: AnalyticsDimension[]
 }
+
+// ---------------------------------------------------------------------------
+// §13 Promotion / coupon templates / roles / users
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THESE LIVE HERE AND ARE ADDITIVE.
+ *
+ * `src/api/marketing.ts` still carries a LOCAL, invented `Promotion`
+ * (`type: 'DISCOUNT' | 'FULL_REDUCTION' | 'BUNDLE'`, `start_at`/`end_at`, `rule:
+ * Record<string, unknown>`). §13 has now frozen the real shape, so the local one is superseded — but
+ * replacing it is a migration that touches `MarketingView` and its tests, not a type edit. These
+ * definitions are therefore added WITHOUT consuming them yet: the tree stays green and the next agent
+ * has the frozen shapes to migrate onto. Two shapes for one resource is the defect this codebase
+ * already removed once for `Order`; this note exists so the same thing does not quietly re-form.
+ *
+ * §13.5 lists what is STILL unfrozen after this batch: the full `AgentRun`/`PendingAction` shapes,
+ * sort parameters, export formats, employee/warehouse/brand/category CRUD, promotion lifecycle beyond
+ * the three states below, and coupon issuance to users. Absence there is not permission.
+ */
+
+/** §39. `rule_config` is DISCRIMINATED by this field, not a bag of nullable keys. */
+export type PromotionType = 'DIRECT_DISCOUNT' | 'PERCENT_DISCOUNT' | 'FULL_REDUCTION'
+
+export type PromotionStatus = 'DRAFT' | 'ACTIVE' | 'ENDED'
+
+/**
+ * The three variants, discriminated so a caller cannot read `discount_bps` off a fixed-amount rule.
+ *
+ * RATES ARE BASIS POINTS, NEVER FLOATS: 12.5% is exactly 1250 bps, while `0.125` is not exactly
+ * representable — and a discount computed from a float is a ledger that does not add up. Same reason
+ * money is integer minor units.
+ */
+export type PromotionRuleConfig =
+  | { discount_amount: number }
+  | { discount_bps: number; max_discount_amount: number | null }
+  | { threshold_amount: number; reduction_amount: number; max_discount_amount: number | null }
+
+/**
+ * `scope` is EXPLICIT rather than an implicit "everything": an all-products promotion says so
+ * (`all_products: true`) instead of being inferred from empty arrays, because inferring it is how a
+ * promotion accidentally covers the whole catalogue.
+ */
+export interface PromotionScope {
+  all_products: boolean
+  product_ids: number[]
+  category_ids: number[]
+  brand_ids: number[]
+}
+
+export interface Promotion {
+  id: number
+  promotion_no: string
+  merchant_id: number
+  name: string
+  description?: string
+  promotion_type: PromotionType
+  status: PromotionStatus
+  priority: number
+  stackable: boolean
+  rule_config: PromotionRuleConfig
+  scope: PromotionScope
+  starts_at: string
+  ends_at: string
+  total_quota: number
+  used_quota: number
+  created_at: string
+  updated_at: string
+}
+
+/** §13.2. `conflicts` is non-empty rather than a 409: a conflict is information to decide with. */
+export interface PromotionConflict {
+  promotion_id: number
+  promotion_no: string
+  reason: string
+}
+
+export interface PromotionImpactEstimate {
+  affected_sku_count: number
+  affected_order_count_30d: number
+  /** Integer minor units. */
+  estimated_discount_amount_30d: number
+}
+
+/**
+ * The preview response IS the exact body `POST /marketing/promotions` accepts, plus these fields.
+ *
+ * `preview_token` is what makes §47 ENFORCEABLE rather than advisory: the create call must carry it
+ * and the server rejects a token whose payload changed. Without it "preview first" is a convention a
+ * client can skip; with it, a single-submit create flow cannot be written — the same compile-time
+ * property `CouponCreatePayload` already has in `src/api/marketing.ts`.
+ */
+export interface PromotionPreview {
+  preview_token: string
+  expires_at: string
+  /** Same shape, with `id` / `promotion_no` null before the write. */
+  promotion: Omit<Promotion, 'id' | 'promotion_no'> & {
+    id: number | null
+    promotion_no: string | null
+  }
+  estimated_impact: PromotionImpactEstimate
+  conflicts: PromotionConflict[]
+  warnings: string[]
+}
+
+/** §13.3. A discriminator the client can switch on, rather than a nullable pair to guess about. */
+export type CouponType = 'FIXED_AMOUNT' | 'PERCENT_DISCOUNT'
+export type CouponTemplateStatus = 'DRAFT' | 'ACTIVE' | 'ENDED'
+export type CouponValidityType = 'RELATIVE' | 'ABSOLUTE'
+
+export interface CouponScope {
+  all_products: boolean
+  product_ids: number[]
+  category_ids: number[]
+}
+
+export interface CouponTemplate {
+  id: number
+  template_no: string
+  merchant_id: number
+  name: string
+  coupon_type: CouponType
+  status: CouponTemplateStatus
+  /** Set for `FIXED_AMOUNT`; null for `PERCENT_DISCOUNT`. */
+  face_value_amount: number | null
+  /** Set for `PERCENT_DISCOUNT`; null for `FIXED_AMOUNT`. Basis points. */
+  discount_bps: number | null
+  threshold_amount: number
+  max_discount_amount: number | null
+  total_quota: number
+  issued_count: number
+  per_user_limit: number
+  validity_type: CouponValidityType
+  valid_days: number | null
+  valid_from: string | null
+  valid_to: string | null
+  applicable_scope: CouponScope
+  created_at: string
+}
+
+/** Mirrors `PromotionPreview`. */
+export interface CouponPreview {
+  preview_token: string
+  expires_at: string
+  coupon: Omit<CouponTemplate, 'id' | 'template_no'> & {
+    id: number | null
+    template_no: string | null
+  }
+  estimated_impact: {
+    estimated_issue_count: number
+    /** Integer minor units. */
+    estimated_discount_amount: number
+  }
+  warnings: string[]
+}
+
+/* -- §13.4 Role / User ----------------------------------------------------- */
+
+/** The `is_grantable` flag is what a checkbox UI cannot express on its own. */
+export interface RolePermission {
+  code: string
+  resource: string
+  action: string
+  is_grantable: boolean
+}
+
+export type DataScope = 'ALL' | 'MERCHANT' | 'SELF'
+
+export interface Role {
+  id: number
+  code: string
+  name: string
+  description?: string
+  /** System roles are not editable by an ordinary console user. */
+  is_system: boolean
+  data_scope: DataScope
+  permissions: RolePermission[]
+  user_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface UserRoleRef {
+  id: number
+  code: string
+  name: string
+}
+
+export type UserType = 'STAFF' | 'CUSTOMER'
+export type UserStatus = 'ACTIVE' | 'DISABLED' | 'LOCKED'
+
+export interface User {
+  id: number
+  username: string
+  /** Masked by the server (§94) on list AND detail — never un-mask. */
+  email: string
+  /** Masked by the server (§94) on list AND detail — never un-mask. */
+  phone: string
+  display_name: string
+  user_type: UserType
+  status: UserStatus
+  merchant_id: number | null
+  data_scope: DataScope
+  data_scope_override: DataScope | null
+  roles: UserRoleRef[]
+  last_login_at: string | null
+  created_at: string
+}
+
+/**
+ * `PUT /system/roles/{id}/permissions` body — the COMPLETE explicit set, never a delta (§12.2).
+ *
+ * A delta invites a caller to omit a permission it did not know about and silently revoke it. The
+ * server additionally owns four rules a checkbox UI cannot express (§13.4):
+ *  1. replace the set wholesale;
+ *  2. REFUSE any change lowering the `risk_level` of an `is_write` tool without separate audited
+ *     approval (§65) — the rule this whole section exists for;
+ *  3. reject any permission whose `is_grantable` is false, whatever was sent;
+ *  4. audit the before/after set with actor and reason — a permission change is an audit event, not a
+ *     settings save.
+ *
+ * The client therefore renders a REVIEW step (like the coupon flow), and must not present this as a
+ * casual toggle.
+ */
+export interface UpdateRolePermissionsRequest {
+  permissions: string[]
+  reason: string
+}

@@ -490,6 +490,39 @@ export type {
   StaleVersionConflict,
 } from '@/types/frozen-contract'
 
+/**
+ * The §13 shapes (promotion, coupon template, role, user).
+ *
+ * Re-exported for the same reason as the order/inventory shapes: `import type { Promotion } from
+ * '@/types/domain'` should reach ONE definition. NOTE that `src/api/marketing.ts` still carries a
+ * LOCAL `Promotion` that §13 superseded — migrating onto these is a view-level job, tracked in the
+ * handoff doc, and this re-export is what makes it a rename rather than a rewrite.
+ */
+export type {
+  CouponPreview,
+  CouponScope,
+  CouponTemplate,
+  CouponTemplateStatus,
+  CouponType,
+  CouponValidityType,
+  DataScope,
+  Promotion,
+  PromotionConflict,
+  PromotionImpactEstimate,
+  PromotionPreview,
+  PromotionRuleConfig,
+  PromotionScope,
+  PromotionStatus,
+  PromotionType,
+  Role,
+  RolePermission,
+  UpdateRolePermissionsRequest,
+  User,
+  UserRoleRef,
+  UserStatus,
+  UserType,
+} from '@/types/frozen-contract'
+
 /** A single order with its line items and shipments (the detail payload). */
 export type { OrderDetail as Order } from '@/types/frozen-contract'
 
