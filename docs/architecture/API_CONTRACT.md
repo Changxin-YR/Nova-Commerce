@@ -159,7 +159,22 @@ else is accepted (§110 mass-assignment guard):
 ## 6. Order shapes
 
 `OrderSummary` (list rows) and `OrderDetail` (single order) differ only in that
-`OrderDetail` adds `items[]`, `shipments[]` and the address snapshot. Both carry
+`OrderDetail` adds `items[]`, `shipments[]` and the address snapshot.
+
+`OrderSummary` deliberately carries **no line items** - a list endpoint that hydrated
+every order's goods would fetch far more than it renders. But an order list that
+cannot name a single product is useless to an operator, and leaving it out forced
+either an N+1 detail fetch per row or a blank column. Two summary fields resolve
+that without shipping the whole basket:
+
+```json
+{ "item_count": 3, "first_item_name": "Nova Phone 15 Pro 原色钛金属 256GB" }
+```
+
+`item_count` is the total number of units; `first_item_name` is the display name of
+the first line (`product_name` + `sku_name`), truncated to 200 characters. Both are
+backend-owned: computing them client-side is impossible, which is exactly why the
+frontend correctly refused to guess. Both carry
 all four status fields (§31–§34), because the UI must never infer one from
 another — most importantly, **shipping never changes `order_status`**, so
 "can this be shipped" reads `fulfillment_status`.
@@ -205,6 +220,27 @@ another — most importantly, **shipping never changes `order_status`**, so
   ],
   "shipments": []
 }
+```
+
+Two further fields on **`OrderDetail`**:
+
+| Field | Type | Why it is server-owned |
+|---|---|---|
+| `cancel_reason` | `string \| null` | Null unless `order_status` is `CANCELLED`/`CLOSED`. The reason is recorded by the cancel workflow, so the client cannot infer it. |
+| `refundable_amount` | integer minor units | `paid_amount - refunded_amount`, bounded below by 0. **The server owns this because INV-005 does.** |
+
+`refundable_amount` is not decorative. The frontend discovered that deriving it as
+`paid_amount - refunded_amount` client-side is a silent failure mode: on a payload
+that lacks the field the expression yields `undefined`, and `undefined > 0` is
+`false` - which would silently disable **every refund affordance in the UI** without
+throwing anything. A money figure that decides whether a control is even rendered
+belongs on the server, next to the rule it enforces.
+
+The cancel endpoint accepts an optional reason, so the field has a writer:
+
+```json
+POST /api/v1/orders/{order_no}/cancel
+{ "reason": "用户主动取消" }
 ```
 
 `receiver_name` and `receiver_phone` arrive already masked (§94). The client must
@@ -292,5 +328,34 @@ Named explicitly so nobody mistakes absence for permission:
 - Pagination `sort`/`order` parameter names (planned: `sort=-created_at`).
 - The `AgentRun` and `PendingAction` full shapes (frozen in Phase 10/13 with the
   rest of the agent contract).
+- `item_count` / `first_item_name` ordering when an order has no items (there will
+  always be at least one; stated so the edge case is not discovered at runtime).
 - SSE payload internals — only the **12 event names** are frozen (§85).
 - Report/export file formats.
+
+
+---
+
+## 11. Addenda — 2026-09-23
+
+Three fields were added after the first freeze, each because the frontend hit a real
+edge rather than a hypothetical one. They are listed together so a reader can see
+what changed and why, instead of discovering the delta by diffing.
+
+| Field | Home | Trigger |
+|---|---|---|
+| `item_count`, `first_item_name` | `OrderSummary` | Order lists could not name a product without an N+1 detail fetch per row. |
+| `cancel_reason` | `OrderDetail` | The cancel affordance had a reason input the server never sends or accepts. |
+| `refundable_amount` | `OrderDetail` | Client-derived `paid - refunded` yields `undefined` on a missing field, and `undefined > 0` is false - silently hiding every refund control. |
+
+Two process notes worth keeping:
+
+1. **The frontend reported these instead of inventing values.** It removed the cancel
+   reason UI rather than leave decoration over a field the server does not send, and
+   it routed order lists to the detail payload rather than fabricate a summary shape.
+   Both were the correct call: a guessed shape becomes a real defect the moment the
+   two sides meet.
+2. **A money field that gates a UI control must be server-owned.** `refundable_amount`
+   is not a display convenience; it is INV-005 exposed to the client. Deriving it
+   locally means the client enforces an accounting rule, which is exactly the
+   arrangement §15 forbids.
