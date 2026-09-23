@@ -149,7 +149,7 @@ def session(engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def commerce(engine) -> Iterator[Commerce]:
+def commerce(engine, request: pytest.FixtureRequest) -> Iterator[Commerce]:
     """Merchant / warehouse / SKU with stock / buyer / operator, and one PAID order.
 
     The order is created directly at ``PROCESSING`` + ``PAID`` rather than driven
@@ -163,6 +163,15 @@ def commerce(engine) -> Iterator[Commerce]:
     prove that a further unit would exceed the line (the cumulative cap).
     """
     marker = uuid.uuid4().hex[:8]
+    # The holder is populated as the graph is built and registered with a finalizer
+    # *before* the first committed write. The teardown after ``yield`` cannot run when
+    # setup fails part-way - pytest only runs the post-yield block if the fixture
+    # produced a value - so a failure mid-setup used to strand committed rows in the
+    # shared schema. That is not hypothetical: residue from exactly this pattern made
+    # the suite non-repeatable and produced failures that looked like code defects.
+    # ``request.addfinalizer`` runs on the way out either way.
+    created: dict[str, object] = {}
+    request.addfinalizer(lambda: _purge(factory, created))
     factory = get_session_factory()
     order_quantity = 3
     unit_price = 1999
@@ -310,7 +319,7 @@ def commerce(engine) -> Iterator[Commerce]:
         s.flush()
         s.commit()
 
-        commerce = Commerce(
+        created.update(
             marker=marker,
             merchant_id=merchant.id,
             warehouse_id=warehouse.id,
@@ -323,30 +332,15 @@ def commerce(engine) -> Iterator[Commerce]:
             order_item_id=item.id,
         )
 
-    yield commerce
+    # ``Commerce`` is frozen+slots, so build it from the holder rather than assigning
+    # onto it - the holder is what the finalizer reads, and it may hold a partial
+    # graph if setup failed.
+    yield Commerce(**created)  # type: ignore[arg-type]
 
-    with factory() as s:
-        order_ids = [commerce.order_id]
-        # FK order matters: items before the packages' parents, packages before the
-        # order they point at, and the order before the users/merchant it references.
-        s.execute(
-            delete(FulfillmentItem).where(
-                FulfillmentItem.fulfillment_id.in_(
-                    select(Fulfillment.id).where(Fulfillment.order_id.in_(order_ids))
-                )
-            )
-        )
-        s.execute(delete(Fulfillment).where(Fulfillment.order_id.in_(order_ids)))
-        s.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))
-        s.execute(delete(Order).where(Order.id.in_(order_ids)))
-        s.execute(delete(InventoryMovement).where(InventoryMovement.warehouse_id == commerce.warehouse_id))
-        s.execute(delete(Inventory).where(Inventory.sku_id == commerce.sku_id))
-        s.execute(delete(ProductSku).where(ProductSku.id == commerce.sku_id))
-        s.execute(delete(Product).where(Product.id == commerce.product_id))
-        s.execute(delete(Warehouse).where(Warehouse.id == commerce.warehouse_id))
-        s.execute(delete(User).where(User.id.in_([commerce.buyer_id, commerce.staff_id])))
-        s.execute(delete(Merchant).where(Merchant.id == commerce.merchant_id))
-        s.commit()
+    # Normal path: the finalizer registered above does the work, so there is exactly
+    # one teardown implementation. Duplicating it here is what data-layer correctly
+    # refused to do - two cleanup paths drift, and the one that runs less often is the
+    # one that rots.
 
 
 def hash_password_stub() -> str:
@@ -368,3 +362,56 @@ def packages_of(session: Session, commerce: Commerce) -> list[Fulfillment]:
     """Every package of the test's order, oldest first - with its lines loaded."""
     stmt = select(Fulfillment).where(Fulfillment.order_id == commerce.order_id).order_by(Fulfillment.id.asc())
     return list(session.scalars(stmt))
+
+
+def _purge(factory, created: dict[str, object]) -> None:
+    """Delete everything the fixture created, in FK order, tolerating a partial graph.
+
+    Called from a finalizer, so it must cope with setup having failed at any point: a
+    key that was never populated is simply skipped, which is why each deletion is
+    guarded rather than assuming the whole graph exists.
+
+    Scoped by the ids the fixture recorded rather than by merchant, so it cannot touch
+    another test's rows even if two fixtures of this kind ever shared a merchant.
+
+    Order matters and is not guesswork: these FKs are ``RESTRICT`` precisely so history
+    cannot be deleted out from under a live row, so the unwinding goes children-first.
+    """
+    merchant_id = created.get("merchant_id")
+    if merchant_id is None:
+        # Nothing was written yet - the failure happened before the first flush.
+        return
+
+    with factory() as session:
+        order_ids = [int(created["order_id"])] if created.get("order_id") else []
+        warehouse_id = created.get("warehouse_id")
+        sku_id = created.get("sku_id")
+        product_id = created.get("product_id")
+        buyer_id = created.get("buyer_id")
+        staff_id = created.get("staff_id")
+
+        if order_ids:
+            session.execute(
+                delete(FulfillmentItem).where(
+                    FulfillmentItem.fulfillment_id.in_(
+                        select(Fulfillment.id).where(Fulfillment.order_id.in_(order_ids))
+                    )
+                )
+            )
+            session.execute(delete(Fulfillment).where(Fulfillment.order_id.in_(order_ids)))
+            session.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))
+            session.execute(delete(Order).where(Order.id.in_(order_ids)))
+        if warehouse_id is not None:
+            session.execute(delete(InventoryMovement).where(InventoryMovement.warehouse_id == warehouse_id))
+        if sku_id is not None:
+            session.execute(delete(Inventory).where(Inventory.sku_id == sku_id))
+            session.execute(delete(ProductSku).where(ProductSku.id == sku_id))
+        if product_id is not None:
+            session.execute(delete(Product).where(Product.id == product_id))
+        if warehouse_id is not None:
+            session.execute(delete(Warehouse).where(Warehouse.id == warehouse_id))
+        user_ids = [uid for uid in (buyer_id, staff_id) if uid is not None]
+        if user_ids:
+            session.execute(delete(User).where(User.id.in_(user_ids)))
+        session.execute(delete(Merchant).where(Merchant.id == int(merchant_id)))
+        session.commit()
