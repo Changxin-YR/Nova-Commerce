@@ -13,8 +13,10 @@ test.describe('application shell', () => {
   test('consumer store boots and shows the home page', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page.locator('.store-header__brand')).toBeVisible()
-    await expect(page.locator('.home__title')).toBeVisible()
+    await expect(
+      page.getByRole('banner').getByRole('link', { name: /Nova Commerce/ }),
+    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: '为你推荐' })).toBeVisible()
 
     // The document title is set by the router's afterEach hook.
     await expect(page).toHaveTitle(/Nova/)
@@ -49,7 +51,7 @@ test.describe('application shell', () => {
     const initial = await html.getAttribute('class')
     const wasDark = (initial ?? '').includes('dark')
 
-    await page.getByRole('button', { name: /切换到(浅色|深色)主题/ }).first().click()
+    await page.getByRole('button', { name: /^(深色|浅色)模式$/ }).first().click()
     await expect(html).toHaveClass(wasDark ? /^(?!.*dark)/ : /dark/)
   })
 })
