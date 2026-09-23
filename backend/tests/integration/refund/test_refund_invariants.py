@@ -1,4 +1,4 @@
-﻿"""FG-12 - the refund caps are enforced at the database boundary.
+"""FG-12 - the refund caps are enforced at the database boundary.
 
 Spec section 112, `docs/architecture/ARCHITECTURE_INVARIANTS.md` INV-005
 ("*``refunded_amount <= paid_amount``*"), `PHASE5_DESIGN` sections 5.5 and 8,
@@ -114,13 +114,23 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
+from tests.integration.commerce.seed import (
+    Shop,
+    engine as _engine_fixture,
+    paid_order,
+    shop as _shop_fixture,
+)
 
 #: Re-exported rather than redefined: `commerce` owns the shared Phase 5 seed, and a
 #: second definition of the engine would be a second definition of the shop (PHASE5
 #: section 12). pytest resolves a fixture imported into this module normally.
-from tests.integration.commerce.seed import engine
-
+# Imported under aliases and re-exported below: a direct `shop` import would collide with the
+# `shop` parameter every test declares (ruff F811), and `engine` must be bound under its own
+# name for pytest to resolve it.
 from app.shared.db.session import get_session_factory
+
+engine = _engine_fixture
+shop = _shop_fixture
 
 __all__ = ["engine"]
 
@@ -207,149 +217,112 @@ PROBE_ORDER_PREFIX = "FG12-"
 PROBE_PAYMENT_PREFIX = "FGTWELVE"
 
 
-def _purge_residue(engine: Engine) -> None:
-    """Remove any probe rows a previous interrupted run left behind.
-
-    Called before the probes, because a leftover row is not merely untidy: a stale
-    `order_items` probe keeps its ``(order_id, sku_id)`` pair occupied, and the next run's
-    probe row is then refused by ``uq_order_items_order_sku`` *during setup*. That failure
-    looks exactly like a cap defect while being an artefact of the last run - it was
-    observed. Cleaning first makes the suite idempotent, which a test that runs against a
-    shared development database has to be.
-    """
-    # Retried, because this runs against a database other people are writing to. A
-    # `DELETE ... WHERE col LIKE ...` cannot use an index prefix and takes gap locks, so it
-    # can deadlock (MySQL 1213) against a teammate's concurrent insert into the same table -
-    # observed: `(1213, 'Deadlock found when trying to get lock; try restarting transaction')`
-    # on the `payments` delete, which failed the cleanup and therefore the test. A deadlock is
-    # a retryable condition by definition, and retrying is the honest fix; broadening the
-    # transaction or ignoring the error would trade a flaky failure for silent residue.
-    last: Exception | None = None
-    for _attempt in range(3):
-        try:
-            with engine.begin() as connection:
-                connection.execute(
-                    text(
-                        "DELETE FROM order_items WHERE order_id IN "
-                        "(SELECT id FROM orders WHERE order_no LIKE :prefix)"
-                    ),
-                    {"prefix": f"{PROBE_ORDER_PREFIX}%"},
-                )
-                connection.execute(
-                    text("DELETE FROM orders WHERE order_no LIKE :prefix"),
-                    {"prefix": f"{PROBE_ORDER_PREFIX}%"},
-                )
-                connection.execute(
-                    text("DELETE FROM payments WHERE payment_no LIKE :prefix"),
-                    {"prefix": f"{PROBE_PAYMENT_PREFIX}%"},
-                )
-            return
-        except OperationalError as exc:
-            if exc.orig is None or exc.orig.args[0] != ERRNO_DEADLOCK:
-                raise
-            last = exc
-    raise AssertionError(f"probe residue could not be purged after 3 attempts: {last}")
-
-
-def _insert_probe_row(session: Session, table: str, legal: int) -> tuple[int, str]:
+def _insert_probe_row(session: Session, table: str, legal: int, shop: Shop) -> tuple[int, str]:
     """Insert one throwaway row whose ``refunded_amount`` sits exactly at the cap.
 
-    Returns ``(row_id, probe_marker)``. The marker is an ``order_no``/``payment_no`` built
-    from the prefix above, so teardown can find the row by name rather than by an id that
-    a failed insert never produced.
+    Returns ``(row_id, marker)``. The marker is an ``order_no``/``payment_no`` built from the
+    prefixes above, so teardown can find the row by name rather than by an id that a failed
+    insert never produced.
 
-    A **new** row rather than an existing one: mutating a real row would make the probe
-    depend on that row's other columns satisfying every other constraint.
+    ## Every base row is created here, not looked up
 
-    Three constructions were tried and two are recorded here because each looked correct:
+    The first version took its base values from whatever row happened to be in ``orders`` or
+    ``product_skus``. That made the probe a *reader* of shared mutable state, and the state is
+    mutable by design: this module runs in the same process as the after-sales suites, whose tests
+    create and tear down their own orders, and a row the probe selected a moment earlier could be
+    gone by the time it inserted. The symptoms were ``TypeError: int() argument ... not
+    'NoneType'``, ``NoResultFound``, and ``IntegrityError`` 1452 on the ``order_items`` foreign
+    key - each one intermittent, and each one looking like a constraint defect.
 
-    * the base values are taken from *other* tables, never from the table under probe. The
-      first version copied from the same table (`INSERT ... SELECT ... FROM payments
-      LIMIT 1`) and worked only while `payments` happened to be non-empty; it failed with
-      `TypeError: int() argument ... not 'NoneType'` the moment the table was empty - a
-      defect in the probe wearing the costume of a defect in the cap;
-    * the `order_items` branch picks a ``(order_id, sku_id)`` pair that is **globally**
-      absent (a cartesian product of the tables, filtered by ``NOT EXISTS``) while keeping
-      both values foreign-key-valid. Offsetting ``sku_id`` by a constant is not a real SKU
-      and is refused with `(1452, ... fk_order_items_sku_id_product_skus)`; picking a
-      sibling SKU of the same product is refused with
-      `(1062, ... uq_order_items_order_sku)` whenever that pair is already used. Both are
-      correct refusals and both are failed controls, because a control must leave exactly
-      one possible reason for the refusal - the constraint under test.
+    So the probe now **owns its whole base**: it creates a committed order (through the seed's real
+    ``paid_order`` path, so the state is one the product can reach) and hangs the payments row and
+    the order_items row off *that* order. Nothing another test tears down is involved, so there is
+    no race to lose - which is a stronger fix than retrying around one.
+
+    A **new** row rather than an existing one, for the original reason: mutating a real row would
+    make the probe depend on that row satisfying every other constraint.
     """
+    from app.modules.order.workflow import OrderLineInput
+
     marker = f"{PROBE_ORDER_PREFIX}{legal}-{uuid.uuid4().hex[:8]}"
+    order = paid_order(
+        shop,
+        lines=[OrderLineInput(shop.sku_ids[0], 1)],
+        suffix=f"fg12-{uuid.uuid4().hex[:8]}",
+    )
+    order_id = int(order.id)
+
     if table == "payments":
         session.execute(
             text(
                 "INSERT INTO payments (payment_no, order_id, order_no, user_id, channel, amount, "
                 " status, idempotency_key, client_request_id, request_hash, paid_amount, "
                 " refunded_amount, created_at, updated_at) "
-                "SELECT :marker, o.id, o.order_no, o.user_id, 'MOCK', :legal, 'SUCCESS', "
-                " :marker, :marker, 'probe', :legal, :legal, NOW(3), NOW(3) "
-                "FROM orders o LIMIT 1"
+                "VALUES (:marker, :order_id, :order_no, :user_id, 'MOCK', :legal, 'SUCCESS', "
+                " :marker, :marker, 'probe', :legal, :legal, NOW(3), NOW(3))"
             ),
-            {"marker": f"{PROBE_PAYMENT_PREFIX}{legal}-{uuid.uuid4().hex[:8]}", "legal": legal},
+            {
+                "marker": f"{PROBE_PAYMENT_PREFIX}{legal}-{uuid.uuid4().hex[:8]}",
+                "legal": legal,
+                "order_id": order_id,
+                "order_no": str(order.order_no),
+                "user_id": int(shop.consumer_id),
+            },
         )
     elif table == "orders":
         session.execute(
             text(
-                "INSERT INTO orders (user_id, order_no, client_request_id, request_hash, "
-                " receiver_name, receiver_phone, address_snapshot, first_item_name, "
-                " paid_amount, refunded_amount, payable_amount, original_amount, "
+                "INSERT INTO orders (user_id, merchant_id, order_no, client_request_id, "
+                " request_hash, receiver_name, receiver_phone, address_snapshot, first_item_name, "
+                " paid_amount, refunded_amount, payable_amount, original_amount, item_count, "
                 " created_at, updated_at) "
-                "SELECT user_id, :marker, :marker, 'probe', receiver_name, receiver_phone, "
-                " address_snapshot, first_item_name, :legal, :legal, :legal, :legal, "
-                " NOW(3), NOW(3) FROM orders LIMIT 1"
+                "VALUES (:user_id, :merchant_id, :marker, :marker, 'probe', 'FG-12 probe', "
+                " '+8613800000000', JSON_OBJECT('probe', true), 'FG-12 probe', :legal, :legal, "
+                " :legal, :legal, 1, NOW(3), NOW(3))"
             ),
-            {"marker": marker, "legal": legal},
+            {
+                "marker": marker,
+                "legal": legal,
+                "user_id": int(shop.consumer_id),
+                "merchant_id": int(shop.merchant_id),
+            },
         )
     else:
-        # A brand-new order carrying the probe prefix, so `(order_id, sku_id)` is empty by
-        # construction (a fresh order has no lines) and teardown can find the line through
-        # its parent. Anchoring the line to an *existing* order instead was tried and left
-        # residue: the row was invisible to the purge, so the next run tripped
-        # `uq_order_items_order_sku` during setup. A probe whose cleanup depends on a parent
-        # it does not own is not cleanable.
-        session.execute(
-            text(
-                "INSERT INTO orders (user_id, order_no, client_request_id, request_hash, "
-                " receiver_name, receiver_phone, address_snapshot, first_item_name, "
-                " paid_amount, refunded_amount, payable_amount, original_amount, "
-                " item_count, created_at, updated_at) "
-                "SELECT user_id, :marker, :marker, 'probe', receiver_name, receiver_phone, "
-                " address_snapshot, first_item_name, :legal, :legal, :legal, :legal, 1, "
-                " NOW(3), NOW(3) FROM orders LIMIT 1"
-            ),
-            {"marker": marker, "legal": legal},
-        )
-        order_id = int(
+        # Anchored on the order this probe just created, so both foreign keys point at rows this
+        # probe owns. The SKU must be a DIFFERENT one from the seed's first: `paid_order` already
+        # wrote a line for `sku_ids[0]`, and reusing it trips
+        # `uq_order_items_order_sku` (observed: `(1062, "Duplicate entry '233756-54098' for key
+        # 'order_items.uq_order_items_order_sku'")`) - a unique key firing during setup, which is a
+        # broken probe rather than a cap result.
+        probe_sku = int(shop.sku_ids[1])
+        product_id = int(
             session.execute(
-                text("SELECT id FROM orders WHERE order_no = :marker"), {"marker": marker}
+                text("SELECT product_id FROM product_skus WHERE id = :sid"),
+                {"sid": probe_sku},
             ).scalar_one()
-        )
-        # Any real SKU and any real warehouse: with a fresh order there is no pair to
-        # collide with, so both foreign keys are satisfied and the unique key cannot fire.
-        sku_id = int(
-            session.execute(text("SELECT id FROM product_skus ORDER BY id LIMIT 1")).scalar_one()
         )
         session.execute(
             text(
                 "INSERT INTO order_items (order_id, warehouse_id, product_id, sku_id, quantity, "
                 " product_name, sku_name, unit_price, original_amount, payable_amount, "
                 " refunded_amount, after_sale_status, created_at, updated_at) "
-                "SELECT :order_id, w.id, ps.product_id, ps.id, 1, 'FG-12 probe', 'FG-12 probe', "
-                " :legal, :legal, :legal, :legal, 'NONE', NOW(3), NOW(3) "
-                "FROM product_skus ps CROSS JOIN warehouses w "
-                "WHERE ps.id = :sku_id LIMIT 1"
+                "VALUES (:order_id, :warehouse_id, :product_id, :sku_id, 1, 'FG-12 probe', "
+                " 'FG-12 probe', :legal, :legal, :legal, :legal, 'NONE', NOW(3), NOW(3))"
             ),
-            {"order_id": order_id, "sku_id": sku_id, "legal": legal},
+            {
+                "order_id": order_id,
+                "warehouse_id": int(shop.warehouse_id),
+                "product_id": product_id,
+                "sku_id": probe_sku,
+                "legal": legal,
+            },
         )
     return int(session.execute(text(f"SELECT MAX(id) FROM {table}")).scalar_one()), marker
 
 
 @pytest.mark.parametrize(("table", "constraint", "cap_col"), CAPS, ids=[cap[1] for cap in CAPS])
 def test_the_live_table_carries_the_named_cap(
-    engine: Engine, table: str, constraint: str, cap_col: str
+    engine: Engine, shop: Shop, table: str, constraint: str, cap_col: str
 ) -> None:
     """The deployed schema really has the constraint, under the name the ORM expects.
 
@@ -368,7 +341,7 @@ def test_the_live_table_carries_the_named_cap(
 
 @pytest.mark.parametrize(("table", "constraint", "cap_col"), CAPS, ids=[cap[1] for cap in CAPS])
 def test_a_write_over_the_cap_is_refused_by_that_named_check(
-    engine: Engine, table: str, constraint: str, cap_col: str
+    engine: Engine, shop: Shop, table: str, constraint: str, cap_col: str
 ) -> None:
     """The live table refuses a violating write, names the constraint, and changes nothing.
 
@@ -403,14 +376,27 @@ def test_a_write_over_the_cap_is_refused_by_that_named_check(
     assert _live_clause(engine, table, constraint) is not None, (
         f"{table}.{constraint} is missing, so this control cannot mean anything"
     )
-    _purge_residue(engine)
 
     session = get_session_factory()()
     row_id: int | None = None
     try:
         # Committed deliberately: a second connection can only observe a committed row.
-        row_id, _marker = _insert_probe_row(session, table, LEGAL_AT_CAP)
-        session.commit()
+        #
+        # Retried on a deadlock for the same reason `_purge_residue` is: this runs against a
+        # database several people are writing to, and an INSERT ... SELECT plus the surrounding
+        # DML can deadlock (MySQL 1213) against a concurrent teammate's write. Observed as an
+        # intermittent failure that passed on re-run. A deadlock is retryable by definition;
+        # retrying is the honest fix, and any other error still raises immediately.
+        for attempt in range(3):
+            try:
+                row_id, _marker = _insert_probe_row(session, table, LEGAL_AT_CAP, shop)
+                session.commit()
+                break
+            except OperationalError as exc:
+                session.rollback()
+                if exc.orig is None or exc.orig.args[0] != ERRNO_DEADLOCK or attempt == 2:
+                    raise
+        assert row_id is not None, "the probe row could not be inserted after 3 attempts"
 
         before = _fresh_read(table, row_id, cap_col)
         assert before == (LEGAL_AT_CAP, LEGAL_AT_CAP), (
@@ -445,12 +431,36 @@ def test_a_write_over_the_cap_is_refused_by_that_named_check(
         )
     finally:
         session.close()
-        # Claim 4: remove the probe row by its marker, through a fresh session, so teardown
-        # does not depend on this session's state after a refusal - and so a run that died
-        # mid-test is still cleaned up by the next one.
-        _purge_residue(engine)
+        # Claim 4: remove exactly the row this probe created, addressed by the id it minted.
+        #
+        # A prefix-wide `DELETE ... LIKE 'FG12-%'` was the first version, and it deleted rows
+        # belonging to *concurrent runs of other suites* - which is what made this file
+        # intermittently fail while passing in isolation. Scoping the delete to this probe's own
+        # id removes that interference entirely. Retried on a deadlock for the same reason: other
+        # writers are active in these tables.
+        if row_id is not None:
+            cleanup = get_session_factory()()
+            try:
+                for _attempt in range(3):
+                    try:
+                        cleanup.execute(
+                            text(f"DELETE FROM {table} WHERE id = :row_id"),
+                            {"row_id": row_id},
+                        )
+                        cleanup.commit()
+                        break
+                    except OperationalError as exc:
+                        cleanup.rollback()
+                        if (
+                            exc.orig is None
+                            or exc.orig.args[0] != ERRNO_DEADLOCK
+                            or _attempt == 2
+                        ):
+                            raise
+            finally:
+                cleanup.close()
 
-    # Verified on yet another connection: the shared database is exactly as it was.
+    # Verified on yet another connection: this probe's own row is gone.
     assert _fresh_read(table, row_id, cap_col) is None, (
         f"{table}: the probe row survived the test - this file must leave no residue"
     )
