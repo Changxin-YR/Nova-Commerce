@@ -164,6 +164,75 @@ frontend              vue-tsc 0 · vite build 0 · vitest 209 · eslint 0
 
 ---
 
+## 4a. ⚠️ FRONTEND TYPE MIGRATION — read this before touching any view
+
+The frontend scaffold was written **before** `API_CONTRACT.md` existed, against
+invented shapes. When the contract landed, the frontend owner compared them and
+found the mismatch was not "unconfirmed" but **wrong**. It correctly refused to
+build eight more pages on top of types it now knew were incorrect.
+
+**Consequence: several existing frontend types are wrong and must be migrated
+before any view work continues.** Building on them means building to be rewritten.
+
+### The concrete mismatches
+
+| Area | Frontend invented | Frozen value |
+|---|---|---|
+| Order status field | `status` | **`order_status`** |
+| Money | nested `snapshot.{items_amount,discount_amount,payable_amount}` | **flat**: `original_amount` / `promotion_discount_amount` / `coupon_discount_amount` / `shipping_amount` / `payable_amount` |
+| Order line | `{product_title, cover_url, sku_specs, subtotal_amount}` | `{product_name, sku_name, image_url, unit_price, original_amount, payable_amount, allocated_discount_amount, after_sale_status}` |
+| List vs detail | one `Order` with nested items | `OrderSummary` (no items) vs `OrderDetail` (+ `items[]` / `shipments[]`) |
+| Receiver | unmasked | **already masked (§94)** — the client must not try to un-mask |
+| Fulfillment | `Shipment{id: string}` | `Fulfillment{id: **number**, fulfillment_no, carrier (null until shipped), items[{id, order_item_id, sku_id, product_name, sku_name, quantity}]}` |
+| Ship request | `{carrier, tracking_no, items[], idempotency_key}` | **exactly** `{carrier, tracking_no, item_quantities[]}` — no idempotency key |
+| `carrier` | free text | **carrier code** (e.g. `"SF"`) |
+| Inventory | `{on_hand, reserved, version}` | `{on_hand_qty, available_qty, locked_qty, safety_stock, sellable_qty, sku_no, product_name, sku_name, version}` |
+| Adjust request | `{delta, reason, version, idempotency_key}` | `{warehouse_id, sku_id, version, delta_available, reason}` |
+| Analytics | `{points:[{date,value}], money:boolean}` | `{metric, unit, period, series[{bucket,value}], summary{total,average,change_ratio}, dimensions[]}` |
+
+### Already done (do not redo)
+
+- `src/types/frozen-contract.ts` — a verbatim transcription of every frozen shape
+  (`Paged<T>`, `PageMeta`, `emptyPage()`, `Fulfillment`, `ShipFulfillmentRequest`,
+  `OrderSummary`/`OrderDetail`/`OrderItem`, `Inventory`, `AdjustmentPreview`,
+  `CreateAdjustmentRequest`, `StaleVersionConflict`, the full analytics envelope
+  and `AnalyticsUnit`). **Additive — it breaks nothing.**
+- `src/domain/analytics/unit.ts` + 21 tests. The "a ratio rendered as ¥ is a
+  silent lie" warning is now a test: `refund.rate = 0.12` must render `12%` and
+  never `¥0.12`; `order_count = 137` never `¥1.37`. `minor_currency` is the only
+  branch that yields money, and it returns the **raw integer** for `<PriceText>`
+  rather than a formatted string, so no float ever touches an amount. Also guards
+  against rendering a percentage-style `12` as `1200%`.
+- Endpoint corrections applied: `/orders/admin` + `/orders/admin/{order_no}`
+  (the `/orders/admin/orders` duplication is gone), `GET /fulfillments/admin`
+  added, `ship` takes `number | string` because the id is numeric.
+
+### Remaining migration, in this order (the order prevents rework)
+
+**(a) Types + API layer.** Make `domain.ts`'s `Order` / `OrderItem` /
+`OrderSnapshot` / `Shipment` into aliases of the frozen types, or delete them, so
+each resource has **exactly one shape**. Update API module return types and
+parameter names (`delta` → `delta_available`).
+
+**(b) Availability modules + their 69 tests.** `orders/availability.ts` must read
+`order_status`; `canShipOrder` must take a `Fulfillment` and decide "not yet
+shipped" from `carrier === null`; `inventory/availability.ts` must use the
+server's `sellable_qty` rather than recomputing it.
+
+**(c) Views.** console Orders / Inventory / Analytics / Dashboard, and consumer
+Orders / OrderDetail / Checkout / MockPay. **The Orders and Products console
+pages already built are in scope too** — they were written against the old shapes.
+
+### Also outstanding (markup tidiness, not defects)
+
+- 73 `nx-card` + 17 `nx-pill` marker occurrences across 15 files. The aliases
+  already render the dense visual, so these are consistency, not bugs.
+- 7 console filter bars still use plain inputs rather than `.nx-filterbar`.
+- `formatMoney` is fully retired (0 call sites, 0 imports, 69 `<PriceText>` uses),
+  and 11 console tables now share `.nx-table`. Both complete.
+
+---
+
 ## 5. Frozen decisions you must not silently change
 
 Read these before inventing anything:

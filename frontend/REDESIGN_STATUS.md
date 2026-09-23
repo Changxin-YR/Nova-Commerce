@@ -162,3 +162,67 @@ The 12 `app/modules/*` APIs do not exist, so no end-to-end data flow is provable
 floor shows clearly-labelled local preview rows (`tags: ['预览数据']`) ONLY when the catalog
 returns nothing, so the layout is reviewable without passing preview data off as server data.
 Delete that block once the catalog module lands.
+
+## API contract reconciliation (API_CONTRACT.md) — FOUNDATION DONE, MIGRATION PENDING
+
+The contract is now frozen. Reading it revealed that **my invented shapes were wrong**, not merely
+unconfirmed. That changes the remaining work from "8 pages" to "fix the foundation, then 8 pages".
+
+### What was wrong (mine vs frozen)
+
+| Area | My invented shape | Frozen contract |
+|---|---|---|
+| Order state field | `status` | `order_status` |
+| Order amounts | nested `snapshot.{items_amount,discount_amount,payable_amount}` | FLAT: `original_amount`, `promotion_discount_amount`, `coupon_discount_amount`, `shipping_amount`, `payable_amount` |
+| Order line | `{product_title, cover_url, sku_specs, subtotal_amount}` | `{product_name, sku_name, image_url, unit_price, original_amount, payable_amount, allocated_discount_amount, ...}` |
+| List vs detail | one `Order` with nested items | `OrderSummary` (no items/shipments) vs `OrderDetail` (+ `items[]`, `shipments[]`) |
+| Receiver | `snapshot.receiver_name` unmasked | `receiver_name`/`receiver_phone` **already masked** (§94 — must NOT be un-masked) |
+| Fulfillment | `Shipment` with `id: string`, `items[{order_item_id,quantity}]` | `Fulfillment` with **`id: number`**, `fulfillment_no`, `carrier`/**tracking `null` until shipped**, `items[{id,order_item_id,sku_id,product_name,sku_name,quantity}]` |
+| Ship body | `{carrier, tracking_no, items[], idempotency_key}` | **exactly** `{carrier, tracking_no, item_quantities[]}` — no idempotency key (§110 guard) |
+| `carrier` | free text input | a carrier **CODE** (e.g. `"SF"`) |
+| Inventory | `{on_hand, reserved, version}` | `{on_hand_qty, available_qty, locked_qty, safety_stock, sellable_qty, sku_no, product_name, sku_name, version}` |
+| Inventory adjust body | `{delta, reason, version, idempotency_key}` | `{warehouse_id, sku_id, version, delta_available, reason}` |
+| Analytics | `{points:[{date,value}], money:boolean}` | `{metric, unit, period, series[{bucket,value}], summary{total,average,change_ratio}, dimensions[]}` |
+| Stale version | generic 409 | 409 + code 40002 with **`data` carrying the current Inventory** |
+
+### Done this turn
+
+- **`src/types/frozen-contract.ts`** — every frozen shape transcribed: `Paged<T>`/`PageMeta`/`emptyPage()`,
+  `Fulfillment`, `ShipFulfillmentRequest`, `OrderSummary`/`OrderDetail`/`OrderItem`, `Inventory`,
+  `AdjustmentPreview`, `CreateAdjustmentRequest`, `StaleVersionConflict`, and the full analytics envelope
+  with `AnalyticsUnit`. Additive, so nothing broke.
+- **`src/domain/analytics/unit.ts`** + **21 tests** — the unit-aware renderer. The captain's warning is
+  encoded as a test: `refund.rate = 0.12` must render `12%`, never `¥0.12`, and `order_count = 137`
+  never `¥1.37`. `minor_currency` is the ONLY branch that returns money, and it returns the raw
+  INTEGER for `<PriceText>` rather than a formatted string, so no float touches a monetary value.
+  Also `checkMetricUnit()` cross-checks the server's declared unit against the 5 frozen metrics.
+- **Endpoint corrections** (ratified by the captain): `/orders/admin` + `/orders/admin/{order_no}`
+  (drops the worse `/orders/admin/orders` duplication); added `GET /fulfillments/admin`; `ship`
+  now takes `number | string`.
+
+### THE MIGRATION THAT REMAINS (this is the real remaining work)
+
+Every consumer of the old `Order`/`Fulfillment` shape must move to the frozen one. Affected:
+
+**Types/API layer**
+- `src/types/domain.ts` — `Order`, `OrderItem`, `OrderSnapshot`, `Shipment` become aliases/re-exports of
+  the frozen types (or are deleted), so there is ONE shape per resource.
+- `src/api/order.ts`, `src/api/aftersales.ts`, `src/api/analytics.ts`, `src/api/inventory.ts` — return
+  types and param names (`delta` → `delta_available`, etc.).
+
+**Availability modules + their tests**
+- `orders/availability.ts` reads `order.status` → `order.order_status`; `canShipOrder` should take a
+  `Fulfillment` (numeric id) and check `carrier/tracking_no === null` for "not yet shipped".
+- `inventory/availability.ts` — `on_hand`/`reserved` → `on_hand_qty`/`locked_qty`, and use the
+  server's `sellable_qty` instead of recomputing it.
+- Their 69 tests change in lockstep (that is the point of having them).
+
+**Views**
+- `console/OrdersView.vue` — flat amounts, `order_status`, masked receiver, and ship via the
+  fulfillment queue (`GET /fulfillments/admin`) keyed by numeric id with a carrier CODE select.
+- `console/InventoryView.vue`, `console/AnalyticsView.vue`, `console/DashboardView.vue` — frozen
+  inventory fields and the analytics envelope.
+- `consumer/{OrdersView,OrderDetailView,CheckoutView,MockPayView}.vue` — same order-shape migration.
+
+**Recommended order**: types → API modules → availability modules + tests → views. Doing views first
+would mean editing them twice.

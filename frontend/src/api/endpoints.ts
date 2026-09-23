@@ -73,8 +73,8 @@ export const API = {
      */
     cancel: (orderNo: string) => `/orders/${orderNo}/cancel`,
     confirmReceipt: (orderNo: string) => `/orders/${orderNo}/confirm-receipt`,
-    adminList: '/orders/admin/orders',
-    adminDetail: (orderNo: string) => `/orders/admin/orders/${orderNo}`,
+    adminList: '/orders/admin',
+    adminDetail: (orderNo: string) => `/orders/admin/${orderNo}`,
   },
 
   // -- payments -----------------------------------------------------------
@@ -91,16 +91,21 @@ export const API = {
   fulfillment: {
     shipments: (orderNo: string) => `/fulfillments/customer/orders/${orderNo}/shipments`,
     /**
-     * TASK endpoint (§99). FROZEN path from PROJECT_BASELINE.yaml `task_endpoints`:
-     *   POST /api/v1/fulfillments/{id}/ship
+     * TASK endpoint (§99). FROZEN path from PROJECT_BASELINE.yaml `task_endpoints` and
+     * API_CONTRACT.md §4: `POST /api/v1/fulfillments/{id}/ship`.
      *
-     * NOTE THE SHAPE: shipping is FULFILLMENT-centric, not order-centric. The caller must
-     * supply a fulfillment id, which means the console needs the order's fulfillment list to
-     * offer the action. `canShipOrder()` therefore requires the id — without it there is no
-     * URL to call, so the button would be a guaranteed failure.
+     * The id is a NUMBER (API_CONTRACT.md §5) and is fulfillment-scoped, because an order may
+     * ship in several packages — "ship this order" is not a well-formed instruction. The body
+     * accepts EXACTLY `carrier` / `tracking_no` / `item_quantities` (§110 mass-assignment guard).
      */
-    ship: (fulfillmentId: string) => `/fulfillments/${fulfillmentId}/ship`,
-    adminList: '/fulfillments/admin/fulfillments',
+    ship: (fulfillmentId: number | string) => `/fulfillments/${fulfillmentId}/ship`,
+    /**
+     * API_CONTRACT.md §5.2 — the fulfillment QUEUE. Added because an operator works from a
+     * queue, not by opening orders one at a time, and because without it there is no interface
+     * capable of discovering the id that `ship` requires. Paged envelope; filters `order_no`
+     * and `fulfillment_status`.
+     */
+    adminList: '/fulfillments/admin',
   },
 
   // -- after-sales --------------------------------------------------------
