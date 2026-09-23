@@ -25,6 +25,7 @@ from app.core.redaction import (
     llm_payload,
     mask_address,
     mask_email,
+    mask_name,
     mask_phone,
     redact,
     redact_text,
@@ -149,6 +150,16 @@ def test_mask_phone_keeps_the_ends_and_drops_the_middle() -> None:
     assert masked.startswith("138")
     assert masked.endswith("5678")
     assert "123456" not in masked.replace("*", "")
+
+
+def test_mask_name_keeps_the_first_character_and_masks_every_name() -> None:
+    """The contract's receiver name is "张*"; a one-character name must not slip
+    through the mask, which is exactly the shortest and most identifying case."""
+    assert mask_name("张三") == "张*"
+    assert mask_name("欧阳娜娜") == "欧***"
+    assert mask_name("王") == "王*"
+    assert mask_name("") == ""
+    assert "张三" not in mask_name("张三")
 
 
 # ---------------------------------------------------------------------------

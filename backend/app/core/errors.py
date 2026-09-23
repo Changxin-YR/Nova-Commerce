@@ -467,6 +467,18 @@ OrderAmountMismatchError = _error(
 )
 PriceChangedError = _error("Price changed since it was last previewed", ErrorCode.PRICE_CHANGED, http_status=409)
 AddressNotFoundError = _error("Address not found", ErrorCode.ADDRESS_NOT_FOUND, http_status=404)
+#: 50010 / 50011 are distinct from the generic 50004 because the UI branches on
+#: them: "this order can no longer be cancelled" and "receipt cannot be confirmed
+#: yet" are actionable states, not a generic conflict. Both carry the from/to
+#: status in `context` so the client can render the real state.
+OrderNotCancellableError = _error(
+    "Order can no longer be cancelled", ErrorCode.ORDER_NOT_CANCELLABLE, http_status=409
+)
+OrderNotConfirmableError = _error(
+    "Order is not in a state where receipt can be confirmed",
+    ErrorCode.ORDER_NOT_CONFIRMABLE,
+    http_status=409,
+)
 
 # -- payment ----------------------------------------------------------------
 PaymentNotFoundError = _error("Payment not found", ErrorCode.PAYMENT_NOT_FOUND, http_status=404)

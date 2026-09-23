@@ -31,7 +31,12 @@ def register_module_routers() -> None:
         ("app.modules.catalog.api", "/catalog", ("public", "admin", "images")),
         ("app.modules.inventory.api", "/inventory", ("customer", "admin")),
         ("app.modules.cart.api", "/cart", ("customer",)),
-        ("app.modules.order.api", "/orders", ("customer", "admin")),
+        # ORDER MATTERS: the admin router must be included before the customer
+        # router. Both are mounted under the same `/orders` prefix, and the
+        # consumer detail route is `GET /orders/{order_no}` -- if it were
+        # registered first it would capture `GET /orders/admin` and the console
+        # list would 404. Do not "tidy" this back into alphabetical order.
+        ("app.modules.order.api", "/orders", ("admin", "customer")),
         ("app.modules.payment.api", "/payments", ("customer", "callbacks", "admin")),
         ("app.modules.fulfillment.api", "/fulfillments", ("customer", "admin")),
         ("app.modules.aftersales.api", "/after-sales", ("customer", "admin", "refunds")),
