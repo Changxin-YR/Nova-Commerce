@@ -310,8 +310,14 @@ class FulfillmentService:
         )
         for line in lines:
             shell.items.append(
+                # ``sku_id`` is snapshotted beside the names: ``product_name`` and
+                # ``sku_name`` are already values on this row, and carrying a line's names
+                # but not the id they came from was the one inconsistent combination.
+                # ``order_item_id`` stays the authoritative link (INV-014); this id exists
+                # so a reader never needs a second query for it.
                 FulfillmentItem(
                     order_item_id=line.id,
+                    sku_id=line.sku_id,
                     product_name=line.product_name,
                     sku_name=line.sku_name,
                     quantity=line.quantity,
@@ -750,6 +756,7 @@ class FulfillmentService:
             template = source_items.get(order_item_id)
             if template is not None:
                 product_name, sku_name = template.product_name, template.sku_name
+                sku_id = template.sku_id
             else:
                 fallback = next((line for line in order.items if line.id == order_item_id), None)
                 if fallback is None:
@@ -761,9 +768,11 @@ class FulfillmentService:
                         },
                     )
                 product_name, sku_name = fallback.product_name, fallback.sku_name
+                sku_id = fallback.sku_id
             residual_package.items.append(
                 FulfillmentItem(
                     order_item_id=order_item_id,
+                    sku_id=sku_id,
                     product_name=product_name,
                     sku_name=sku_name,
                     quantity=quantity,
