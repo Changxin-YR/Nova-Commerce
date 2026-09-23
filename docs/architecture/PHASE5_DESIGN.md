@@ -684,7 +684,44 @@ Consequences, both mandatory:
 * **A red run must be re-confirmed in isolation before it is believed**, because the
   second-order failures it creates are indistinguishable from real ones.
 
-### 13.6 The freeze window
+### 13.6 DDL has no transaction semantics - never inside a savepoint you intend to roll back
+
+A verifier proved the three caps are enforced by the **live** tables (not only by
+synthetic twins) and, to complete the argument, added a *meta-control*: drop the
+constraint, re-issue the same violating write, show it now lands - which is what
+proves the rejection came from the cap rather than from something incidental.
+
+The probe wrapped that in a savepoint and rolled back. **MySQL performs an implicit
+commit on DDL.** `ALTER TABLE ... DROP CHECK` closed the transaction and destroyed
+the savepoint, so the rollback undid nothing: the constraint was gone from the shared
+schema and the probe row was committed. It was caught by a whole-table re-read (the
+`refund_cap` count came back 2, not 3), repaired from the identical clause on another
+table rather than by retyping it, and verified three ways - it enforces again, it is
+byte-identical to what the migration produces (a `downgrade`/`upgrade` round trip),
+and `alembic check` is clean. The round trip also emptied `payments`, which held
+accumulated residue rather than fixtures.
+
+Two rules:
+
+* **A meta-control that mutates DDL belongs on a table the test owns outright** -
+  `CREATE TABLE` a twin, attach the clause, `DROP CHECK` it explicitly, `DROP TABLE`
+  in teardown. No transaction need be relied on and no shared object is at risk.
+* **After any DDL probe, re-read the catalogue and assert the object count**, not the
+  exit code of the repair. The damage here was invisible until the count was checked.
+
+The same probe also produced the phase's most valuable negative-control technique:
+against the **live** tables a violating write is refused with **errno 3819 naming the
+real constraint**, with the row byte-identical when re-read on a **separate
+connection**. It also showed why a live-table probe needs care that a twin does not -
+one attempt was refused by a *unique key* (`1062`) rather than the cap, so the probe
+must be built so the unique keys cannot be what refuses it, and the assertion must
+name errno 3819 explicitly.
+
+`scripts/verify_refund_caps.py` re-reads the three clauses from
+`information_schema` and asserts the **expression**, not just the name - a constraint
+re-created with the wrong clause would satisfy a name-only check.
+
+### 13.7 The freeze window
 
 When the captain sends `FREEZE`, stop writing to the repository. Finish the tool call
 you are in, report, and wait. The window exists to make section 13.4 possible, and it
