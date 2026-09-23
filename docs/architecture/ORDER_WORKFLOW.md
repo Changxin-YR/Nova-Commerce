@@ -288,14 +288,23 @@ obligation 1). Deleting the fallback with the field present only on the detail
 payload would have turned a silent fallback into a silently hidden control on the
 list. `API_CONTRACT.md` section 6 now names the field on the base order shape.
 
-### 11.5 The outbox seam is still a seam
+### 11.5 The outbox seam is wired (Phase 6 landed it)
 
-`CreateOrderWorkflow` step 9 and `PaymentSuccessWorkflow` step 10 both carry a marked
-"Phase 6 inserts the outbox row HERE, in this same transaction" comment. Phase 5
-deliberately does **not** create the table: an outbox row that nobody publishes is
-worse than no row, because it looks like the event was recorded. The comment is
-load-bearing - the row must commit with the business rows, so its position in the
-method is not movable.
+`CreateOrderWorkflow` step 9, `PaymentSuccessWorkflow` step 10 and `RefundWorkflow`
+step 7 now **write** the row through `app.shared.outbox.OutboxWriter.enqueue(...)`,
+in the same transaction that writes the business rows - the marked comment became
+the call.
+
+That `enqueue` never commits is the whole point: it appends to the caller's
+transaction, so `order.created` / `payment.settled` / `refund.succeeded` and the rows
+they describe become visible together or not at all (spec section 49). The two
+failure modes it removes are symmetric - an order with no queued event, and a queued
+event about an order that rolled back.
+
+The publish half is separate and retryable (`publish_due` / `run_publish_cycle`, with
+the retry clock in `next_retry_at`). An outbox row that nobody publishes is worse
+than none, which is why the writer and the publisher landed together rather than the
+table first.
 
 ## 12. Carried forward: the Phase 5 deletions, and the one coupling that must not move silently
 
@@ -314,12 +323,29 @@ Deleting the fallback without adding the field to the summary payload would have
 been a regression, not a cleanup - the same silent-hiding failure the addendum was
 written for, one screen over.
 
-### 12.2 The outbox seam is still a seam (Phase 6)
+### 12.2 The outbox row's position is load-bearing (spec section 49)
 
-Marked in two places, deliberately unmoved:
-`CreateOrderWorkflow` step 9 and `PaymentSuccessWorkflow` step 10. Phase 6 inserts the
-row there, in the same transaction, so that a duplicate callback cannot produce a
-duplicate outbox effect. An outbox row that nobody publishes is worse than none.
+`CreateOrderWorkflow` step 9, `PaymentSuccessWorkflow` step 10 and `RefundWorkflow`
+step 7 emit their event inside the caller's transaction, **below** the guards that
+decide whether the operation happened at all. Two things are true and it is worth
+keeping them apart:
+
+* the position is what section 49 requires - the row must commit with the business
+  rows, so it cannot live in a transaction of its own;
+* "a duplicate cannot produce a second row" is served by **two independent** guards:
+  the guards above make a duplicate *unreachable* (answered in step 1 by the unique
+  index, or caught by the SUCCESS/PAID guards), and `enqueue` additionally dedups on
+  `(event_type, aggregate_type, aggregate_id)`.
+
+The second of those has a consequence a verifier should know: a mutation that moves the
+payment block above its guards does **not** redden FG-11 on its own, because the
+aggregate dedup masks it. That is a fact about the test's sensitivity, not a licence -
+do not move either block, and do not add a pre-check of its own (a pre-check is a
+check-then-act race, and the unique index already decides correctly).
+
+The dedup anchor is the aggregate identity, **not** the emitter's scope-local key, so
+two merchants or two users picking the same key string cannot collide a legitimate
+event away. See `backend/app/shared/db/models/outbox.py` for the argument.
 
 ### 12.3 Single-merchant coupling (do not relax silently)
 
