@@ -663,7 +663,15 @@ def purge_shop(created: dict[str, object], *, marker: str) -> None:
     """
     factory = get_session_factory()
     merchant_id = created.get("merchant_id")
-    marker_like = f"{marker}%"
+    # Two shapes must be matched. The seed builds event ids as
+    # evt-<marker>-<suffix> (see signed_success_callback), and callers may pass
+    # their own id - every one of which embeds the marker. A bare "{marker}%"
+    # therefore matches **nothing**, which is a real leak rather than a tidiness
+    # issue: payment_callbacks has no FK to payments on purpose (design 5.2: an
+    # unresolvable delivery must stay recordable), so nothing cascades these rows away
+    # and they reference deleted merchants and payments forever - exactly the rows an
+    # incident review reads. Reported by payment-workflow with a measurement.
+    marker_like = f"%{marker}%"
     # Idempotent by construction: every statement is scoped to ids or marker prefixes
     # that this test created, so a second call (finalizer plus finally) is a no-op.
     # Nothing here deletes by a blanket pattern or truncates a table.
