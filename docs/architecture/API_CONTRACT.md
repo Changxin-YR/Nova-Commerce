@@ -432,3 +432,202 @@ UI and discovered there was nothing to call.
 That is a useful signal in the other direction too — a page that cannot be built from
 the frozen contract is evidence the contract is incomplete, not evidence the page is
 unnecessary.
+
+---
+
+## 13. Response shapes for §12 — the gap §12.3 itself created (2026-09-23, third batch)
+
+§12.3 named the pattern "the rule was frozen and the interface was not" — and then §12
+repeated it one level down. It froze six **paths** (§4 names `PromotionPreview`,
+`Promotion`, `CouponPreview`, `CouponTemplate`, `Role`, `User`) while defining **no
+shape for any of them**. The frontend reported this rather than inventing the six, which
+is why it is being fixed here instead of discovered later.
+
+### 13.1 Promotion
+
+```json
+{
+  "id": 12,
+  "promotion_no": "NVP2026092300001",
+  "merchant_id": 1,
+  "name": "秋季数码焕新",
+  "description": "手机品类满 3000 减 300",
+  "promotion_type": "FULL_REDUCTION",
+  "status": "DRAFT",
+  "priority": 100,
+  "stackable": false,
+  "rule_config": {
+    "threshold_amount": 300000,
+    "reduction_amount": 30000,
+    "max_discount_amount": null
+  },
+  "scope": {
+    "all_products": false,
+    "product_ids": [3, 7, 11],
+    "category_ids": [],
+    "brand_ids": [2]
+  },
+  "starts_at": "2026-09-25T00:00:00.000Z",
+  "ends_at": "2026-10-08T23:59:59.000Z",
+  "total_quota": 1000,
+  "used_quota": 37,
+  "created_at": "2026-09-23T04:00:00.000Z",
+  "updated_at": "2026-09-23T04:00:00.000Z"
+}
+```
+
+`promotion_type` is one of `DIRECT_DISCOUNT` | `PERCENT_DISCOUNT` | `FULL_REDUCTION`
+(§39). **`rule_config` is discriminated by `promotion_type`**, and the three variants are:
+
+| `promotion_type` | `rule_config` fields |
+|---|---|
+| `DIRECT_DISCOUNT` | `discount_amount` (minor units, per unit) |
+| `PERCENT_DISCOUNT` | `discount_bps` (basis points — 1250 = 12.5%), `max_discount_amount` (nullable cap) |
+| `FULL_REDUCTION` | `threshold_amount`, `reduction_amount`, `max_discount_amount` (nullable) |
+
+Two deliberate choices, both about correctness rather than taste:
+
+- **Rates are basis points, never floats.** 12.5% is exactly 1250 bps; `0.125` is not
+  exactly representable, and a discount computed from a float is a ledger that does not
+  add up. This is the same reason money is integer minor units.
+- **`scope` is explicit rather than an implicit "everything".** A promotion with no
+  scope is an all-products promotion, and that should be *stated* (`all_products: true`)
+  rather than inferred from empty arrays. Inferring it is how a promotion accidentally
+  covers the whole catalogue.
+
+### 13.2 PromotionPreview
+
+The preview response **is the exact body `POST /marketing/promotions` accepts**, plus:
+
+```json
+{
+  "preview_token": "pv_9f2c...",
+  "expires_at": "2026-09-23T04:15:00.000Z",
+  "promotion": { "...": "the Promotion shape above, with id/promotion_no null" },
+  "estimated_impact": {
+    "affected_sku_count": 3,
+    "affected_order_count_30d": 142,
+    "estimated_discount_amount_30d": 4260000
+  },
+  "conflicts": [
+    { "promotion_id": 9, "promotion_no": "NVP2026080100007", "reason": "OVERLAPPING_WINDOW_AND_SCOPE" }
+  ],
+  "warnings": ["该促销将与现有活动叠加，实际折扣可能高于预估"]
+}
+```
+
+`preview_token` is what makes §47 enforceable rather than advisory: the create call must
+carry it, and the server rejects a token whose underlying payload has changed. Without it
+"preview first" is a convention the client can skip; with it, a single-submit create flow
+**cannot be written** — which is exactly how the frontend implemented the coupon
+equivalent, making it a compile-time property rather than a discipline.
+
+`conflicts` is non-empty rather than a 409 because a conflict is information the
+operator needs in order to decide, not an error that stops them looking.
+
+### 13.3 CouponTemplate and CouponPreview
+
+```json
+{
+  "id": 5,
+  "template_no": "NVC2026092300001",
+  "merchant_id": 1,
+  "name": "新客立减 50",
+  "coupon_type": "FIXED_AMOUNT",
+  "status": "DRAFT",
+  "face_value_amount": 5000,
+  "discount_bps": null,
+  "threshold_amount": 19900,
+  "max_discount_amount": null,
+  "total_quota": 10000,
+  "issued_count": 0,
+  "per_user_limit": 1,
+  "validity_type": "RELATIVE",
+  "valid_days": 30,
+  "valid_from": null,
+  "valid_to": null,
+  "applicable_scope": { "all_products": true, "product_ids": [], "category_ids": [] },
+  "created_at": "2026-09-23T04:00:00.000Z"
+}
+```
+
+`coupon_type` is `FIXED_AMOUNT` | `PERCENT_DISCOUNT`. For `FIXED_AMOUNT`,
+`face_value_amount` is set and `discount_bps` is null; for `PERCENT_DISCOUNT` the
+reverse. A discriminator the client can switch on, rather than a nullable pair it has to
+guess about.
+
+`CouponPreview` mirrors `PromotionPreview`: `preview_token`, `expires_at`, `coupon`
+(the shape above), `estimated_impact`, `warnings`.
+
+### 13.4 Role and User, and the §12.2 constraint made concrete
+
+```json
+{
+  "id": 4,
+  "code": "OPERATOR",
+  "name": "运营",
+  "description": "商品、库存、促销与订单运营",
+  "is_system": true,
+  "data_scope": "MERCHANT",
+  "permissions": [
+    { "code": "product:write", "resource": "product", "action": "write", "is_grantable": true },
+    { "code": "inventory:adjust", "resource": "inventory", "action": "adjust", "is_grantable": true }
+  ],
+  "user_count": 6,
+  "created_at": "2026-09-23T04:00:00.000Z",
+  "updated_at": "2026-09-23T04:00:00.000Z"
+}
+```
+
+```json
+{
+  "id": 42,
+  "username": "operator01",
+  "email": "op01@example.com",
+  "phone": "138****5678",
+  "display_name": "运营一号",
+  "user_type": "STAFF",
+  "status": "ACTIVE",
+  "merchant_id": 1,
+  "data_scope": "MERCHANT",
+  "data_scope_override": null,
+  "roles": [ { "id": 4, "code": "OPERATOR", "name": "运营" } ],
+  "last_login_at": "2026-09-23T03:12:00.000Z",
+  "created_at": "2026-06-01T00:00:00.000Z"
+}
+```
+
+`User.email` and `User.phone` arrive **masked** (§94) on list and detail alike. A staff
+directory is an exfiltration target and an operator rarely needs the full value; the
+client must not attempt to un-mask.
+
+**The §12.2 rule now has a shape to attach to.** A permission entry carries
+`is_grantable`, and the write is:
+
+```json
+PUT /api/v1/system/roles/{id}/permissions
+{
+  "permissions": ["product:read", "order:read", "analytics:read"],
+  "reason": "调整运营职责范围"
+}
+```
+
+Server-side obligations, stated here because a checkbox UI cannot express them:
+
+1. Replace the set wholesale. A delta invites a caller to omit a permission it did not
+   know about, silently revoking it.
+2. **Refuse any change that lowers the `risk_level` of a tool marked `is_write`** unless a
+   separate, audited approval accompanies it (§65). This is the rule the whole section
+   exists for: with a generic blob update it is one unchecked box away.
+3. Reject a permission whose `is_grantable` is false, regardless of what was sent.
+4. Audit the before/after set with actor and reason — a permission change is an audit
+   event, not a settings save.
+
+### 13.5 What is still unfrozen, after this batch
+
+Named so absence is not read as permission:
+
+- Employee/warehouse/brand/category CRUD shapes (Phase 3 modules still lack routers).
+- The full `AgentRun` / `PendingAction` shapes (Phase 10/13).
+- Promotion lifecycle beyond `DRAFT` | `ACTIVE` | `ENDED`, and coupon issuance to users.
+- Sort parameters and export formats.
