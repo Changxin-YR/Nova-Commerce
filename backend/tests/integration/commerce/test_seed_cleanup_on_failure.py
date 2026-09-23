@@ -45,11 +45,12 @@ _REPO_BACKEND = Path(__file__).resolve().parents[3]
 #: next run, spawning another - a self-replicating probe. The `.probe` name keeps pytest
 #: away from it (`norecursedirs`-style safety by naming), while the throwaway conftest
 #: below still makes `shop` resolvable from the child's own directory.
-#: Under ``tests/`` rather than the package: pytest's default ``norecursedirs`` includes
-#: ``.*``, so a dotted directory here is never collected - which keeps the probe from being
-#: collected *and* keeps ``git status`` clean for the evidence emitter, WITHOUT editing a
-#: shared .gitignore.
-_STAGE = Path(__file__).resolve().parents[2] / ".probe_stage"
+#: Staged in ``tests/build/``: pytest's default ``norecursedirs`` includes ``.*`` **and**
+#: ``build``, so neither collection nor git ever sees the probe. ``build/`` is already in
+#: the committed .gitignore, which matters because the evidence emitter refuses a PASS on a
+#: dirty tree - a probe directory showing up as untracked would break that check, and
+#: editing the shared .gitignore to hide my own scratch is the wrong fix.
+_STAGE = Path(__file__).resolve().parents[2] / "build" / "probe_stage"
 
 _CONFTEST = """
 from tests.integration.commerce.seed import engine, shop  # noqa: F401
@@ -57,7 +58,7 @@ from tests.integration.commerce.seed import engine, shop  # noqa: F401
 
 
 def _run_nested(tmp_path: Path, body: str) -> subprocess.CompletedProcess[str]:
-    _STAGE.mkdir(exist_ok=True)
+    _STAGE.mkdir(parents=True, exist_ok=True)
     (_STAGE / "conftest.py").write_text(_CONFTEST, encoding="utf-8")
     target = _STAGE / f"probe_{tmp_path.name}.py"
     target.write_text(textwrap.dedent(body), encoding="utf-8")
