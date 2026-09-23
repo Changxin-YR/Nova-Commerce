@@ -716,10 +716,12 @@ class CreateOrderWorkflow:
             # than the alternatives: creating a second order, or blocking a request
             # thread on another customer's transaction.
             #
-            # (In practice InnoDB usually makes this branch unreachable - our blocked
-            # INSERT waits on the winner's unique-index lock until they commit, and
-            # then a fresh read sees their COMPLETED row - so this is the honest
-            # answer for the cases where that wait does not apply.)
+            # (The claim is verified, not assumed: `session.py:104` sets the session
+            # isolation to READ-COMMITTED, so once the winner commits, our blocked INSERT
+            # fails on the unique index and the very next read sees their COMPLETED row -
+            # which is why the 8-thread same-key test observes 1 create + 7 replays and
+            # zero 10012s. This `raise` is therefore the honest answer for the cases
+            # where that wait does not apply, not the common path.)
             raise IdempotencyInProgressError(
                 "a request with this Idempotency-Key is still in progress",
                 context={"idempotency_key": idempotency_key},
