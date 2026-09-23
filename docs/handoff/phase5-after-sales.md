@@ -71,8 +71,11 @@ Note `get_by_after_sale_no_for_update(after_sale_no)` takes **no scope filter** 
 * **Concurrency.** No test of two simultaneous refunds on one claim/order, and none of refunds racing a shipment. The lock order (claim -> payment -> order -> lines sorted by id) is reasoned, not measured; the verifier should probe it.
 * **`RETURN_IN` stock effects under retry across processes** - I assert the idempotency key and that a replay adds no movement, but only within one process.
 * **The HTTP tests log in for real**, so they mutate global `users` state and are the most contention-sensitive of my files; under concurrent runs they can fail on rows a fixture just created.
-* **`RefundWorkflow` does NOT write `orders.fulfillment_status`.** PHASE5_DESIGN section 6.2
- says it should set `DELIVERED` once a `RETURN_REFUND` claim has every line back ("a returned
- parcel *was* delivered"). **I did not implement that**, so a fully-returned order keeps its
- shipped fulfillment status. Either implement it or get the design line struck - do not assume
- it happens.
+* **`RefundWorkflow` does not write `orders.fulfillment_status`, and that is now the settled
+  ruling rather than a gap.** Design 6.2 originally said the refund should set `DELIVERED` once a
+  `RETURN_REFUND` claim had every line back; the captain struck that sentence at `e423e4f`, on the
+  ground that a parcel returned *was* delivered earlier by a delivery fact, so making the refund the
+  writer would mean money movement asserting a logistics fact - the axis collapse design 4.4 forbids.
+  Design 4.4 now lists this axis as the fulfillment workflow's alone, which is what the code does.
+  Do not "close" this by implementing it: an implementation that followed the old sentence would pass
+  its tests and silently couple two axes the spec keeps independent.
