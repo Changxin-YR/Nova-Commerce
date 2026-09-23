@@ -22,7 +22,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import AppError, ErrorCode
+from app.core.errors import AppError, ErrorCode, FulfillmentAlreadyShippedError
 from app.modules.fulfillment.models import Fulfillment
 from app.modules.fulfillment.schemas import ShipFulfillmentRequest
 from app.modules.fulfillment.service import FulfillmentService
@@ -200,6 +200,14 @@ def test_shipping_an_already_shipped_package_is_refused(session: Session, commer
         _ship(session, commerce, shell.id, quantity=1)
 
     assert int(caught.value.code) == int(ErrorCode.FULFILLMENT_ALREADY_SHIPPED)
+    # The **canonical** class from app.core.errors, not a local stand-in: the whole
+    # value of a frozen business code is that one class carries it, so that a caller
+    # catching the domain error catches the same object everywhere. Asserted on the
+    # class and its HTTP status together, because a correct code on a 400 response is
+    # still a contract violation (that was a real defect: the 70xxx family fell
+    # through to 400 before `http_status_for`'s divisor was fixed).
+    assert isinstance(caught.value, FulfillmentAlreadyShippedError)
+    assert caught.value.status_code == 409
     session.rollback()
 
 

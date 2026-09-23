@@ -51,8 +51,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import (
-    AppError,
-    ErrorCode,
+    FulfillmentAlreadyShippedError,
     FulfillmentNotFoundError,
     FulfillmentQuantityError,
     ValidationError,
@@ -69,32 +68,11 @@ from app.shared.db.base import utc_now
 __all__ = [
     "FULFILLMENT_READ_PERMISSIONS",
     "FULFILLMENT_SHIP_PERMISSIONS",
-    "FulfillmentAlreadyShippedError",
     "FulfillmentPage",
     "FulfillmentService",
-    "FulfillmentStateError",
     "compute_fulfillment_status",
     "compute_residual",
 ]
-
-
-#: Errors the fulfillment surface needs that ``app/core/errors.py`` does not yet
-#: define. The four ``70xxx`` codes are already in :class:`ErrorCode` and already
-#: mapped to HTTP statuses (70 002 and 70 003 -> 409), so only the classes had to be
-#: built; building them locally keeps that file untouched (it is not this module's
-#: to edit) while giving the API layer a typed failure instead of a bare ``AppError``.
-#: **Reported to the captain** so they can be lifted into ``errors.py`` if they want
-#: one place for the domain's exception vocabulary.
-FulfillmentStateError = type(
-    "FulfillmentStateError",
-    (AppError,),
-    {"code": ErrorCode.FULFILLMENT_STATE_INVALID},
-)
-FulfillmentAlreadyShippedError = type(
-    "FulfillmentAlreadyShippedError",
-    (AppError,),
-    {"code": ErrorCode.FULFILLMENT_ALREADY_SHIPPED},
-)
 
 
 #: Ships are performed with either the specific task permission or the legacy
