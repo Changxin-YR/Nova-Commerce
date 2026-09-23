@@ -48,6 +48,7 @@ so a test that makes its own orders still cleans up.
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 from collections.abc import Iterator, Sequence
@@ -264,7 +265,13 @@ def shop(engine, request) -> Iterator[Shop]:
     the scoping rule - it can never delete a row this test did not create.
     """
     factory = get_session_factory()
-    marker = uuid.uuid4().hex[:8]
+    # `NV_TEST_SEED_MARKER` pins the marker, which exists so a test can generate rows
+    # under a prefix it chooses and then assert *only on its own* rows. That matters
+    # because the suite shares one MySQL instance and several processes may run at once:
+    # a whole-database residue count races them and produces comparisons that differ for
+    # reasons unrelated to the fixture. Unset (the normal case) the marker stays random,
+    # so uniqueness is unchanged.
+    marker = os.environ.get("NV_TEST_SEED_MARKER") or uuid.uuid4().hex[:8]
     created: dict[str, object] = {"created_warehouse": False}
     shop_obj: Shop | None = None
 

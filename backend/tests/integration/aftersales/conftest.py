@@ -81,6 +81,7 @@ from tests.integration.commerce.seed import (
     PASSWORD,
     Shop as SeededShop,
     paid_order,
+    shop as shared_shop,
 )
 
 __all__ = [
