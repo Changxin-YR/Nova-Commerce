@@ -157,12 +157,30 @@ class CreateOrderRequest(OrderPreviewRequest):
     """``POST /api/v1/orders`` (§14.2, §14.3).
 
     Adds the body half of the two idempotency guards. The header half
-    (``Idempotency-Key``) cannot live here - it is a header, and putting a
+    (``Idempotency-Key``) cannot live here - it is a header, and putting an
     equivalent field in the body would invite clients to omit the header.
+
+    ## Why ``address_id`` is **re-required** here
+
+    Preview accepts an optional address (the V1 shipping policy is free, so nothing
+    prices off it), but create cannot: the order snapshots the receiver's name, phone
+    and address onto itself (§35), and the design's ``create_order`` signature takes
+    ``address_id`` with no default.
+
+    The field is therefore overridden as required rather than inherited as optional.
+    Inheriting it would let a create with no address pass validation and fail later as
+    ``ADDRESS_NOT_FOUND (50008)`` / 404 - an error that says the *address* could not be
+    found when in fact the request never contained one. The client would go looking for
+    a missing address instead of a missing field. Re-requiring it turns that into the
+    422 that names the field, at the edge, before any transaction opens.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    address_id: int = Field(
+        gt=0,
+        description="The caller's own address; snapshotted onto the order at creation.",
+    )
     client_request_id: str = Field(
         min_length=1,
         max_length=64,

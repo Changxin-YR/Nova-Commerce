@@ -96,6 +96,7 @@ from app.modules.order.schemas import iso_millis
 from app.modules.pricing import (
     CouponRule,
     PricedLine,
+    PriceSnapshot,
     PricingService,
     PromotionRule,
 )
@@ -892,7 +893,7 @@ class CreateOrderWorkflow:
         address_id: int,
         address_snapshot: dict[str, object],
         remark: str | None,
-        snapshot: object,
+        snapshot: PriceSnapshot,
     ) -> Order:
         """Insert the order with a temporary unique ``order_no``, then stamp the real one.
 
@@ -916,11 +917,11 @@ class CreateOrderWorkflow:
             payment_status=PaymentStatus.UNPAID.value,
             fulfillment_status=FulfillmentStatus.UNFULFILLED.value,
             after_sale_status=AfterSaleStatus.NONE.value,
-            original_amount=snapshot.original_amount,  # type: ignore[attr-defined]
-            promotion_discount_amount=snapshot.promotion_discount_amount,  # type: ignore[attr-defined]
-            coupon_discount_amount=snapshot.coupon_discount_amount,  # type: ignore[attr-defined]
-            shipping_amount=snapshot.shipping_amount,  # type: ignore[attr-defined]
-            payable_amount=snapshot.payable_amount,  # type: ignore[attr-defined]
+            original_amount=snapshot.original_amount,
+            promotion_discount_amount=snapshot.promotion_discount_amount,
+            coupon_discount_amount=snapshot.coupon_discount_amount,
+            shipping_amount=snapshot.shipping_amount,
+            payable_amount=snapshot.payable_amount,
             # Nothing is paid yet: paid_amount is Phase 5's to write, and seeding it
             # from `payable_amount` would make INV-005 unfalsifiable.
             paid_amount=0,
@@ -931,7 +932,7 @@ class CreateOrderWorkflow:
             receiver_phone=str(address_snapshot.get("receiver_phone") or ""),
             address_snapshot=dict(address_snapshot),
             remark=remark,
-            item_count=snapshot.item_count,  # type: ignore[attr-defined]
+            item_count=snapshot.item_count,
             first_item_name=self._first_item_name(snapshot),
             expires_at=now + timedelta(minutes=settings.ORDER_PAYMENT_TIMEOUT_MINUTES),
             created_at=now,
@@ -947,20 +948,20 @@ class CreateOrderWorkflow:
         return order
 
     @staticmethod
-    def _first_item_name(snapshot: object) -> str:
+    def _first_item_name(snapshot: PriceSnapshot) -> str:
         """``product_name`` + ``sku_name`` of the first line, truncated to 200 (搂6).
 
         A snapshot, not a join: the list column has to be readable from the order
         row alone, and INV-014 forbids resolving it from the live catalogue.
         """
-        items = getattr(snapshot, "items", ())
+        items = snapshot.items
         if not items:
             return ""
         line = items[0].line
         combined = f"{line.product_name} {line.sku_name}".strip()
         return combined[:FIRST_ITEM_NAME_MAX_LENGTH]
 
-    def _insert_items(self, *, order: Order, warehouse_id: int, snapshot: object) -> list[OrderItem]:
+    def _insert_items(self, *, order: Order, warehouse_id: int, snapshot: PriceSnapshot) -> list[OrderItem]:
         """Insert the lines, taking every allocation from the pricing snapshot.
 
         The per-item split is read through the snapshot's own accessors rather than
@@ -971,12 +972,12 @@ class CreateOrderWorkflow:
         CHECK constraints so the row cannot disagree with the arithmetic.
         """
         inserted: list[OrderItem] = []
-        for item_price in snapshot.items:  # type: ignore[attr-defined]
+        for item_price in snapshot.items:
             line = item_price.line
             sku_id = line.sku_id
-            promotion = int(snapshot.promotion_allocation(sku_id))  # type: ignore[attr-defined]
-            coupon = int(snapshot.coupon_allocation(sku_id))  # type: ignore[attr-defined]
-            allocated = promotion + coupon
+            promotion = snapshot.promotion_allocation(sku_id)
+            coupon = snapshot.coupon_allocation(sku_id)
+            allocated = snapshot.allocated_discount(sku_id)
 
             item = OrderItem(
                 # The relationship rather than a raw `order_id`: assigning it sets the
@@ -1002,7 +1003,7 @@ class CreateOrderWorkflow:
                 promotion_discount_amount=promotion,
                 coupon_discount_amount=coupon,
                 allocated_discount_amount=allocated,
-                payable_amount=item_price.original_amount - allocated,
+                payable_amount=snapshot.item_payable_amount(sku_id),
                 refunded_amount=0,
                 after_sale_status=AfterSaleStatus.NONE.value,
             )

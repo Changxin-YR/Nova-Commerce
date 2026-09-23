@@ -234,11 +234,16 @@ def to_preview(cart: Any) -> OrderPreviewOut:
     items: list[OrderPreviewItemOut] = []
     for item_price in cart.items:
         line = item_price.line
-        promotion = int(cart.promotion_allocation(line.sku_id))
-        coupon = int(cart.coupon_allocation(line.sku_id))
+        sku_id = line.sku_id
+        # Read through the authority's own accessors. It would be tempting to write
+        # `original - promotion - coupon` here, and it would even be correct today - but
+        # that is a second implementation of an identity pricing-author owns, and it is
+        # the one that goes silently wrong the day the identity changes (a per-item
+        # share of a shipping charge, say). §37 allows one authority, so the split is
+        # asked for, not re-derived.
         items.append(
             OrderPreviewItemOut(
-                sku_id=line.sku_id,
+                sku_id=sku_id,
                 product_id=line.product_id,
                 product_name=line.product_name,
                 sku_name=line.sku_name,
@@ -246,10 +251,10 @@ def to_preview(cart: Any) -> OrderPreviewOut:
                 unit_price=line.unit_price,
                 quantity=line.quantity,
                 original_amount=item_price.original_amount,
-                promotion_discount_amount=promotion,
-                coupon_discount_amount=coupon,
-                allocated_discount_amount=promotion + coupon,
-                payable_amount=item_price.original_amount - promotion - coupon,
+                promotion_discount_amount=cart.promotion_allocation(sku_id),
+                coupon_discount_amount=cart.coupon_allocation(sku_id),
+                allocated_discount_amount=cart.allocated_discount(sku_id),
+                payable_amount=cart.item_payable_amount(sku_id),
             )
         )
 
