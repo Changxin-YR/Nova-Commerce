@@ -39,11 +39,27 @@ _REPO_BACKEND = Path(__file__).resolve().parents[3]
 #: the file's own location. A file in ``%TEMP%`` collects fine and then errors with
 #: "fixture 'shop' not found" - worth recording, because that failure looks like a broken
 #: fixture rather than a misplaced file.
-_HERE = Path(__file__).resolve().parent
+#: A **non-collected** staging directory. Anything pytest collects must not be written
+#: here: an earlier version wrote the probe into the package itself, and when the child
+#: process was killed before its cleanup the stray `test_nested_*.py` was collected by the
+#: next run, spawning another - a self-replicating probe. The `.probe` name keeps pytest
+#: away from it (`norecursedirs`-style safety by naming), while the throwaway conftest
+#: below still makes `shop` resolvable from the child's own directory.
+#: Under ``tests/`` rather than the package: pytest's default ``norecursedirs`` includes
+#: ``.*``, so a dotted directory here is never collected - which keeps the probe from being
+#: collected *and* keeps ``git status`` clean for the evidence emitter, WITHOUT editing a
+#: shared .gitignore.
+_STAGE = Path(__file__).resolve().parents[2] / ".probe_stage"
+
+_CONFTEST = """
+from tests.integration.commerce.seed import engine, shop  # noqa: F401
+"""
 
 
 def _run_nested(tmp_path: Path, body: str) -> subprocess.CompletedProcess[str]:
-    target = _HERE / f"test_nested_{tmp_path.name}.py"
+    _STAGE.mkdir(exist_ok=True)
+    (_STAGE / "conftest.py").write_text(_CONFTEST, encoding="utf-8")
+    target = _STAGE / f"probe_{tmp_path.name}.py"
     target.write_text(textwrap.dedent(body), encoding="utf-8")
     try:
         return subprocess.run(
