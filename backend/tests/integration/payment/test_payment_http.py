@@ -28,11 +28,12 @@ that the same question is asked at two layers.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.core.errors import ErrorCode
+from app.modules.order.models import Order
 from app.modules.payment.enums import CallbackProcessStatus, PaymentRecordStatus
 from app.shared.db.session import get_session_factory
 
@@ -547,6 +548,66 @@ def test_the_create_endpoint_requires_an_idempotency_key(client, fresh_order: Sh
     # the client's error mapper would not map back to "your retry needs a key".
     assert response.status_code == 400, response.text
     assert response.json()["code"] == int(ErrorCode.IDEMPOTENCY_KEY_REQUIRED)
+
+
+def test_expired_order_cannot_start_a_payment_attempt(client, fresh_order: Shop, shop_token: str) -> None:
+    with get_session_factory()() as session:
+        order = session.get(Order, fresh_order.order_id)
+        assert order is not None
+        order.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        session.commit()
+
+    response = client.post(
+        f"{BASE}/customer/payments",
+        json={
+            "order_no": fresh_order.order_no,
+            "channel": "MOCK",
+            "client_request_id": f"expired-{fresh_order.marker}",
+        },
+        headers=_auth(shop_token, **{"Idempotency-Key": f"expired-{fresh_order.marker}"}),
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == int(ErrorCode.ORDER_ALREADY_EXPIRED)
+    assert fresh_connection_row(
+        "SELECT COUNT(*) FROM payments WHERE order_id = :order_id",
+        {"order_id": fresh_order.order_id},
+    )[0] == 0
+
+
+def test_expired_order_can_replay_its_existing_payment_attempt(
+    client, fresh_order: Shop, shop_token: str
+) -> None:
+    payload = {
+        "order_no": fresh_order.order_no,
+        "channel": "MOCK",
+        "client_request_id": f"replay-{fresh_order.marker}",
+    }
+    headers = _auth(shop_token, **{"Idempotency-Key": f"replay-{fresh_order.marker}"})
+    first = client.post(f"{BASE}/customer/payments", json=payload, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["data"]["replayed"] is False
+
+    with get_session_factory()() as session:
+        order = session.get(Order, fresh_order.order_id)
+        assert order is not None
+        order.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        session.commit()
+
+    second = client.post(f"{BASE}/customer/payments", json=payload, headers=headers)
+    assert second.status_code == 200, second.text
+    assert second.json()["data"]["payment_no"] == first.json()["data"]["payment_no"]
+    assert second.json()["data"]["replayed"] is True
+    new_attempt = client.post(
+        f"{BASE}/customer/payments",
+        json={**payload, "client_request_id": f"new-{fresh_order.marker}"},
+        headers=_auth(shop_token, **{"Idempotency-Key": f"new-{fresh_order.marker}"}),
+    )
+    assert new_attempt.status_code == 409, new_attempt.text
+    assert new_attempt.json()["code"] == int(ErrorCode.ORDER_ALREADY_EXPIRED)
+    assert fresh_connection_row(
+        "SELECT COUNT(*) FROM payments WHERE order_id = :order_id",
+        {"order_id": fresh_order.order_id},
+    )[0] == 1
 
 
 def test_the_create_endpoint_cannot_be_talked_into_an_amount(client, fresh_order: Shop, shop_token: str) -> None:

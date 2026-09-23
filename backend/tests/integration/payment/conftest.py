@@ -28,7 +28,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import delete, text
@@ -296,7 +296,7 @@ def _seed(marker: str) -> Shop:
             address_snapshot={"full_address": "GuangdongShenzhenNanshanPayment IT Road 2"},
             item_count=sum(LINE_QUANTITIES),
             first_item_name="Payment IT Product Payment IT SKU 1",
-            expires_at=now,
+            expires_at=now + timedelta(minutes=30),
             created_at=now,
             updated_at=now,
         )
@@ -344,7 +344,7 @@ def _seed(marker: str) -> Shop:
             request_hash="b" * 64,
             paid_amount=0,
             refunded_amount=0,
-            expires_at=now,
+            expires_at=now + timedelta(minutes=30),
             created_at=now,
             updated_at=now,
         )
@@ -530,7 +530,7 @@ def fresh_order(shop: Shop) -> Iterator[Shop]:
             address_snapshot={"full_address": "GuangdongShenzhenNanshanPayment IT Road 2"},
             item_count=LINE_QUANTITIES[0],
             first_item_name="Payment IT Product Payment IT SKU 1",
-            expires_at=now,
+            expires_at=now + timedelta(minutes=30),
             created_at=now,
             updated_at=now,
         )

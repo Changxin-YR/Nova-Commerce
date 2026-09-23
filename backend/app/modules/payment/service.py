@@ -45,6 +45,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import (
     IdempotencyKeyRequiredError,
     IdempotencyPayloadMismatchError,
+    OrderExpiredError,
     OrderNotFoundError,
     OrderStateInvalidError,
     PaymentChannelUnsupportedError,
@@ -192,7 +193,7 @@ class PaymentService:
             user_id=principal.user_id, order_no=order.order_no, channel=channel
         )
 
-        payment = self._insert_or_replay(
+        payment, replayed = self._insert_or_replay(
             principal=principal,
             order=order,
             channel=channel,
@@ -202,13 +203,14 @@ class PaymentService:
         )
         self._session.commit()
         logger.info(
-            "payment attempt created",
+            "payment attempt served",
             payment_no=payment.payment_no,
             order_no=order.order_no,
             channel=channel,
             amount=payment.amount,
+            replayed=replayed,
         )
-        return PaymentCreateResult(payment=payment, replayed=False, order=order)
+        return PaymentCreateResult(payment=payment, replayed=replayed, order=order)
 
     # -- reads -----------------------------------------------------------
     def get_customer_payment(self, *, principal: Principal, payment_id: int) -> Payment:
@@ -328,7 +330,7 @@ class PaymentService:
         client_request_id: str,
         idempotency_key: str,
         request_hash: str,
-    ) -> Payment:
+    ) -> tuple[Payment, bool]:
         """Attempt the insert; on a duplicate key, resolve which guard fired.
 
         The insert is wrapped in a SAVEPOINT so the duplicate-key failure is confined
@@ -388,13 +390,18 @@ class PaymentService:
             with self._session.begin_nested():
                 self._session.add(payment)
                 self._session.flush()
+                if order.expires_at is not None and order.expires_at <= now:
+                    raise OrderExpiredError(
+                        "this order's payment window has expired",
+                        context={"order_no": order.order_no},
+                    )
         except IntegrityError:
             return self._resolve_conflict(
                 principal=principal,
                 client_request_id=client_request_id,
                 idempotency_key=idempotency_key,
                 request_hash=request_hash,
-            )
+            ), True
 
         payment.payment_no = f"{self._settings.PAYMENT_NO_PREFIX}{now:%Y%m%d}{payment.id:06d}"
         self._session.flush()
@@ -407,7 +414,7 @@ class PaymentService:
             channel=channel,
             amount=payment.amount,
         )
-        return payment
+        return payment, False
 
     def _resolve_conflict(
         self,
