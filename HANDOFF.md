@@ -843,11 +843,12 @@ their own assertions, not the authors':
 * **Idempotency race**: 8 threads released together on one `Idempotency-Key` -
   exactly one `orders` row, one `idempotency_records` row, and all eight callers
   returned the **same** `order_no` (one creator, seven replays). The unique index,
-  not application logic, is what serialised them. **Honest caveat:** the companion
-  distinct-key negative control ("N unguarded creates produce N orders") did NOT
-  complete - it counted 0 matching orders and the cause was not isolated in the
-  time available. The shared-key claim above does not depend on it: it is direct
-  observation of 1 order / 1 record / 8 identical order numbers.
+  not application logic, is what serialised them. The companion distinct-key control is a committed
+  test (`test_concurrent_creates_with_different_keys_make_one_order_each`) and
+  passes inside the same gate: 8 different keys produce 8 orders and 8
+  reservations, so the uniqueness above is the key guard doing the work rather
+  than a global mutex. (An earlier ad-hoc version of that control was
+  inconclusive; the committed test supersedes it.)
 
 The shared dev database was left clean afterwards: 0 rows in all four Phase 4
 tables and no leftover scratch schemas.
