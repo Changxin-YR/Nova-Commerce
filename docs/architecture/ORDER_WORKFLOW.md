@@ -233,3 +233,11 @@ server-owned because it decides whether a refund control renders (contract §11)
   test branch must be deleted in the same change. Until then the bridge is the
   only thing keeping refund controls visible on a payload that predates the
   backend field.
+
+* **Single-merchant coupling (do not relax silently):** `_reserve_stock` resolves
+  **one** warehouse per order. That is equivalent to resolving per line only because
+  `load_priced_lines` refuses a cart spanning merchants, so every line shares one
+  `merchant_id` and `get_default(merchant_id=...)` is deterministic. If that guard is
+  ever relaxed - a marketplace cart - the resolution must move inside the loop in the
+  same change, or every line in the order would be locked against one merchant's
+  warehouse. Phase 5 inherits the guard as the enforcement, not a comment.

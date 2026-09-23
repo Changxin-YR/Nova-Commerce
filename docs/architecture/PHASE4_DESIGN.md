@@ -322,21 +322,26 @@ Steps, in this order:
    * FULL_REDUCTION: if `eligible_original >= threshold_amount` →
      `min(reduction_amount, max_discount_amount or ∞, eligible_original)`, else 0.
    * Allocate the order-level discount pro-rata over eligible lines by their original
-     amount, remainder to the **last eligible line**.
+     amount, using the remainder rule below.
 3. `apply_coupon` on the eligible lines, against
    `eligible_original − promotion_allocated_to_eligible`:
    * FIXED_AMOUNT: `min(face_value_amount, remaining)`, threshold on eligible original.
    * PERCENT_DISCOUNT: `floor(remaining × discount_bps / 10000)`, capped by remaining
      and `max_discount_amount`.
-   * Same pro-rata allocation over eligible lines by their remaining amount, remainder
-     to the last eligible line.
+   * Same pro-rata allocation over eligible lines by their remaining amount, using the
+     remainder rule below.
 4. `calculate_shipping`: V1 `FreeShippingPolicy` returns 0. Any non-zero result makes
    `build_price_snapshot` raise `PricingInvariantError`, because a shipping charge has no
    per-item home and would break INV-006 by construction (§14.4).
 5. `payable = original − promotion − coupon + shipping`.
 
 `allocate_pro_rata(total, weights)` must guarantee `sum(result) == total`, `total == 0`
-→ all zeros, and `0 <= result[i] <= weights[i]` for every line. The remainder is handed
+→ all zeros, and (whenever `total <= sum(weights)`) `0 <= result[i] <= weights[i]`
+for every line. Every caller caps the discount at the eligible amount before
+allocating, so the priced path always operates in that regime; the cap is what keeps
+per-item `payable_amount` non-negative. Called directly with `total > sum(weights)`,
+the weights are proportions rather than caps and a share may exceed its own weight -
+which is why no caller may skip the cap. The remainder is handed
 out **one minor unit at a time, walking backwards from the last line and skipping
 zero-weight lines**. For every ordinary cart this is exactly the frozen rule "the
 remainder is absorbed by the last item"; the backward walk only diverges when the last
@@ -476,7 +481,7 @@ call → `envelope(...)`. `Idempotency-Key` is a required `Header` on create, pr
 
 Unit (no DB):
 
-* allocation: sum-exact property over awkward weight sets; remainder to last; zero total.
+* allocation: sum-exact property over awkward weight sets; remainder-walk exactness; zero total.
 * pricing: each promotion type, caps, thresholds, ineligible-line scoping, coupon after
   promotion, `payable >= 0`, INV-006 exactness, non-zero shipping raises.
 * state machine: every legal transition and a representative set of illegal ones;
