@@ -31,8 +31,13 @@ export const API = {
     brands: '/catalog/public/brands',
     adminProducts: '/catalog/admin/products',
     adminProduct: (id: string) => `/catalog/admin/products/${id}`,
-    publish: (id: string) => `/catalog/admin/products/${id}/publish`,
-    unpublish: (id: string) => `/catalog/admin/products/${id}/unpublish`,
+    /**
+     * TASK endpoint (§99). Path is the FROZEN one from PROJECT_BASELINE.yaml
+     * `task_endpoints`: `POST /api/v1/products/{id}/publish` — note the absence of the
+     * `/catalog/admin` module prefix, unlike the list/detail routes above.
+     */
+    publish: (id: string) => `/products/${id}/publish`,
+    unpublish: (id: string) => `/products/${id}/unpublish`,
     skus: (productId: string) => `/catalog/admin/products/${productId}/skus`,
   },
 
@@ -53,17 +58,23 @@ export const API = {
     clear: '/cart/customer/cart/items',
   },
 
-  // -- orders (§96) -------------------------------------------------------
+  // -- orders (§96, §99) --------------------------------------------------
   orders: {
     preview: '/orders/orders/preview',
     create: '/orders/orders',
     list: '/orders/orders',
     detail: (orderNo: string) => `/orders/orders/${orderNo}`,
-    cancel: (orderNo: string) => `/orders/orders/${orderNo}/cancel`,
-    confirmReceipt: (orderNo: string) => `/orders/orders/${orderNo}/confirm-receipt`,
+    /**
+     * TASK endpoints (§99), FROZEN paths from PROJECT_BASELINE.yaml `task_endpoints`:
+     *   POST /api/v1/orders/{order_no}/cancel
+     *   POST /api/v1/orders/{order_no}/confirm-receipt
+     * They sit at the `/orders` prefix WITHOUT the `/orders/orders` module duplication the
+     * list/detail routes use.
+     */
+    cancel: (orderNo: string) => `/orders/${orderNo}/cancel`,
+    confirmReceipt: (orderNo: string) => `/orders/${orderNo}/confirm-receipt`,
     adminList: '/orders/admin/orders',
     adminDetail: (orderNo: string) => `/orders/admin/orders/${orderNo}`,
-    adminShip: (orderNo: string) => `/orders/admin/orders/${orderNo}/ship`,
   },
 
   // -- payments -----------------------------------------------------------
@@ -79,7 +90,17 @@ export const API = {
   // -- fulfillment --------------------------------------------------------
   fulfillment: {
     shipments: (orderNo: string) => `/fulfillments/customer/orders/${orderNo}/shipments`,
-    adminShip: '/fulfillments/admin/shipments',
+    /**
+     * TASK endpoint (§99). FROZEN path from PROJECT_BASELINE.yaml `task_endpoints`:
+     *   POST /api/v1/fulfillments/{id}/ship
+     *
+     * NOTE THE SHAPE: shipping is FULFILLMENT-centric, not order-centric. The caller must
+     * supply a fulfillment id, which means the console needs the order's fulfillment list to
+     * offer the action. `canShipOrder()` therefore requires the id — without it there is no
+     * URL to call, so the button would be a guaranteed failure.
+     */
+    ship: (fulfillmentId: string) => `/fulfillments/${fulfillmentId}/ship`,
+    adminList: '/fulfillments/admin/fulfillments',
   },
 
   // -- after-sales --------------------------------------------------------
@@ -150,10 +171,17 @@ export const API = {
 
   // -- governance: pending actions / approval (§101 HITL) -----------------
   governance: {
+    /**
+     * TASK endpoints (§99). FROZEN paths from PROJECT_BASELINE.yaml `task_endpoints`:
+     *   POST /api/v1/pending-actions/{id}/approve
+     *   POST /api/v1/pending-actions/{id}/reject
+     * Note the hyphenated `pending-actions` prefix sits OUTSIDE the `/governance` module
+     * namespace, unlike the list/detail routes below.
+     */
     pendingActions: '/governance/pending_actions',
     pendingAction: (actionId: string) => `/governance/pending_actions/${actionId}`,
-    approve: (actionId: string) => `/governance/pending_actions/${actionId}/approve`,
-    reject: (actionId: string) => `/governance/pending_actions/${actionId}/reject`,
+    approve: (actionId: string) => `/pending-actions/${actionId}/approve`,
+    reject: (actionId: string) => `/pending-actions/${actionId}/reject`,
     tools: '/governance/tools',
   },
 

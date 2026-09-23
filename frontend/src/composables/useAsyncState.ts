@@ -24,6 +24,19 @@ export interface UseAsyncStateOptions<T> {
   initial?: T | null
 }
 
+/**
+ * Structural check for an empty paged payload (`{ items: [], meta: {...} }`).
+ *
+ * Deliberately structural rather than a cast to `Paged<unknown>`: `T` is generic here, so a
+ * cast would be a lie for non-paged callers, and this keeps the helper honest about what it
+ * actually requires — an `items` array that happens to be empty.
+ */
+export function isEmptyPaged(result: unknown): boolean {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return false
+  const items = (result as { items?: unknown }).items
+  return Array.isArray(items) && items.length === 0
+}
+
 export function useAsyncState<T>(
   loader: () => Promise<T>,
   options: UseAsyncStateOptions<T> = {},
@@ -81,6 +94,10 @@ export function useAsyncState<T>(
     if (options.isEmpty) return options.isEmpty(result) ? 'empty' : 'success'
     if (result === null || result === undefined) return 'empty'
     if (Array.isArray(result) && result.length === 0) return 'empty'
+    // Paged payloads wrap rows in `{ items, meta }`, so a bare-array check misses them and
+    // every list page would render an empty table with a "共 0 条" pager instead of the §108
+    // Empty state. Detected structurally so it works for `Paged<T>` without a cast.
+    if (isEmptyPaged(result)) return 'empty'
     return 'success'
   }
 

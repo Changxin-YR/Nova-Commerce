@@ -1,5 +1,61 @@
 # Frontend redesign — migration status
 
+## Phase 8 (t2) — Merchant console
+
+### DONE and verified
+
+**Action-availability logic (the t2 test requirement)** — pure modules under `src/domain/`,
+all wired to the frozen state machines and unit-tested:
+- `orders/availability.ts` — 28 tests. Encodes §31 ("shipping NEVER changes `order_status`",
+  so an order is PROCESSING while shipped), refusal after partial shipment, and the rule that
+  the ship action requires a fulfillment id.
+- `afterSales/availability.ts` + `inventory/availability.ts` + `governance/availability.ts` —
+  20 tests. Refund cap = `approved_amount || requested_amount − refunded_amount`; optimistic-lock
+  version required; only PENDING pending-actions are decidable; `READ` is the LOWEST risk level.
+- `listParams.ts` — 21 tests. Empty select → absent key (not `status=`), page ≥ 1, page_size
+  capped, whitespace-only text treated as absent.
+
+**Console pages rebuilt to the dense pattern**: `OrdersView.vue` (filter bar → hairline table →
+pager, row actions from the availability module, ship dialog that resolves a fulfillment id
+first) and `ProductsView.vue` (task-based publish/unpublish).
+
+**API-boundary mock test** — `views/console/__tests__/OrdersView.spec.ts` (11 tests):
+`vi.mock('@/api')`, asserting which action renders per status, that each action calls the
+frozen task endpoint function, that shipping calls `fulfillmentAdminApi.ship(fulfillmentId, …)`
+with only the three accepted fields (§110), and that a 403 is handled gracefully.
+
+**Two real bugs found by these tests, both fixed:**
+1. `useAsyncState` only detected a **bare** empty array, so a paged `{items: [], meta}` payload
+   rendered an empty table + "共 0 条" pager instead of the §108 Empty state — on every list
+   page. Fixed centrally (`isEmptyPaged`) and covered by 13 new tests.
+2. Shipping was **unreachable**: the endpoint is fulfillment-keyed, the id was fetched only
+   inside the click handler, and hiding the action until an id exists left nothing to click.
+   Fixed with `canResolveShipment()` so a shippable order always has a way in.
+
+**Endpoint paths realigned to the frozen `task_endpoints` list** in `PROJECT_BASELINE.yaml`
+(3 were wrong in my t1 scaffold — see the t2 report for the divergence list).
+
+### REMAINING — the other 8 console pages
+
+Still on the pre-redesign markup (they render correctly through the compatibility aliases but
+are not dense tables, and are not wired to the availability modules):
+
+| Page | Needs |
+| --- | --- |
+| `InventoryView.vue` | dense table + `canAdjustInventory` / `validateAdjustment` + optimistic-lock conflict UX |
+| `AfterSalesView.vue` | dense table + `afterSaleActionFlags` / `validateRefundAmount` |
+| `DashboardView.vue` | KPI strip + ChartSpec chart on the dense grid |
+| `AnalyticsView.vue` | date-window filter bar via `buildAnalyticsParams` + charts |
+| `MarketingView.vue` | coupon/promotion tables (no frozen task endpoints exist — see report) |
+| `AiWorkspaceView.vue` | dense message blocks + pending-actions table via `pendingActionFlags` |
+| `KnowledgeView.vue` | doc table + `buildKnowledgeDocParams` + retrieval stages |
+| `SystemView.vue` | health dependency table (criticality column) |
+
+Plus: 7 files still use `formatMoney` instead of `<PriceText>` (amounts correct, uniformity
+pending), listed below.
+
+---
+
 ## Brand rename (owner decision): Nexora → Nova
 
 Done in `frontend/` only. **68 occurrences across 15 source/config/doc files**, in two

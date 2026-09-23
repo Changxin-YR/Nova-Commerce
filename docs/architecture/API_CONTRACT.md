@@ -1,0 +1,296 @@
+# API Contract (frozen)
+
+> **Status:** FROZEN. Owner: backend.
+> **Why this document exists:** spec §96 and §99 freeze the *verb pattern* of the
+> API and a handful of exact paths, and §98 fixes the *coverage* of the admin
+> surface — but neither fixes the response **shapes**. The frontend was left
+> guessing, and guessing at a wire format is how a UI silently rots.
+>
+> Per §150 (facts first, smallest fix, record it, carry on) the missing half is
+> frozen here rather than left implicit. Where this document and a guess disagree,
+> this document wins.
+>
+> **Rule for implementers:** if you need something this document does not define,
+> ask — do not invent. An invented shape becomes a real defect the moment the two
+> sides meet.
+
+---
+
+## 1. Envelope (already frozen by §95)
+
+Every `/api/v1` response, success or failure:
+
+```json
+{ "code": 0, "message": "OK", "data": {}, "trace_id": "8f3a..." }
+```
+
+`code == 0` means success. Non-zero codes are the stable business codes in
+`app/core/errors.py`; the frontend's `domain-mirror.spec.ts` fails the build if
+they drift. `trace_id` is also returned as the `X-Trace-Id` header.
+
+## 2. Scalar encodings (frozen)
+
+These four rules remove most of the ambiguity that was blocking frontend work.
+
+| Kind | Encoding | Note |
+|---|---|---|
+| **Money** | JSON **integer**, minor units (cents) | Never a string, never a float. `299900` means ¥2,999.00. |
+| **Identifiers** | JSON **number** | BIGINT UNSIGNED. Exact in JS below 2^53; ids will not approach that. A string id would force `String(id)` at every call site for no benefit at this scale. |
+| **Timestamps** | ISO-8601 **UTC with milliseconds** | `"2026-09-22T23:31:07.507Z"`. Never a local time, never epoch seconds. |
+| **Enums** | SCREAMING_SNAKE **string** | Exactly the frozen vocabularies of §31–§34. Never an ordinal. |
+| **null vs absent** | `null` is explicit; absent means "not requested" | An omitted field is never a silent `null`. |
+
+## 3. List shape (frozen) — the highest-risk assumption
+
+**Every list endpoint returns the same paged envelope. Never a bare array.**
+
+```json
+{
+  "items": [ /* ... */ ],
+  "meta": { "page": 1, "page_size": 20, "total": 137, "total_pages": 7 }
+}
+```
+
+Rationale, because this one is worth defending: a bare array cannot carry a total,
+so the moment a list grows past one page the client must either drop pagination or
+the server must make a breaking change. Deciding now costs nothing; deciding later
+costs a migration on both sides. `meta` is **always present**, even for a single
+page, so the client never branches on its existence.
+
+Query parameters, uniformly: `page` (1-based, default 1), `page_size`
+(default 20, max 100), plus endpoint-specific filters. `total_pages` is
+`ceil(total / page_size)` and is `0` when `total` is `0`.
+
+Empty result is `{"items": [], "meta": {"page": 1, "page_size": 20, "total": 0, "total_pages": 0}}`
+— **not** a 404, and not `null`. The §108 Empty state is driven by
+`items.length === 0`, never by a missing field.
+
+## 4. Task endpoints (frozen)
+
+Spec §99: state changes are **task verbs**, never `PATCH {status}`.
+
+| Action | Method + path | `data` on success |
+|---|---|---|
+| Publish product | `POST /api/v1/products/{id}/publish` | Product |
+| Unpublish product | `POST /api/v1/products/{id}/unpublish` | Product |
+| Cancel order | `POST /api/v1/orders/{order_no}/cancel` | Order |
+| Confirm receipt | `POST /api/v1/orders/{order_no}/confirm-receipt` | Order |
+| Ship fulfillment | `POST /api/v1/fulfillments/{id}/ship` | Fulfillment |
+| Approve pending action | `POST /api/v1/pending-actions/{id}/approve` | PendingAction |
+| Reject pending action | `POST /api/v1/pending-actions/{id}/reject` | PendingAction |
+| Create inventory adjustment | `POST /api/v1/inventory/adjustments` | Inventory |
+| Preview inventory adjustment | `POST /api/v1/inventory/adjustments/preview` | AdjustmentPreview |
+| Publish promotion | `POST /api/v1/marketing/promotions/{id}/publish` | Promotion |
+| Unpublish promotion | `POST /api/v1/marketing/promotions/{id}/unpublish` | Promotion |
+| Reprocess document | `POST /api/v1/knowledge/documents/{id}/reprocess` | KnowledgeDocument |
+| Archive document | `POST /api/v1/knowledge/documents/{id}/archive` | KnowledgeDocument |
+| Cancel agent run | `POST /api/v1/agent/runs/{run_id}/cancel` | AgentRun |
+| Log out everywhere | `POST /api/v1/auth/logout-all` | `{ "revoked_sessions": 3 }` |
+
+**Task endpoints return the updated entity, not `204`.** A state transition that
+returns nothing leaves the client unable to confirm *what changed*, so it either
+refetches (an extra round trip on every click) or optimistically guesses (which
+drifts from the server). Returning the entity removes both problems.
+
+**Ship is keyed by fulfillment id, not order number** (§99). An order may ship in
+several packages, so "ship this order" is not a well-formed instruction.
+
+## 5. Fulfillment discovery — closing the gap the frontend correctly identified
+
+`POST /fulfillments/{id}/ship` needs an id. Nothing in the frozen spec said how a
+client learns one. Both of the following are therefore frozen:
+
+**5.1 A fulfillment appears inside its order.** `GET /api/v1/orders/{order_no}`
+returns, among the order fields:
+
+```json
+{
+  "order_no": "NV20260922000001",
+  "order_status": "PROCESSING",
+  "payment_status": "PAID",
+  "fulfillment_status": "PARTIAL_SHIPPED",
+  "after_sale_status": "NONE",
+  "shipments": [ /* Fulfillment objects, possibly empty */ ]
+}
+```
+
+**5.2 The console can list fulfillments.**
+`GET /api/v1/fulfillments/admin` — paged envelope, filters `order_no`,
+`fulfillment_status`. This exists because an operator works from a fulfillment
+queue, not by opening orders one at a time.
+
+### Fulfillment object (frozen shape)
+
+```json
+{
+  "id": 123,
+  "order_id": 456,
+  "order_no": "NV20260922000001",
+  "fulfillment_no": "NVF20260922000001",
+  "fulfillment_status": "UNFULFILLED",
+  "carrier": "SF",
+  "tracking_no": "SF1234567890",
+  "shipped_at": null,
+  "delivered_at": null,
+  "created_at": "2026-09-22T23:31:07.507Z",
+  "items": [
+    {
+      "id": 1,
+      "order_item_id": 9,
+      "sku_id": 3,
+      "product_name": "Nova Phone 15 Pro",
+      "sku_name": "原色钛金属 256GB",
+      "quantity": 1
+    }
+  ]
+}
+```
+
+`id` is the identifier that `POST /fulfillments/{id}/ship` takes. `carrier` and
+`tracking_no` are `null` until shipped.
+
+`POST /fulfillments/{id}/ship` request body — **exactly three fields**, nothing
+else is accepted (§110 mass-assignment guard):
+
+```json
+{ "carrier": "SF", "tracking_no": "SF1234567890", "item_quantities": [ {"order_item_id": 9, "quantity": 1} ] }
+```
+
+## 6. Order shapes
+
+`OrderSummary` (list rows) and `OrderDetail` (single order) differ only in that
+`OrderDetail` adds `items[]`, `shipments[]` and the address snapshot. Both carry
+all four status fields (§31–§34), because the UI must never infer one from
+another — most importantly, **shipping never changes `order_status`**, so
+"can this be shipped" reads `fulfillment_status`.
+
+```json
+{
+  "id": 456,
+  "order_no": "NV20260922000001",
+  "order_status": "PROCESSING",
+  "payment_status": "PAID",
+  "fulfillment_status": "UNFULFILLED",
+  "after_sale_status": "NONE",
+  "original_amount": 299900,
+  "promotion_discount_amount": 20000,
+  "coupon_discount_amount": 0,
+  "shipping_amount": 0,
+  "payable_amount": 279900,
+  "paid_amount": 279900,
+  "refunded_amount": 0,
+  "receiver_name": "张**",
+  "receiver_phone": "138****5678",
+  "created_at": "2026-09-22T23:31:07.507Z",
+  "paid_at": "2026-09-22T23:32:10.000Z",
+  "expires_at": "2026-09-22T23:46:07.507Z",
+  "items": [
+    {
+      "id": 9,
+      "product_id": 3,
+      "sku_id": 3,
+      "product_name": "Nova Phone 15 Pro",
+      "sku_name": "原色钛金属 256GB",
+      "image_url": "https://.../signed",
+      "unit_price": 299900,
+      "quantity": 1,
+      "original_amount": 299900,
+      "promotion_discount_amount": 20000,
+      "coupon_discount_amount": 0,
+      "allocated_discount_amount": 20000,
+      "payable_amount": 279900,
+      "refunded_amount": 0,
+      "after_sale_status": "NONE"
+    }
+  ],
+  "shipments": []
+}
+```
+
+`receiver_name` and `receiver_phone` arrive already masked (§94). The client must
+not attempt to un-mask them. This is deliberate: an order list is a common
+exfiltration target and the operator rarely needs the full value.
+
+**Admin order reads:** `GET /api/v1/orders/admin` and
+`GET /api/v1/orders/admin/{order_no}`. The consumer paths stay exactly as §96
+froze them. The admin segment sits under the same `/orders` prefix so the two
+surfaces cannot drift apart into unrelated namespaces.
+
+## 7. Inventory
+
+```json
+{
+  "id": 11,
+  "warehouse_id": 1,
+  "sku_id": 3,
+  "sku_no": "NV-SKU-0003",
+  "product_name": "Nova Phone 15 Pro",
+  "sku_name": "原色钛金属 256GB",
+  "available_qty": 42,
+  "locked_qty": 3,
+  "safety_stock": 0,
+  "sellable_qty": 42,
+  "on_hand_qty": 45,
+  "version": 7,
+  "updated_at": "2026-09-22T23:31:07.507Z"
+}
+```
+
+`POST /api/v1/inventory/adjustments` request — **`version` is required** (§27
+optimistic lock for low-contention background edits):
+
+```json
+{ "warehouse_id": 1, "sku_id": 3, "version": 7, "delta_available": -5, "reason": "盘点差异" }
+```
+
+A stale `version` returns **409** with code `INVENTORY_CONFLICT_STALE_VERSION
+(40002)` and `data` containing the current Inventory, so the UI can show the
+conflict and offer a refresh instead of silently overwriting. `MANUAL_ADJUST`
+movements carry an operator id; the endpoint is never reachable from the agent
+path without approval (§79).
+
+## 8. Analytics (shapes now frozen; §98 required the surface, not the form)
+
+Every analytics endpoint returns the same envelope, so one chart component and one
+table component can render all of them:
+
+```json
+{
+  "metric": "sales.gmv",
+  "unit": "minor_currency",
+  "period": { "from": "2026-08-24", "to": "2026-09-22", "granularity": "day" },
+  "series": [ { "bucket": "2026-09-01", "value": 1289900 } ],
+  "summary": { "total": 28410000, "average": 947000, "change_ratio": 0.12 },
+  "dimensions": [ { "key": "sku_no", "label": "SKU", "value": "NV-SKU-0003" } ]
+}
+```
+
+`unit` is one of `minor_currency`, `count`, `ratio`. The client must read `unit`
+rather than assume — a ratio rendered as ¥ would be a silent, plausible-looking
+lie. `bucket` is `YYYY-MM-DD` for day granularity, `YYYY-MM` for month. Empty
+result is `series: []` with a zeroed `summary`, never `null`.
+
+The five required metrics (§120, §124): `sales.gmv`, `sales.order_count`,
+`inventory.turnover`, `product.performance`, `refund.rate`.
+
+## 9. Error responses the UI must handle explicitly
+
+| HTTP | code | Meaning | UI behaviour |
+|---|---|---|---|
+| 401 | `20002` `TOKEN_EXPIRED` | access token expired | refresh once, then retry; on failure sign out |
+| 401 | `20004` `REFRESH_TOKEN_REUSED` | session family revoked | sign out and say so — **do not silently retry** |
+| 403 | `20008`/`20009`/`20010` | forbidden / missing permission / data scope | `PermissionDenied` state, never a generic error |
+| 409 | `40002` | stale inventory version | show the conflict, offer refresh |
+| 409 | `90008` | coupon already locked | re-preview the cart |
+| 202 | `110007` `AGENT_ACTION_REQUIRES_APPROVAL` | write needs human approval | show the approval card — **not** an error |
+| 503 | `100009` | retrieval unavailable | "knowledge base unavailable"; commerce keeps working |
+
+## 10. What is still NOT frozen
+
+Named explicitly so nobody mistakes absence for permission:
+
+- Pagination `sort`/`order` parameter names (planned: `sort=-created_at`).
+- The `AgentRun` and `PendingAction` full shapes (frozen in Phase 10/13 with the
+  rest of the agent contract).
+- SSE payload internals — only the **12 event names** are frozen (§85).
+- Report/export file formats.

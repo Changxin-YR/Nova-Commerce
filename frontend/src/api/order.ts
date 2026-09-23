@@ -63,10 +63,25 @@ export const orderAdminApi = {
   async detail(orderNo: string): Promise<Order> {
     return httpClient.get<Order>(API.orders.adminDetail(orderNo))
   },
+}
 
-  /** Task endpoint (§99). Requires an idempotency key so a retry cannot double-ship. */
-  async ship(orderNo: string, payload: ShipRequest): Promise<Shipment> {
-    return httpClient.post<Shipment>(API.orders.adminShip(orderNo), payload, {
+/**
+ * Fulfillment administration.
+ *
+ * Shipping lives HERE, not on the order module, because the frozen task endpoint is
+ * `POST /fulfillments/{id}/ship` (PROJECT_BASELINE.yaml `task_endpoints`) — it is keyed by
+ * FULFILLMENT id, not order number. The console therefore resolves the order's unshipped
+ * fulfillment first and passes its id in; see `canShipOrder()` in
+ * `src/domain/orders/availability.ts` for why the id is mandatory.
+ *
+ * `ShipRequest` carries the quantity split per order item, so a partial shipment is expressed
+ * as data rather than as a separate endpoint. The server enforces
+ * `FULFILLMENT_QUANTITY_EXCEEDS_ORDER` (70 001) and `FULFILLMENT_ALREADY_SHIPPED` (70 003).
+ */
+export const fulfillmentAdminApi = {
+  async ship(fulfillmentId: string, payload: ShipRequest): Promise<Shipment> {
+    // Idempotency key prevents a retried request from creating a second shipment.
+    return httpClient.post<Shipment>(API.fulfillment.ship(fulfillmentId), payload, {
       idempotencyKey: payload.idempotency_key,
     })
   },
