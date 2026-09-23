@@ -4,7 +4,7 @@
 > project up with **zero prior context**. Everything needed to continue is here
 > or is linked from here.
 >
-> Handoff written: 2026-09-23 08:40 · **Updated 12:40** · Repo `main` at `be5926e`
+> Handoff written: 2026-09-23 08:40 · **Updated 13:00** · Repo `main` at `ffbd14f`
 
 ---
 
@@ -167,7 +167,7 @@ pytest                153 passed  (119 unit + 28 identity integration + 6 concur
 ruff check            All checks passed
 alembic autogenerate  true no-op (migrations have converged)
 docker compose        5/5 healthy
-frontend              vue-tsc 0 · vite build 0 · vitest 230 · eslint 0
+frontend              vue-tsc 0 · vite build 0 · vitest 246 · eslint 0
 FG-09                 PASS (artifact + 6/6 assertions, real MySQL)
 ```
 
@@ -511,3 +511,36 @@ docker compose --env-file .env -f ops/docker-compose.yml ps     # expect 5/5 hea
 
 Then read `PROJECT_BASELINE.yaml` → `docs/architecture/API_CONTRACT.md` →
 §7 of this document, and start on FG-09.
+
+
+---
+
+## 12. Handoff addendum — 13:00
+
+**Frontend contract migration is complete** (commit `0150fd8`, 246 tests, four gates
+green). All invented types were replaced with the frozen shapes, `order_status` is
+used throughout, `canShipOrder` reads `carrier === null` on a `Fulfillment`, and
+inventory reads the server's `sellable_qty` rather than recomputing it.
+
+Three contract gaps it exposed are now closed (commit `ffbd14f`, contract §11):
+
+| Field | Trigger |
+|---|---|
+| `OrderSummary.item_count`, `first_item_name` | Order lists could not name a product without an N+1 detail fetch per row. |
+| `OrderDetail.cancel_reason` | A cancel-reason input decorated a value the server never sent or accepted. |
+| `OrderDetail.refundable_amount` | Client-derived `paid - refunded` yields `undefined` on a missing field, and `undefined > 0` is `false` — silently disabling **every refund affordance** with no error thrown. |
+
+That last one is worth carrying forward as a rule: **a money field that decides
+whether a UI control renders must be server-owned.** It is INV-005 exposed to the
+client, and §15 forbids the client from being its authority. Expect the same shape
+of problem wherever a cap or a limit is rendered as a control.
+
+**Still in flight at handoff:** `console/{AfterSales, Marketing, AiWorkspace,
+Knowledge, System}View.vue` remain on pre-redesign markup (task t4). The AI
+Workspace one must stay a narrow local view model — contract §10 says the full
+`AgentRun`/`PendingAction` shapes are not frozen yet, and inventing a rich shape now
+would be contradicted in Phase 10/13.
+
+**Where the next agent starts:** `docs/architecture/API_CONTRACT.md`, then §7 above
+(Phase 4 — Cart + Pricing + Order), then the §6 list of MySQL/Alembic traps so they
+are not paid for twice.
