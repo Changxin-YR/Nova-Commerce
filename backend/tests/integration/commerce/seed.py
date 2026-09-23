@@ -615,9 +615,29 @@ def paid_order(
 
     Raises `AssertionError` if the settlement did not apply, so a fixture failure
     surfaces as itself rather than as a confusing assertion three lines later.
+
+    ## Why ``suffix`` is a label and not a key
+
+    A per-call token is folded into the key derivation below, so calling this twice with
+    the *same* ``suffix`` produces two independent settled orders. That matters because
+    ``make_order`` derives ``client_request_id``/``idempotency_key`` from the suffix and
+    ``settle_order`` does the same - so a constant suffix used across tests (which is what
+    a function-scoped fixture over a module-scoped shop does) reuses the **same order and
+    payment keys every time**. The second call then hits the idempotency replay path
+    instead of creating anything, hands back the already-settled order, and the
+    ``PENDING_PAYMENT`` guard in ``PaymentService.create`` raises
+    ``OrderStateInvalidError: this order is not awaiting payment`` - so the first test of a
+    module passes and every later one errors, while the same test passes in isolation.
+
+    Fixing it here rather than asking each caller to pass a unique suffix is the point:
+    the helper advertises "create and settle an order", so it must be safe to call
+    repeatedly. A caller who has to invent a unique suffix to avoid a collision has been
+    handed a trap. ``suffix`` therefore stays a *readable label* for debugging, and the
+    token supplies the uniqueness.
     """
-    order = make_order(shop, lines=lines, suffix=f"{suffix}-o")
-    execution = settle_order(shop, order, suffix=f"{suffix}-p")
+    token = uuid.uuid4().hex[:8]
+    order = make_order(shop, lines=lines, suffix=f"{suffix}-{token}-o")
+    execution = settle_order(shop, order, suffix=f"{suffix}-{token}-p")
     assert execution.applied, (
         f"the shared seed could not settle order {order.order_no}: "
         f"status={execution.status} error_code={execution.error_code} detail={execution.detail}"
