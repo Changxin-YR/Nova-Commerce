@@ -160,10 +160,14 @@ def _grant_if_absent(
     """Grant a permission to a role, tolerating the pair already being granted.
 
     ``RoleRepository.grant_permission`` inserts unconditionally, so granting a pair that is
-    already there raises a duplicate-key error rather than being a no-op. Attempt-and-tolerate
-    rather than *read-then-grant*, for the same reason as above: the check-then-act version can
-    still lose the race, and a fixture that fails intermittently is worse than one that is
-    merely slower.
+    already there raises a duplicate-key error rather than being a no-op.
+
+    The read below is a **fast path, not the guarantee**. The guarantee is the savepoint: the
+    insert is attempted and a unique violation is read as "somebody else granted it", which is
+    the desired end state. Two concurrent callers can both pass the read and both insert, so a
+    read-then-return version would leave exactly the check-then-act race this avoids - the same
+    reasoning as the permission insert above, and the same shape data-layer adopted in the
+    shared seed.
     """
     already = (
         session.execute(
