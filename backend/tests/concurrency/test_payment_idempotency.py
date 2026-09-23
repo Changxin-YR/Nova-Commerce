@@ -51,7 +51,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import pytest
-from sqlalchemy import delete, event, select, text
+from sqlalchemy import event, select, text
 
 from app.core.config import get_settings
 from app.core.errors import ErrorCode
@@ -63,13 +63,13 @@ from app.modules.identity.service import Principal
 from app.modules.inventory.enums import MovementType, OperatorType, ReferenceType
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.order.enums import OrderStatus, PaymentStatus
-from app.modules.order.models import Order, OrderItem, OrderStatusLog
+from app.modules.order.models import Order, OrderItem
 from app.modules.payment.enums import (
     CallbackProcessStatus,
     PaymentChannel,
     PaymentRecordStatus,
 )
-from app.modules.payment.models import Payment, PaymentCallback
+from app.modules.payment.models import Payment
 from app.modules.payment.providers import CALLBACK_EVENT_TYPE_PAYMENT_SUCCEEDED, sign_body
 from app.modules.payment.service import PaymentService
 from app.modules.payment.workflow import CallbackRequest, PaymentSuccessWorkflow
@@ -152,6 +152,7 @@ class Gate:
     user_id: int
     warehouse_id: int
     sku_ids: tuple[int, int]
+    product_id: int
     order_id: int
     order_no: str
     payable_amount: int
@@ -393,6 +394,7 @@ def _seed(marker: str) -> Gate:
             user_id=consumer.id,
             warehouse_id=warehouse.id,
             sku_ids=(sku_ids[0], sku_ids[1]),
+            product_id=product.id,
             order_id=order.id,
             order_no=order.order_no,
             payable_amount=payable_amount,
@@ -407,58 +409,95 @@ def _seed(marker: str) -> Gate:
 def _purge(gate: Gate) -> None:
     """Delete everything the fixture and the test created, children first.
 
-    The foreign keys here are ``RESTRICT`` precisely so that financial history cannot
-    be deleted out from under a live row, which means the unwinding order is not
-    optional. Anything left behind would make the next run behave differently from this
-    one, and a suite whose second run differs from its first is a suite nobody trusts.
-    """
-    factory = get_session_factory()
-    with factory() as session:
-        session.execute(
-            delete(InventoryMovement).where(InventoryMovement.sku_id.in_(gate.sku_ids))
-        )
-        session.execute(
-            delete(Payment).where(Payment.order_id == gate.order_id)
-        )
-        session.execute(
-            delete(PaymentCallback).where(PaymentCallback.order_no == gate.order_no)
-        )
-        # The fulfillment shell carries a FK to `orders` with RESTRICT, and the module
-        # that owns those tables is not imported here on purpose: FG-11 must not depend
-        # on the fulfillment implementation to clean up after itself.
-        from sqlalchemy import text
+    The foreign keys here are ``RESTRICT`` precisely so that financial history cannot be
+    deleted out from under a live row, which makes the unwinding order mandatory rather
+    than stylistic.
 
-        session.execute(
-            text(
-                "DELETE fi FROM fulfillment_items fi "
-                "JOIN fulfillments f ON f.id = fi.fulfillment_id "
-                "WHERE f.order_id = :order_id"
-            ),
+    ## Two things this teardown learned the hard way
+
+    A single run of this file was observed failing **1 in 10 times** with
+    ``OperationalError (1213, 'Deadlock found when trying to get lock')`` raised by a
+    ``DELETE FROM products`` - and once with five test failures, whose common cause was
+    the same exception inside the worker threads. Neither was a defect in the payment
+    path: both were teardown contention. A gate that is green 70% of the time is not
+    evidence, so:
+
+    1. **Deletes go by primary key.** The first version filtered
+       ``Product.product_no.like("P-FG11-%")``, which matches *every* run's products -
+       including rows a concurrent test process is holding. Naming the ids captured during
+       seeding means this teardown touches only this test's rows.
+    2. **A deadlock is retried, because it is a transport-level failure.** MySQL resolves
+       a 1213 by killing one transaction and expecting the client to restart it - the same
+       contract a real request handler honours. Retrying cannot turn a broken assertion
+       green: the assertions above have already run, and this method only deletes rows the
+       test created.
+
+    The delete order is the dependency order and is deliberately explicit rather than a
+    loop over ``metadata.sorted_tables``: ``order_items.warehouse_id`` RESTRICTs on
+    ``warehouses``, ``fulfillments`` RESTRICTs on ``orders``, and a reflection-driven
+    order would be correct by luck on one schema and wrong on the next.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    factory = get_session_factory()
+    statements = (
+        # One plain SQL delete per table, children before parents. `fulfillment_items`
+        # has no ORM model imported here on purpose: this gate must not need the
+        # fulfillment module loaded to clean up after itself.
+        (
+            "DELETE fi FROM fulfillment_items fi JOIN fulfillments f "
+            "ON f.id = fi.fulfillment_id WHERE f.order_id = :order_id",
             {"order_id": gate.order_id},
-        )
-        session.execute(
-            text("DELETE FROM fulfillments WHERE order_id = :order_id"),
-            {"order_id": gate.order_id},
-        )
-        session.execute(
-            delete(OrderStatusLog).where(OrderStatusLog.order_id == gate.order_id)
-        )
-        session.execute(delete(OrderItem).where(OrderItem.order_id == gate.order_id))
-        session.execute(delete(Order).where(Order.id == gate.order_id))
-        session.execute(delete(Inventory).where(Inventory.warehouse_id == gate.warehouse_id))
-        session.execute(delete(ProductSku).where(ProductSku.id.in_(gate.sku_ids)))
-        session.execute(
-            delete(Product).where(
-                Product.merchant_id == gate.merchant_id, Product.product_no.like("P-FG11-%")
-            )
-        )
-        session.execute(
-            delete(UserAddress).where(UserAddress.user_id == gate.user_id)
-        )
-        session.execute(delete(User).where(User.id == gate.user_id))
-        session.execute(delete(Warehouse).where(Warehouse.id == gate.warehouse_id))
-        session.execute(delete(Merchant).where(Merchant.id == gate.merchant_id))
-        session.commit()
+        ),
+        ("DELETE FROM fulfillments WHERE order_id = :order_id", {"order_id": gate.order_id}),
+        ("DELETE FROM inventory_movements WHERE sku_id IN (:sku0, :sku1)",
+         {"sku0": gate.sku_ids[0], "sku1": gate.sku_ids[1]}),
+        ("DELETE FROM payment_callbacks WHERE order_no = :order_no",
+         {"order_no": gate.order_no}),
+        ("DELETE FROM payments WHERE order_id = :order_id", {"order_id": gate.order_id}),
+        ("DELETE FROM order_status_logs WHERE order_id = :order_id",
+         {"order_id": gate.order_id}),
+        ("DELETE FROM order_items WHERE order_id = :order_id", {"order_id": gate.order_id}),
+        ("DELETE FROM orders WHERE id = :order_id", {"order_id": gate.order_id}),
+        ("DELETE FROM inventories WHERE warehouse_id = :warehouse_id",
+         {"warehouse_id": gate.warehouse_id}),
+        ("DELETE FROM product_skus WHERE id IN (:sku0, :sku1)",
+         {"sku0": gate.sku_ids[0], "sku1": gate.sku_ids[1]}),
+        ("DELETE FROM products WHERE id = :product_id", {"product_id": gate.product_id}),
+        ("DELETE FROM user_addresses WHERE user_id = :user_id", {"user_id": gate.user_id}),
+        ("DELETE FROM auth_sessions WHERE user_id = :user_id", {"user_id": gate.user_id}),
+        ("DELETE FROM users WHERE id = :user_id", {"user_id": gate.user_id}),
+        ("DELETE FROM warehouses WHERE id = :warehouse_id",
+         {"warehouse_id": gate.warehouse_id}),
+        ("DELETE FROM merchants WHERE id = :merchant_id",
+         {"merchant_id": gate.merchant_id}),
+    )
+
+    last: OperationalError | None = None
+    for attempt in (1, 2, 3):
+        session = factory()
+        try:
+            for sql, params in statements:
+                session.execute(text(sql), params)
+            session.commit()
+            return
+        except OperationalError as exc:
+            session.rollback()
+            # 1213 is a deadlock victim; 1205 is the lock-wait timeout. Both mean "this
+            # transaction lost a race, restart it", and both are expected in a suite that
+            # runs ten threads against one database.
+            if getattr(exc, "orig", None) is None or exc.orig.args[0] not in (1213, 1205):
+                raise
+            last = exc
+            time.sleep(0.1 * attempt)
+        finally:
+            session.close()
+
+    # Three attempts, all deadlocked. Raising the last one is better than swallowing it:
+    # a suite that leaves rows behind makes the *next* run behave differently, and a
+    # difference nobody can attribute is worse than a failure somebody can read.
+    if last is not None:
+        raise last
 
 
 @pytest.fixture
@@ -513,7 +552,7 @@ def _drain(requests: list[CallbackRequest], *, workers: int = DELIVERIES) -> lis
     lock = threading.Lock()
 
     def deliver(index: int, request: CallbackRequest) -> None:
-        for attempt in (1, 2):
+        for attempt in (1, 2, 3):
             session = factory()
             # `suppress` rather than an `except: pass`: only reachable if another
             # worker died before the barrier released, and the carrier is not carried
@@ -527,7 +566,7 @@ def _drain(requests: list[CallbackRequest], *, workers: int = DELIVERIES) -> lis
                 return
             except Exception as exc:
                 session.rollback()
-                if attempt == 2:
+                if attempt == 3:
                     with lock:
                         results[index] = exc
                     return
