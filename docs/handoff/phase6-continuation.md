@@ -9,12 +9,13 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
   for the current local lead over `origin/main`. No commits from this
   continuation have been pushed.
-- Backend: `python -m pytest tests -q` from `backend/` passed **1144 tests** with
-  one upstream Starlette/AnyIO deprecation warning. `ruff check --no-cache
-  backend/app backend/tests backend/migrations` passed.
-- Schema: Alembic head is `48f1e3b5a00c`; `alembic check` found no drift. The
-  new `ix_orders_status_expires_at` index was read back as
-  `(order_status, expires_at)`.
+- Backend: `python -m pytest tests -q` from `backend/` passed **1147 tests**
+  before the final scope-validation case was added; its four promotion integration
+  tests then passed. One upstream Starlette/AnyIO deprecation warning remains.
+  `ruff check --no-cache backend/app backend/tests backend/migrations` passed.
+- Schema: Alembic head is `40c9914d7367`; `alembic check` found no drift.
+  The order expiry index and promotion checks, unique indexes, and foreign keys
+  were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
 - Frontend: the recorded FG-03 build passed; FG-20 has 292 Vitest cases and
   FG-21 has 5 Playwright shell cases. These are version-bound in their artifacts.
@@ -40,14 +41,24 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    parametrized names containing spaces. FG-07/08/09/10/11/12 were rerun against
    real tests, and the FG-03/20/21 frontend evidence was added. `FINAL_GATE.md`
    is now generated from the baseline and revision-aware artifacts.
+5. Promotions now persist in `promotions` and `promotion_products` with a
+   merchant-scoped, payload-bound preview token. Console preview, create,
+   publish, unpublish and list endpoints, plus storefront active listing, are
+   wired through the real HTTP stack. Preview estimates the 30-day impact and
+   reports overlapping scope and time windows. Order preview and create resolve
+   the active rule through `PricingService`; order creation reserves the
+   promotion quota within its transaction. Real MySQL tests cover the HTTP
+   routes, token replay and tampering, scope ownership, pricing, and two
+   concurrent orders competing for the last quota slot.
 
 ## Remaining work, in execution order
 
-1. **Phase 6 Marketing** (`REQ-MKT-001` through `004`): persist promotions and
-   product scope, enforce preview-before-create, resolve active promotion
-   strategies in order pricing; implement coupon templates, owned coupons and
-   usage records with concurrent lock-on-order, use-on-payment, release-on-cancel.
-   The pricing value objects and `PricingRules` seam already exist.
+1. **Phase 6 Marketing** (`REQ-MKT-002` through `004`): implement coupon
+   templates, owned coupons and usage records with concurrent lock-on-order,
+   use-on-payment, release-on-cancel. Promotion stacking policy and quota
+   release on cancellation still need explicit business rules before extending
+   the first single-promotion implementation. The pricing value objects and
+   `PricingRules` seam already exist.
 2. **Phase 6 Analytics**: backend metric queries and frozen admin API responses
    are absent. The frontend's marketing/analytics views are present but do not
    prove their backend paths work.
@@ -70,10 +81,12 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 
 ## Next code entry point
 
-Start with the `PromotionRule`/`CouponRule` types in
-`backend/app/modules/pricing/value_objects.py`, the resolver seam in
+Promotion persistence and order integration are in progress on this branch.
+After they are committed and their watched gate evidence is refreshed, continue
+with `CouponRule` in `backend/app/modules/pricing/value_objects.py`, the
+`validate_coupon_input` guard and pricing seams in
 `backend/app/modules/order/workflow.py` and `backend/app/modules/order/service.py`,
-and API_CONTRACT §13. The HTTP layer currently passes no resolved rule, so a
-selected `coupon_id` deliberately returns `COUPON_NOT_FOUND (90004)` rather
-than silently charging full price. Preserve that guard while introducing the
-actual resolver.
+the payment settlement and order cancellation paths, and API_CONTRACT §13.3.
+A selected `coupon_id` currently returns `COUPON_NOT_FOUND (90004)` rather
+than silently charging full price; the real resolver must retain that behavior
+for missing, foreign, expired, or already locked coupons.

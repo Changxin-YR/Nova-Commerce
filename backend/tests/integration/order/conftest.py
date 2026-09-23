@@ -43,6 +43,7 @@ from app.modules.identity.service import Principal
 from app.modules.inventory.enums import MovementType, OperatorType, ReferenceType
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.models import Promotion, PromotionProduct
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.modules.payment.models import Payment
 from app.shared.db.base import utc_now
@@ -404,6 +405,10 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
             session.execute(delete(OrderStatusLog).where(OrderStatusLog.order_id.in_(order_ids)))
             session.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))
             session.execute(delete(Order).where(Order.id.in_(order_ids)))
+        session.execute(
+            delete(PromotionProduct).where(PromotionProduct.merchant_id == created["merchant_id"])
+        )
+        session.execute(delete(Promotion).where(Promotion.merchant_id == created["merchant_id"]))
         # Keyed by the marker prefix: `idempotency_records` has no owner column, so a
         # prefix is the only reliable attribution - which is why `Shop.key()` builds
         # keys that way rather than randomising them.

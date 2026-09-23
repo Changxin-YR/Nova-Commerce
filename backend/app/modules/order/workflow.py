@@ -78,6 +78,7 @@ from app.modules.identity.models import UserAddress
 from app.modules.identity.service import AddressService, Principal
 from app.modules.inventory.enums import OperatorType as MovementOperatorType, ReferenceType
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.service import PromotionService
 from app.modules.order.enums import (
     AfterSaleStatus,
     FulfillmentStatus,
@@ -601,12 +602,24 @@ class CreateOrderWorkflow:
 
         # -- step 4: price (business inputs only, 搂38) ----------------------
         priced_lines, merchant_id = load_priced_lines(self._session, lines)
+        promotion_row = None
+        if pricing_rules is None:
+            promotion_rule, promotion_row = PromotionService(self._session).resolve_for_cart(
+                merchant_id=merchant_id,
+                sku_ids={line.sku_id for line in lines},
+                now=utc_now(),
+                for_update=True,
+            )
+            rules = PricingRules(promotion=promotion_rule)
         cart = self._pricing.calculate_cart_price(
             priced_lines,
             promotion=rules.promotion,
             coupon=rules.coupon,
             shipping_policy=None,
         )
+        if promotion_row is not None and cart.promotion_discount_amount > 0:
+            promotion_row.used_quota += 1
+            self._session.flush()
         # `build_price_snapshot` is the first INV-006 gate: it refuses to return a
         # snapshot whose per-item payables do not re-add to the order payable, and
         # it refuses a non-zero shipping charge for the same reason (搂14.4).

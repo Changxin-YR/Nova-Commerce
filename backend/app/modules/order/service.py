@@ -53,6 +53,7 @@ from app.modules.identity.enums import DataScope, PermissionCode
 from app.modules.identity.service import AddressService, Principal
 from app.modules.inventory.enums import ReferenceType
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.service import PromotionService
 from app.modules.order.enums import (
     FULFILLMENT_STATUSES,
     ORDER_STATUSES,
@@ -154,7 +155,15 @@ class OrderService:
         rules = pricing_rules or PricingRules()
         validate_coupon_input(coupon_id=coupon_id, rules=rules)
 
-        priced_lines, _merchant_id = load_priced_lines(self._session, lines)
+        priced_lines, merchant_id = load_priced_lines(self._session, lines)
+        if pricing_rules is None:
+            promotion_rule, _promotion_row = PromotionService(self._session).resolve_for_cart(
+                merchant_id=merchant_id,
+                sku_ids={line.sku_id for line in lines},
+                now=utc_now(),
+                for_update=False,
+            )
+            rules = PricingRules(promotion=promotion_rule)
         return self._pricing.calculate_cart_price(
             priced_lines,
             promotion=rules.promotion,
