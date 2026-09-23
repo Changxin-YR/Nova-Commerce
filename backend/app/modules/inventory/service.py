@@ -404,6 +404,105 @@ class InventoryService:
             locked_after=inventory.locked_qty,
         )
 
+    # -- return_in (goods came back) --------------------------------------
+    def return_in(
+        self,
+        *,
+        sku_id: int,
+        quantity: int,
+        idempotency_key: str,
+        warehouse_id: int | None = None,
+        reference_type: ReferenceType = ReferenceType.AFTER_SALE,
+        reference_id: int | None = None,
+        operator_type: OperatorType = OperatorType.STAFF,
+        operator_id: int | None = None,
+        reason: str | None = None,
+    ) -> ReservationResult:
+        """A returned unit re-enters sellable stock (spec section 28 ``RETURN_IN``).
+
+        The mirror of :meth:`deduct`, and it exists for the same reason: every stock
+        mutation has exactly one method that owns the movement it appends, so
+        ``available_qty`` and the ledger can never disagree (INV-007).
+
+        ## Why ``available_qty`` and not ``locked_qty``
+
+        At payment time the unit went ``available -= q`` (reserve) and then
+        ``locked -= q`` (deduct). The goods physically left, and the row stopped
+        counting them as sellable. A return puts the unit back where it came from -
+        ``available += q`` - and ``locked_qty`` is untouched, because nothing about
+        a return reserves anything. Crediting ``locked_qty`` instead would leave a
+        unit that can only be sold by first being released, i.e. stock that exists
+        but is not offerable.
+
+        ## What this method deliberately does NOT do
+
+        It does not decide *whether* a return is owed money, and it does not touch
+        the order or the claim. ``RETURN_REFUND`` credits stock and
+        ``REFUND_ONLY`` must not - the customer kept the goods, and crediting them
+        would inflate availability until the next stock count found it. That
+        distinction is the refund workflow's to make; this method is only the
+        mechanism, which is why it is invocable on its own and must be called with
+        the same ``idempotency_key`` on every retry.
+
+        ``operator_type`` defaults to ``STAFF`` rather than ``SYSTEM``: the refund
+        was executed by a person, and an audit that cannot tell a human's decision
+        from the system's own action is not much of an audit.
+        """
+        if quantity <= 0:
+            raise ValidationError("quantity must be positive")
+
+        existing = self._movement_exists(idempotency_key)
+        if existing is not None:
+            inventory = self._inventory.get_by_sku(
+                sku_id=sku_id, warehouse_id=existing.warehouse_id
+            )
+            return ReservationResult(
+                sku_id=sku_id,
+                quantity=quantity,
+                movement_id=existing.id,
+                available_after=inventory.available_qty if inventory else existing.after_available,
+                locked_after=inventory.locked_qty if inventory else existing.after_locked,
+                replayed=True,
+            )
+
+        warehouse = self.resolve_warehouse(warehouse_id)
+        inventory = self._inventory.lock_for_update(warehouse_id=warehouse.id, sku_id=sku_id)
+        if inventory is None:
+            # Deliberately not an implicit create: a return for a SKU that has no
+            # inventory row means the sale and the stock record disagree, and
+            # inventing the row here would paper over that.
+            raise InventoryNotFoundError(f"SKU {sku_id} has no stock record")
+
+        before_available, before_locked = inventory.available_qty, inventory.locked_qty
+        inventory.available_qty += quantity
+        # Cumulative counter for reconciliation, so "does the ledger explain the
+        # balance?" stays answerable without replaying every movement (INV-007).
+        inventory.total_in_qty += quantity
+        inventory.version += 1
+
+        movement = self._append(
+            inventory=inventory,
+            movement_type=MovementType.RETURN_IN,
+            before_available=before_available,
+            after_available=inventory.available_qty,
+            before_locked=before_locked,
+            after_locked=inventory.locked_qty,
+            idempotency_key=idempotency_key,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            operator_type=operator_type,
+            operator_id=operator_id,
+            reason=reason,
+        )
+        self._session.flush()
+        return ReservationResult(
+            sku_id=sku_id,
+            quantity=quantity,
+            movement_id=movement.id,
+            available_after=inventory.available_qty,
+            locked_after=inventory.locked_qty,
+        )
+
     # -- adjustment (the optimistic path) ---------------------------------
     def preview_adjustment(
         self,

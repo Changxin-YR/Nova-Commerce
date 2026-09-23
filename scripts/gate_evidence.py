@@ -133,6 +133,41 @@ def _summary_from_stdout(stdout: str) -> str:
     return ""
 
 
+def _git_state() -> dict[str, object]:
+    """The revision this artifact was produced against, and whether it was dirty.
+
+    An evidence file that says "PASS" without saying *what* passed is only half a
+    proof. Concretely: FG-11 was emitted once from a tree that was later found to
+    be flaky three runs in ten, and the artifact gave no way to tell which revision
+    it described - so it could not be retired, only suspected. Recording the commit
+    makes a stale artifact identifiable instead of ambiguous.
+
+    ``dirty`` is recorded per-path rather than repo-wide because four authors share
+    this working tree during a phase: a repo-wide dirty flag is always true and
+    therefore says nothing, while "the tested paths were modified relative to the
+    recorded commit" is the fact a reader actually needs.
+    """
+    revision = _run_git(["rev-parse", "HEAD"])
+    subject = _run_git(["log", "-1", "--format=%s", "HEAD"])
+    dirty = _run_git(["status", "--porcelain", "--", "backend/app", "backend/tests", "backend/migrations"])
+    return {
+        "revision": revision,
+        "subject": subject,
+        "tested_paths_dirty": bool(dirty.strip()),
+        "tested_paths_dirty_files": [line for line in dirty.splitlines() if line.strip()],
+    }
+
+
+def _run_git(args: list[str]) -> str:
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=ROOT, capture_output=True, text=True, timeout=30, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return proc.stdout or ""
+
+
 def _build_plan(gate: Gate) -> tuple[list[str], str]:
     """The real pytest invocation, and the readable command recorded in the artifact."""
     xml_out = gate.xml_out
@@ -245,6 +280,17 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
     if exit_code != 0:
         reasons.append(f"pytest exit_code={exit_code}")
 
+    git_state = _git_state()
+    if git_state["tested_paths_dirty"]:
+        # Not a gate failure - the code may be perfectly correct - but it must not
+        # be reported as PASS, because a reader cannot reproduce the run from the
+        # recorded revision. Phase 5's own rule: a verdict that was not observed
+        # against an identifiable tree is not evidence.
+        reasons.append(
+            "the tested paths were modified relative to the recorded commit "
+            f"({git_state['revision']}), so this run cannot be reproduced from it"
+        )
+
     verdict = "PASS" if not reasons else "FAIL"
 
     report = {
@@ -260,6 +306,7 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
         "summary": _summary_from_stdout(stdout),
         "verdict": verdict,
         "fail_reasons": reasons,
+        "git": git_state,
         "infrastructure": gate.infrastructure,
         "junit_report": junit,
         "assertions": assertions,

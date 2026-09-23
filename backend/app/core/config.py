@@ -466,14 +466,30 @@ class Settings(BaseSettings):
 
     @property
     def mock_payment_allowed(self) -> bool:
-        """Whether the DEV/DEMO mock payment surface may run at all.
+        """Whether the mock payment surface may run at all (spec section 97).
 
         Asked by the settings validator *and* by the endpoint. The duplication is
         deliberate: an endpoint must not trust that it was constructed with a
         validated Settings object, and the validator must not be the only thing
         standing between a misconfigured deployment and a forged settlement.
+
+        ## Why this set is ``{"dev", "test"}`` and not ``{"dev", "test", "demo"}``
+
+        Section 97 says the mock endpoints exist "only in DEV/DEMO". This codebase
+        has no separate ``demo`` environment: :data:`AppEnv` is
+        ``dev | test | staging | prod``, and a demo deployment runs as ``dev``. The
+        first version of this property listed ``"demo"`` anyway, which meant a
+        member of a *security guard* could never be satisfied - a guard that names
+        a mode nobody can enter reads as though that mode is handled, and the next
+        person to touch the guard would have to work out that it is not.
+
+        The requirement is met by the property's shape, not by the name: what the
+        spec actually forbids is a **hardened** environment settling payments
+        without a provider, and that is enforced twice - here, and by the
+        ``PAYMENT_MOCK_ENABLED`` validator refusing to start under
+        ``staging``/``prod``.
         """
-        return self.PAYMENT_MOCK_ENABLED and self.APP_ENV in {"dev", "test", "demo"}
+        return self.PAYMENT_MOCK_ENABLED and self.APP_ENV in {"dev", "test"}
 
     def provider_callback_secret(self, provider: str) -> str:
         """The HMAC secret for one provider, falling back to the shared one.

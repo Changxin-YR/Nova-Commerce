@@ -48,10 +48,13 @@ is arranged around those two sentences:
 > **The layout below is intent, not mandate.** Where a layer would exist only to
 > satisfy this list, it does not get created. Two rulings from the build:
 >
-> * `fulfillment/workflow.py` does not exist and should not. The ship path is
->   `FulfillmentService.ship` plus the pure `compute_fulfillment_status` /
->   `compute_residual` helpers; adding an empty workflow module would be scaffolding
->   with no owner and no caller.
+> * `fulfillment/workflow.py` does not exist, should not, and has been struck from
+>   the layout above. The ship path is `FulfillmentService.ship` plus the pure
+>   `compute_fulfillment_status` / `compute_residual` helpers; adding an empty
+>   workflow module would be scaffolding with no owner and no caller. It was listed
+>   here for symmetry with the other modules, and symmetry is not a reason for a
+>   layer to exist. The same correction applies to any docstring that names a
+>   `ShipWorkflow`.
 > * `payment/api/admin.py` exists because the console needs the payment list the
 >   contract froze; a module that only mirrors another module's endpoints does not.
 >
@@ -84,7 +87,6 @@ backend/app/modules/fulfillment/
     schemas.py           # ShipFulfillmentRequest (exactly 3 fields)
     serializers.py       # ORM -> API_CONTRACT section 5 Fulfillment shape
     service.py           # create_shell (called by payment), ship, reads
-    workflow.py          # ShipWorkflow helpers
     api/
         __init__.py
         customer.py      # /fulfillments/customer/*
@@ -281,10 +283,28 @@ passes a naive test while destroying the audit value.
 `delivered_at`, `package_count` int default 1, `remark` varchar(500) NULL.
 
 `fulfillment_items`: `fulfillment_id` FK RESTRICT, `order_item_id` FK RESTRICT,
-`sku_id` FK RESTRICT, `product_name` varchar(200), `sku_name` varchar(200),
-`quantity` bigint CHECK `quantity > 0`. `UNIQUE (fulfillment_id, order_item_id)`
-so one package cannot list the same line twice (a duplicate would let a single
-package over-ship a line while each row looks valid).
+`product_name` varchar(200), `sku_name` varchar(200), `quantity` bigint CHECK
+`quantity > 0`. `UNIQUE (fulfillment_id, order_item_id)` so one package cannot list
+the same line twice (a duplicate would let a single package over-ship a line while
+each row looks valid).
+
+> **CORRECTED during the build - there is no `sku_id` column, and this document
+> originally said there was.** The authoritative column list is REQ-FUL-002 /
+> section 45: `fulfillment_id, order_item_id, quantity`. The captain wrote `sku_id
+> FK RESTRICT` into an earlier version of this section and then ruled that it should
+> be stored; data-layer refused the change and cited REQ-FUL-002, which is the
+> machine-readable baseline, and they were right. The ruling was withdrawn.
+>
+> `sku_id` is still a **required field of the frozen section 5 wire shape**, so it
+> is *derived* on the read path from `order_item_id -> order_items.sku_id`. That
+> reads a snapshot table, not the live catalogue, so INV-014 is untouched, and it
+> costs nothing on the order read path: `to_detail` builds the map from
+> `order.items`, which the loading query has already fetched. A duplicated key
+> would have been a second place for a shipping error to disagree with itself -
+> the same reason `order_items` snapshots rather than joins.
+>
+> The general lesson, since this is the second contradiction of its kind in this
+> document: `PROJECT_BASELINE.yaml` wins over anything written here.
 
 Business rule: the **sum of shipped quantities per `order_item_id` across all
 fulfillments of an order must never exceed that line's `quantity`**
@@ -562,10 +582,22 @@ it, and do not "just fix it quickly" because it is small.
 
 | Path | Owner |
 |---|---|
-| `backend/app/modules/payment/**`, `backend/tests/**/payment/**`, `backend/tests/concurrency/test_payment_idempotency.py` | payment-workflow |
+
+> **Corrected during the build.** This table first assigned
+> `{payment,fulfillment,aftersales}/{models.py,enums.py}` to data-layer as one row, which
+> contradicted section 4.3: that section writes the after-sales vocabularies as part of
+> the frozen contract, i.e. the after-sales author's. The tree is coherent -
+> `aftersales/models.py` imports the vocabularies that `aftersales/enums.py` declares -
+> but the stale row was a real hazard: the next reader who "restored" the assignment
+> would have overwritten a live file, or added a second copy of the vocabulary, and a
+> duplicated vocabulary is how the Python enums and the `CHECK` constraints derived from
+> them diverge silently (the Alembic-cannot-see-CHECK-changes trap, HANDOFF section 6).
+> `payment/enums.py` and `fulfillment/enums.py` genuinely are data-layer's.| `backend/app/modules/payment/**`, `backend/tests/**/payment/**`, `backend/tests/concurrency/test_payment_idempotency.py` | payment-workflow |
 | `backend/app/modules/fulfillment/**`, `backend/tests/**/fulfillment/**` | fulfillment-workflow |
 | `backend/app/modules/aftersales/**`, `backend/tests/**/aftersales/**` | after-sales-workflow |
-| `backend/app/modules/{payment,fulfillment,aftersales}/{models.py,enums.py}`, `backend/migrations/versions/**` | data-layer |
+| `backend/app/modules/{payment,fulfillment}/enums.py` | data-layer |
+| `backend/app/modules/aftersales/enums.py` | after-sales-workflow |
+| `backend/app/modules/{payment,fulfillment,aftersales}/models.py`, `backend/migrations/versions/**` | data-layer |
 | `backend/app/modules/order/serializers.py`, `backend/app/modules/order/repository.py`, `backend/app/modules/order/service.py`, `backend/app/modules/order/workflow.py` | captain |
 | `backend/app/api/v1/router.py`, `backend/app/core/config.py`, `.env.example`, `docs/architecture/**`, `scripts/**`, `HANDOFF.md`, `PROJECT_BASELINE.yaml` | captain |
 | `backend/tests/integration/refund/**` | verifier |
@@ -575,3 +607,85 @@ it, and do not "just fix it quickly" because it is small.
 Shared read-only helpers live in `backend/tests/integration/commerce/seed.py`
 (owned by data-layer): every Phase 5 test imports its fixtures/helpers from
 there rather than re-deriving a merchant/SKU/warehouse seed four times.
+
+## 13. Measurement protocol and defect reporting (added mid-phase, after four false alarms)
+
+Four writers share one working tree and **one MySQL database**. That is the phase's
+biggest source of wrong information, and it produced four wasted rounds in one
+afternoon. The rules below are not ceremony; each one exists because something
+specific went wrong.
+
+### 13.1 One test process at a time
+
+Two `pytest` processes against the same MySQL will interleave DDL and DML, and the
+loser reports **errors that do not exist**. Observed: a full-suite run showed four
+`ERROR`s in the order integration tests; each of those tests passed in isolation
+seconds later. A concurrent pair of runs also turned a 3.5-second FG-11 gate into a
+60-second run with 3 deadlock failures, which looked like a flaky gate and was not.
+
+So: before running `pytest tests`, say so in the team channel and wait for the
+captain's go-ahead. Fast single-file runs are fine; whole-suite runs are queued.
+
+### 13.2 A defect report must name the commit it was observed at
+
+Adopt this unconditionally. Three of the four false alarms were reports of a defect
+that had **already been fixed** by the time anyone read the report:
+
+* a `NameError` in `payment/models.py` was reported by three different people across
+  three turns, after it was fixed;
+* an `AppError` `NameError` in `fulfillment/service.py` was reported after its fix
+  had landed (it had been real for one intermediate commit);
+* a failure in `test_payment_idempotency.py` was reported after it had been fixed.
+
+Every one cost a turn to disprove, and the disproof always had the same shape:
+"this passes on HEAD". Include `git rev-parse --short HEAD` in the report. If the
+report says an older commit, the first response is to re-run at HEAD.
+
+### 13.3 Re-run at HEAD before escalating
+
+Before telling another owner their file is broken: re-run your repro at HEAD. If it
+still fails, report it. If it does not, say so and drop it - a stale defect report
+costs the owner a turn and costs the reporter credibility.
+
+### 13.4 Evidence is emitted from a CLEAN tree only
+
+`scripts/gate_evidence.py` records the revision and **refuses to emit a PASS when the
+tested paths are dirty relative to it** (the artifact still records the run and marks
+it FAIL with the reason, because a suppressed run is worse than a failed one). This
+was added after FG-11 was emitted once from a tree that was later found to be flaky:
+the artifact said `PASS` and gave no way to tell which revision it described, so it
+could not be retired, only suspected.
+
+Consequence: the captain calls a **freeze** - nobody writes - commits, checks the tree
+is clean, and *then* emits. An evidence artifact is a claim about a revision.
+
+### 13.5 The database is shared state, and a failed test skips its teardown
+
+This one cost two people real time, and it is the most misleading of the five.
+
+The integration fixtures **commit** their seeds (they must: a payment callback arrives
+on another connection, and a rolled-back fixture would be invisible to it) and delete
+them in teardown. A test that *fails* never runs its teardown, so every failure leaves
+its merchant, products, warehouse, orders, payments and fulfillments behind.
+
+Left-over rows then change the behaviour of later tests, because the seeds resolve
+things like a **default warehouse** by querying "the active one for this merchant" -
+and an orphaned row from an earlier run can shadow the one the current test just made.
+The observed symptom was brutal: shipping worked, but `fulfillment_status` stayed
+`UNFULFILLED`, producing six failures that looked exactly like a real regression and
+vanished on a clean database. At the worst point the shared `nova` schema held ~20
+orders, 24 warehouses, 41 users and 76 payment callbacks of residue.
+
+Consequences, both mandatory:
+
+* **A test count is only meaningful together with the state of the database it was
+  measured on.** Before reading anything into a number, establish that the schema holds
+  no residue from earlier failed runs.
+* **A red run must be re-confirmed in isolation before it is believed**, because the
+  second-order failures it creates are indistinguishable from real ones.
+
+### 13.6 The freeze window
+
+When the captain sends `FREEZE`, stop writing to the repository. Finish the tool call
+you are in, report, and wait. The window exists to make section 13.4 possible, and it
+is short.

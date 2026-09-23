@@ -66,6 +66,21 @@ def build_api_router() -> APIRouter:
             if router is None:
                 continue
             tag = f"{prefix.strip('/')}:{submodule}"
+            # ``submodule`` names the FILE; it is deliberately NOT part of the
+            # mount path. Climbing into the path would mean rewriting every
+            # decorator in this codebase, whose frozen routes are already written
+            # against the module prefix: ``order/api/admin.py`` declares
+            # ``@router.get("/admin")`` and must answer ``GET /orders/admin``,
+            # not ``GET /orders/admin/admin``. So a sub-router owns its own
+            # sub-path - ``payment/api/callbacks.py`` spells ``/callbacks/{provider}``
+            # - and ``f"{prefix}/{submodule}"`` is the wrong fix.
+            #
+            # The cost of that convention is that a sub-router whose decorator
+            # forgets its sub-path mounts on a path that is *registered and
+            # plausible but wrong*: a Phase 5 author's ``@router.post("/{provider}")``
+            # answered ``POST /payments/MOCK`` instead of ``POST /payments/callbacks/MOCK``.
+            # A route table assertion sees nothing wrong, which is why the frozen-path
+            # tests in this repo probe by ANSWER rather than by registration.
             api_router.include_router(router, prefix=prefix, tags=[tag])
 
     return api_router

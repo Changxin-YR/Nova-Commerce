@@ -36,6 +36,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from app.core.errors import InternalError
 from app.core.redaction import mask_address, mask_name, mask_phone
 from app.modules.order.models import Order, OrderItem
 from app.modules.order.schemas import (
@@ -119,26 +120,63 @@ def _item_out(item: OrderItem) -> OrderItemOut:
     )
 
 
-def _fulfillment_out(row: Any) -> FulfillmentOut:
-    """Project a fulfillment ORM row into the §5 frozen shape.
+def _fulfillment_out(row: Any, *, sku_by_line: dict[int, int] | None = None) -> FulfillmentOut:
+    """Project a fulfillment ORM row into the frozen shape of API_CONTRACT section 5.
 
-    Phase 4 never calls this with a row (there is no fulfillment table yet), but
-    the projection lives here rather than being deferred so that
-    ``OrderDetailOut.shipments`` has a frozen element type from the first
-    release. Written against attribute access only, so it does not import - and
-    therefore cannot drift with - a Phase 5 model.
+    ## ``sku_id`` is DERIVED, not stored
+
+    ``fulfillment_items`` stores ``fulfillment_id``, ``order_item_id`` and
+    ``quantity`` (REQ-FUL-002 / section 45) and, like ``order_items``, copies
+    ``product_name``/``sku_name`` so a historical shipment cannot be rewritten by a
+    later product edit. It does **not** carry ``sku_id``, and that is deliberate:
+    the same key is reachable through ``order_item_id`` -> ``order_items.sku_id``,
+    and a duplicated key is a second place for a shipping error to disagree with
+    itself.
+
+    The frozen section 5 wire shape nonetheless requires ``sku_id``, so it is
+    resolved here from a caller-supplied map. This is **not** the N+1 that an ORM
+    ``property`` would be: ``to_detail`` builds the map from ``order.items``, which
+    the query that loaded the order has already fetched (``lazy="selectin"``), so it
+    costs no round trip. Reading ``order_items`` is INV-014-safe - it is the
+    *snapshot* table, not the live catalogue - which is exactly why this lookup is
+    allowed here and a catalogue join would not be.
+
+    The map is a parameter rather than a lookup performed inline so this function
+    stays attribute-only and keeps the property the phase-4 tests pin: it never
+    touches the database itself, so it cannot become an N+1 by accident.
+
+    There is deliberately **no** fallback to a ``sku_id`` attribute on the row: the
+    column does not exist (REQ-FUL-002), and a fallback would have let a future
+    reader believe one was expected and "restore" it. One path, one rule.
+
+    A line whose ``sku_id`` cannot be resolved raises rather than emitting ``null``:
+    ``sku_id`` is required by a frozen shape, and a ``null`` would be a silent
+    contract violation on the flagship read path. It cannot happen for a real row -
+    the FK guarantees the order line exists, and the map is built from that order's
+    own lines.
     """
-    items = [
-        FulfillmentItemOut(
-            id=line.id,
-            order_item_id=line.order_item_id,
-            sku_id=line.sku_id,
-            product_name=line.product_name,
-            sku_name=line.sku_name,
-            quantity=line.quantity,
+    resolved = sku_by_line or {}
+    items: list[FulfillmentItemOut] = []
+    for line in getattr(row, "items", None) or ():
+        sku_id = resolved.get(line.order_item_id)
+        if sku_id is None:
+            raise InternalError(
+                "a fulfillment item references an order line that is not on the order",
+                context={
+                    "fulfillment_id": getattr(row, "id", None),
+                    "order_item_id": line.order_item_id,
+                },
+            )
+        items.append(
+            FulfillmentItemOut(
+                id=line.id,
+                order_item_id=line.order_item_id,
+                sku_id=sku_id,
+                product_name=line.product_name,
+                sku_name=line.sku_name,
+                quantity=line.quantity,
+            )
         )
-        for line in (getattr(row, "items", None) or ())
-    ]
     return FulfillmentOut(
         id=row.id,
         order_id=row.order_id,
@@ -222,10 +260,16 @@ def to_detail(
     if not fulfillments:
         fulfillments = tuple(getattr(order, "shipments", None) or ())
 
+    # ``fulfillment_items`` does not store ``sku_id`` (REQ-FUL-002), so the frozen
+    # shape's ``sku_id`` is resolved from the order's own lines. Those lines are
+    # already loaded by the query that loaded the order, so the map costs no round
+    # trip, and it reads ``order_items`` - the snapshot table - not the catalogue.
+    sku_by_line = {line.id: line.sku_id for line in lines}
+
     return OrderDetailOut(
         **summary.model_dump(),
         items=[_item_out(item) for item in lines],
-        shipments=[_fulfillment_out(row) for row in fulfillments],
+        shipments=[_fulfillment_out(row, sku_by_line=sku_by_line) for row in fulfillments],
         full_address=mask_full_address(order.address_snapshot),
         remark=order.remark,
         cancel_reason=order.cancel_reason,
