@@ -1242,14 +1242,17 @@ first task is the outbox seam - marked, unmoved, and waiting in two places:
 
 ### 19.1 Repository state
 
-* `main` is **3 commits ahead of `origin/main` (`17e1184`)** and they are
-  **NOT pushed**:
+* `main` is **ahead of `origin/main` (`17e1184`)** and the commits are
+  **NOT pushed**. `git log --oneline origin/main..main` gives the exact list:
   * `075e293` - phase6 outbox: transaction-joining writer, publisher, and the
     three wired seams
   * `cb62f4a` - outbox tests: the suite, the false-collision guard, and the
     teardown obligation
   * `b190ea3` - docs: the outbox seam is wired, and the position claim is
     corrected
+  * `9354b6a` - handoff: Phase 6 outbox increment - state, open items, and the
+    traps
+  * the commit carrying `docs/handoff/phase6-outbox.md`'s final revision
 * Working tree **clean**.
 * `pytest tests` -> **1137 passed, 0 failed** (1102 pre-existing + 35 new).
 * `ruff check --no-cache app tests migrations` -> clean.
