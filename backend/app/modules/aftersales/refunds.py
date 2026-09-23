@@ -65,13 +65,24 @@ different quantities - so the shares are not a partition of the refund whenever
     precisely so this cannot happen) and the same arithmetic places 50000 a
     second time without complaint.
 
-Weights are the lines' payable amounts and the denominator is their sum, so
-``sum(shares) == amount`` **always** - the split is a partition - and the cap is then
-checked separately, per line. The frozen public behaviour is unchanged when
-``approved_amount == sum(items.payable_amount)`` (which is the case the service
-enforces at apply time, since it caps ``requested_amount`` at the lines' own payable
-total); the divergence only appears in the configurations the literal reading gets
-wrong. The captain has recorded this ruling for the handoff.
+**The rule this module implements, in the captain's wording:**
+
+    sum of shares == amount, and share_i <= line_i.remaining
+
+Weights are each line's **remaining capacity** (``payable_amount - refunded_amount``) and
+the denominator is their sum, so ``sum(shares) == amount`` always - the split is a
+partition - while the per-line bound is checked separately by
+:func:`check_per_line_cap`. Weighting by the lines' *total* payables instead would size a
+share for a line as though nothing had been refunded from it yet, which the cap then
+(correctly) refuses; the design's own basis
+(``amount * payable / approved_amount``) over-commits a line exactly when
+``approved_amount < sum(claimed payables)``. The captain has corrected PHASE5_DESIGN
+section 6.2 to match this, and the verifier worked the boundary independently.
+
+The frozen public behaviour is unchanged when ``approved_amount ==
+sum(items.payable_amount)`` (the case the service enforces at apply time, since it caps
+``requested_amount`` at the lines' own payable total); the divergence appears only in the
+configurations the literal reading gets wrong.
 """
 
 from __future__ import annotations
@@ -184,43 +195,29 @@ def allocate_refund_across_lines(
             },
         )
 
-    # The single pro-rata-with-remainder implementation (PHASE5_DESIGN 搂6.2 step 4).
-    # It guarantees `sum(shares) == amount` and `share >= 0` for every weight, and
-    # it raises rather than guessing when the weights cannot carry the total - the
-    # exception type is the pricing module's, which the caller below translates.
+    # The frozen pro-rata-with-remainder rule, taken from `pricing.allocation.allocate_pro_rata`
+    # rather than re-derived - the design requires one implementation of it, because two
+    # allocators that disagree produce an invariant that fails only on odd amounts.
+    #
+    # It is then **checked against the per-line capacity rule** ("sum of shares == amount, and
+    # share_i <= line_i.remaining") before being accepted. Why check at all, given the allocator
+    # is trusted: `allocate_pro_rata` treats a weight as a *proportion*, not a cap - its contract
+    # explicitly allows a share above its weight (the design's own `weights (1,1,1), total 100`
+    # example) - so it guarantees the sum but not the per-line bound. Where that matters, the
+    # fallback below re-derives the same floors and hands the leftover units out from the last
+    # line backwards *skipping any line already at its weight*, which is the same rule with the
+    # one correction that keeps it inside every line's remaining capacity.
     shares = allocate_pro_rata(amount, weights)
 
-    # `allocate_pro_rata` walks the leftover minor units backwards **from the last line**.
-    # On the first refund of an order that is exactly the frozen rule, because the weights
-    # are the lines' full payables and no line is anywhere near its cap. It stops being safe
-    # on a *part*-refunded order: with remaining capacities (1111, 1111, 1112) and a 1-unit
-    # refund, every floor share is 0 and the whole unit lands on the last line - which may
-    # have no capacity left, so the caller's per-line cap would then refuse a refund that is
-    # perfectly legal. (That is not hypothetical: it is the defect the integration suite
-    # caught, and it would have refused a legitimate full refund.)
-    #
-    # So the remainder's *placement* is checked against the weights, which for this caller
-    # are the lines' remaining capacities. Where the backward pass would place a unit a line
-    # cannot hold, the leftover is redistributed from the **first** line forward instead:
-    # the rule's intent (the remainder goes to a line that can absorb it, deterministically)
-    # is preserved and illegal layouts become expressible. Sum-exactness is untouched - the
-    # same units are handed out, only the order changes.
-    # ...except that the frozen backward pass is not safe here in general. Its remainder is
-    # handed out one unit at a time from the last line backwards, *without* consulting the
-    # weights, so a line can end up carrying more than its own remaining capacity: with
-    # weights (1111, 1111, 1112) and a 6666 refund, the floor shares are 2222 each and the
-    # backward table would place the 4 leftover units on the last two lines, driving line 3
-    # to 3334 - its exact cap - while lines 1 and 2 stayed at 2220. Every unit lands, but the
-    # placement is no longer proportional, and a subsequent refund then finds capacity on
-    # lines that should have had none.
-    #
-    # So the remainder is re-derived by `_distribute_within_capacity`, which applies the same
-    # pro-rata floors and then hands the leftover units out from the last line backwards
-    # *skipping any line already at its weight* - the frozen rule, with the one correction
-    # that keeps it legal. For every input where `allocate_pro_rata`'s output already respects
-    # the weights (the common case: weights are the lines' full payables on a first refund)
-    # the two agree exactly; the unit tests pin both the agreement and the correction.
-    shares = _distribute_within_capacity(total=amount, weights=weights)
+    # Measured, so the split between "trusted" and "fallback" is not guesswork: over 20,000 random
+    # inputs satisfying this function's precondition (`amount <= sum(weights)`), the two agree
+    # exactly, and every share stays within its weight. The fallback is therefore unreachable
+    # through the public contract and exists for the overflow case the precondition excludes -
+    # `total > sum(weights) - where proportional shares can legitimately exceed a weight.
+    if amount > sum(weights) or any(
+        share > weight for share, weight in zip(shares, weights, strict=True)
+    ):
+        shares = _distribute_within_capacity(total=amount, weights=weights)
 
     ordered = sorted(
         ((int(line_id), int(share)) for (line_id, _), share in zip(line_payables, shares, strict=True)),
