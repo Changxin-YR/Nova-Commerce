@@ -354,3 +354,65 @@ still yields a usable amount when the field is absent.
 | `npx vite build` | EXIT=0 |
 | `npx vitest run` | EXIT=0, **250 passed** (was 246; +4 for the addendum branches) |
 | `npx eslint .` | EXIT=0 |
+
+---
+
+## t4 console sweep - all five remaining views converted
+
+`AfterSales`, `Knowledge`, `Marketing`, `System` and `AiWorkspace` are now on the dense 京麦 pattern:
+filter bar -> hairline `.nx-table` -> pager, `StateView` for all five section 108 states, and every
+row action gated by a pure, unit-tested availability module instead of an inline status comparison.
+
+### New availability modules (pure + tested)
+- `src/domain/knowledge/availability.ts` + **15 tests**. `PROCESSING` blocks BOTH task actions (a
+  parse/embed job is in flight, so reprocessing queues a second job over the same document and
+  archiving pulls it out from under a job about to write chunks); `ARCHIVED` blocks both (a
+  reprocess would silently resurrect it); `UPLOADED` offers archive only. A test asserts the terminal
+  states genuinely offer nothing, so the hint can never hide a usable action.
+- `src/domain/marketing/availability.ts` + **9 tests**. Only a `DRAFT` publishes, only an `ACTIVE`
+  promotion unpublishes, `ENDED` is terminal; a test asserts exactly ONE transition per non-terminal
+  state so a "simplification" offering both or neither fails.
+
+### Two task paths were WRONG against API_CONTRACT.md section 4
+- Knowledge `reprocess`/`archive` were at `/knowledge/admin/documents/{id}/...`; the frozen paths are
+  `/knowledge/documents/{id}/reprocess|archive`. Fixed.
+- Marketing had **no** promotion publish/unpublish at all, despite section 4 freezing
+  `/marketing/promotions/{id}/publish|unpublish`. Added to `endpoints.ts` + `marketingAdminApi`.
+
+### Domain decisions worth keeping
+- **AfterSales**: the business claim (section 34) and the money fact (the `refunds[]` ledger, section
+  46) render as **separate columns**, and the money column reads the LEDGER rather than the claim -
+  collapsing them would report a claim as "refunded" when no money has moved.
+- **Marketing**: coupon creation is **preview -> confirm** (section 47). The preview renders the exact
+  payload that would be sent, built once so preview and submit cannot diverge, and nothing is posted
+  from the form step.
+- **System**: `criticality` stays a first-class column with an explicit statement when a `critical`
+  dependency is down versus a degradable feature gap.
+- **AiWorkspace**: pending-action decidability now comes from the tested `pendingActionFlags` instead
+  of inline `status === 'PENDING'` checks.
+
+### Assumptions to confirm (API_CONTRACT.md section 10 territory)
+1. **`AgentRun` / `PendingAction` field shapes** are NOT frozen. The fields the AI workspace list
+   reads are documented as assumptions in a comment block at the top of `AiWorkspaceView.vue`, and the
+   list is kept deliberately NARROW so a Phase 10/13 freeze only requires reconciling that list.
+2. **Promotion shape and lifecycle** (`DRAFT/ACTIVE/ENDED`, the local `Promotion` interface in
+   `src/api/marketing.ts`) - unfrozen, so both the vocabulary and the transitions are assumptions.
+3. **The knowledge and promotion transition guards** are the frontend's conservative reading of
+   sections 53 / 47. The server stays authoritative (`DOCUMENT_STATE_INVALID` 100002,
+   `PROMOTION_CONFLICT` 90001) and the views handle those codes explicitly.
+
+### Not built, because no endpoint is frozen (reported, not invented)
+- **Promotion creation.** Section 47 requires a preview step and `PROMOTION_PREVIEW_REQUIRED` (90003)
+  exists as a code, but neither a preview nor a create endpoint is frozen, so the form was not built.
+  The page offers status transitions only.
+- **Role / permission editing.** Section 65 forbids a CRITICAL write being downgradeable to READ by an
+  ordinary console user; a role editor is exactly that kind of write and has no frozen endpoint. The
+  System page states the boundary rather than shipping a control that cannot honour it.
+
+### Gates at the end of t4
+| Command | Result |
+| --- | --- |
+| `npx vue-tsc --noEmit` | EXIT=0 |
+| `npx vite build` | EXIT=0, `2384 modules transformed` |
+| `npx vitest run` | EXIT=0, `19 files`, **`276 passed`** (floor 246) |
+| `npx eslint .` | EXIT=0 |

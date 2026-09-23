@@ -8,7 +8,21 @@
  * events. This page adds NO new event handling and NEVER displays reasoning: there is
  * no chain-of-thought channel to display (§132).
  *
- * The §108 agent states are surfaced explicitly:
+ * ASSUMED FIELD SHAPES \u2014 READ BEFORE TRUSTING THIS LIST (API_CONTRACT.md \u00a710)
+ *  \u00a710 states plainly that the full `AgentRun` and `PendingAction` shapes are NOT frozen; they land
+ *  with the rest of the agent contract in Phase 10/13. Everything this page reads off those two
+ *  entities is therefore an ASSUMPTION, not a contract:
+ *
+ *    AgentRun:      id, thread_id, agent_name, status, query, tokens_used, cost_amount, started_at,
+ *                   finished_at, pending_action_id, error_code, error_message
+ *    PendingAction: id, agent_run_id, action_type, tool_name, summary, risk_level, status, payload,
+ *                   payload_hash, diff, requested_by, decided_by, expires_at, created_at
+ *
+ *  They live in `src/types/domain.ts` today. The list is kept deliberately NARROW for that reason:
+ *  no rich shape is invented here that a Phase 10/13 freeze would contradict, so reconciling this
+ *  page later means touching the field list above and nothing else.
+ *
+ * The \u00a7108 agent states are surfaced explicitly:
  *   Streaming · WaitingApproval · Failed · Cancelled
  */
 import { computed, ref, watch } from 'vue'
@@ -16,6 +30,7 @@ import { agentApi, governanceApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useAiThreadStore } from '@/stores/aiThread'
 import { useNotificationStore } from '@/stores/notification'
+import { pendingActionBlockedReason, pendingActionFlags } from '@/domain/governance/availability'
 import { normalizeError } from '@/api/error'
 import { AGENT_TABS, type AgentName } from '@/config/app'
 import StateView from '@/components/ui/StateView.vue'
@@ -290,8 +305,13 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
             </ul>
 
             <div class="ai__pending-actions">
+              <!--
+                Decidability comes from the TESTED `pendingActionFlags`, not an inline status
+                comparison: only PENDING is decidable (section 101), and that module is the single
+                place the rule lives, so this row cannot drift from it.
+              -->
               <button
-                v-if="action.status === 'PENDING'"
+                v-if="pendingActionFlags(action).approve"
                 type="button"
                 class="nx-btn nx-btn--primary"
                 @click="decideFromList(action.id, true, action.payload_hash)"
@@ -299,14 +319,20 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
                 批准
               </button>
               <button
-                v-if="action.status === 'PENDING'"
+                v-if="pendingActionFlags(action).reject"
                 type="button"
                 class="nx-btn"
                 @click="decideFromList(action.id, false, action.payload_hash)"
               >
                 拒绝
               </button>
-              <span v-else class="nx-muted">已处理（{{ action.decided_by ?? '—' }}）</span>
+              <span
+                v-else
+                class="nx-muted"
+                :title="pendingActionBlockedReason(action.status)"
+              >
+                已处理（{{ action.decided_by ?? '—' }}）
+              </span>
             </div>
           </div>
         </article>
