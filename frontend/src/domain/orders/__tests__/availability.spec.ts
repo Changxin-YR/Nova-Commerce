@@ -13,7 +13,7 @@
  *     it on the fulfillment.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   canCancelOrder,
   canConfirmReceipt,
@@ -24,6 +24,7 @@ import {
   orderActionBlockedReason,
   orderActionFlags,
   refundableAmount,
+  refundableBridgeState,
 } from '@/domain/orders/availability'
 import type { AfterSaleStatus, FulfillmentStatus, OrderStatus, PaymentStatus } from '@/types/domain'
 import type { Fulfillment } from '@/types/frozen-contract'
@@ -111,6 +112,53 @@ describe('refundableAmount — server-owned, with a documented pre-backend bridg
 
   it('is 0 for an unpaid order, so a refund is never offered on it', () => {
     expect(refundableAmount({ paid_amount: 0, refunded_amount: 0 })).toBe(0)
+  })
+})
+
+describe('the refundable bridge ANNOUNCES itself (§15 transition hygiene)', () => {
+  /**
+   * The bridge is tolerated only while it is noisy. These tests exist because a silent fallback
+   * becomes a permanent fallback: the whole point of the warning is that a bridge which speaks up
+   * gets deleted, so the warning is a behaviour worth pinning rather than a nicety.
+   */
+  beforeEach(() => {
+    refundableBridgeState.warned = false
+  })
+
+  it('warns when it falls back, naming the missing field and the removal trigger', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    refundableAmount({ paid_amount: 279900, refunded_amount: 0 })
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    const message = String(warn.mock.calls[0]?.[0] ?? '')
+    // Names the missing field...
+    expect(message).toContain('OrderDetail.refundable_amount')
+    // ...and the condition that retires the bridge, so nobody has to reverse-engineer it.
+    expect(message).toContain('Phase 5')
+    expect(message).toContain('Removal trigger')
+    warn.mockRestore()
+  })
+
+  it('does NOT warn when the server supplied the field', () => {
+    // The bridge must be silent on the happy path, otherwise the signal becomes noise and the
+    // warning is ignored exactly when it matters.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: 279900 })
+
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('warns only ONCE per session, because it is called from computed values and templates', () => {
+    // A per-call warning would flood the console into uselessness the moment an order list renders.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const legacyOrder = { paid_amount: 279900, refunded_amount: 0 }
+    refundableAmount(legacyOrder)
+    refundableAmount(legacyOrder)
+    refundableAmount(legacyOrder)
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
   })
 })
 

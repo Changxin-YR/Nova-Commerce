@@ -78,10 +78,14 @@ export interface OrderActionFlags {
  * from being the authority on it.
  *
  * WHY THERE IS STILL A DERIVATION HERE: the order module does not exist yet (`app/modules/*`), so
- * until it lands a real payload has no `refundable_amount`. Without the bridge, `undefined > 0` is
- * `false` and EVERY refund affordance would silently disappear — the exact failure mode that
- * prompted the addendum. The bridge keeps the UI correct in the meantime and is discarded the
- * moment the server field is present; it is a transition, not a second source of truth.
+ * until it lands a real payload has no `refundable_amount`. Without the fallback, `undefined > 0` is
+ * `false` and EVERY refund affordance would silently disappear — a dead UI is worse than a clearly
+ * marked transition, because a dead UI gets debugged while a silent fallback gets forgotten.
+ *
+ * @deprecated TRANSITIONAL BRIDGE. This arithmetic must be removed once the backend ships
+ *   `OrderDetail.refundable_amount`. It lives in the DOMAIN layer, and a second source of truth for a
+ *   money figure is exactly the shape §15 forbids — so it is tolerated only as a labelled, noisy,
+ *   temporary bridge. See `TODO(phase-5)` at the fallback branch below.
  */
 export function refundableAmount(
   order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount'> & {
@@ -92,8 +96,42 @@ export function refundableAmount(
   if (typeof fromServer === 'number' && Number.isFinite(fromServer)) {
     return Math.max(0, fromServer)
   }
-  // Transitional bridge only — see the doc comment. Never used once the backend ships the field.
+
+  // TODO(phase-5): DELETE this branch AND its spec cases once Phase 5 lands
+  //   `OrderDetail.refundable_amount`.
+  // Removal trigger: a real `GET /orders/{admin/{order_no}}` response carries the field, so this
+  //   branch becomes unreachable in production and the domain layer goes back to having ONE source
+  //   of truth for a money figure. Owner: the backend implementer completing Phase 5 (the
+  //   definition of done for Phase 5 in HANDOFF.md names this deletion explicitly).
+  warnBridgeHit()
   return Math.max(0, order.paid_amount - order.refunded_amount)
+}
+
+/**
+ * Test seam. The warn-once latch is module state, so the tests reset it to assert the warning fires
+ * exactly once per session rather than on every render pass.
+ */
+export const refundableBridgeState = { warned: false }
+
+/**
+ * A silent fallback becomes a PERMANENT fallback. The bridge therefore announces itself in
+ * development, naming the missing field and the condition that retires it, so it cannot be forgotten
+ * — the point being that a bridge which speaks up is a bridge that gets deleted.
+ *
+ * `import.meta.env.DEV` keeps this out of production builds entirely: the warning is a developer
+ * signal, not user-facing noise. Warns ONCE per session because this function is called from
+ * computed values and templates, and a per-call warning would flood the console into uselessness.
+ */
+function warnBridgeHit(): void {
+  if (!import.meta.env.DEV || refundableBridgeState.warned) return
+  refundableBridgeState.warned = true
+  console.warn(
+    '[nexora] refundableAmount() fell back to paid_amount - refunded_amount.\n' +
+      '  Missing field: OrderDetail.refundable_amount (server-owned, API_CONTRACT.md §11).\n' +
+      '  This is a TRANSITIONAL BRIDGE in the domain layer and a second source of truth for a money\n' +
+      '  figure that gates whether refund controls render (INV-005 / §15).\n' +
+      '  Removal trigger: delete the fallback + its spec cases once Phase 5 ships the field.',
+  )
 }
 
 /** Cancellable while nothing has left the warehouse and refunds have not started. */
