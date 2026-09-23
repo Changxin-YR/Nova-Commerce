@@ -1097,12 +1097,28 @@ day's worth of false signals, every one of them honest:
    `after_sales.refunded_amount <= approved_amount`. A defect there raises no database
    error, which is why they get adversarial probes.
 
+4. **`scripts/residue.py` checks only one direction.** It detects
+   *child-with-missing-parent* (`orphaned_callbacks`) but has no
+   *parent-with-missing-child* check - a balance whose ledger rows went, or an
+   `inventories` row that `verify_ledger` (INV-007) cannot explain. The tool carries the
+   same asymmetry as the hypothesis it was built from, which is why the omission is
+   worth naming: the failing direction is usually the one the author did not think of.
+   The query is written and verified:
+   ```sql
+   SELECT COUNT(*) FROM inventories i
+   WHERE NOT EXISTS (SELECT 1 FROM inventory_movements m
+                     WHERE m.warehouse_id = i.warehouse_id AND m.sku_id = i.sku_id)
+   ```
+   Run it in **both** directions after any purge change. Found by the fulfillment
+   author while auditing the teardown for exactly this class, and left as a finding
+   rather than a request because the tool is data-layer's file.
+
 **Documentation:**
 
-4. **`REQ-PAY-001` wording.** The baseline says `payments: payment_no UNIQUE`; the schema
+5. **`REQ-PAY-001` wording.** The baseline says `payments: payment_no UNIQUE`; the schema
    scopes it to `(merchant_id, payment_no)`, which is correct for a multi-merchant
    deployment. Correct the baseline wording rather than adding a redundant global unique.
-5. **`c9eaac3` is a 4-file partial commit** from a concurrent `git reset`; `a785744` is
+6. **`c9eaac3` is a 4-file partial commit** from a concurrent `git reset`; `a785744` is
    the real one. A history wart, pushed, not squashed - rewriting history under four
    writers was judged the bigger risk.
 
