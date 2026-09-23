@@ -29,6 +29,27 @@ GATE = Gate(
     ),
     test_target="tests/concurrency/test_payment_idempotency.py",
     marker="concurrency",
+    # The gate's result depends on the application code and its own test file. It does
+    # NOT depend on another author's uncommitted module, which is what made the first
+    # emission record FAIL while the gate itself passed 11/11 - see Gate.relevant_paths.
+    # Scoped to what this gate actually exercises. `backend/app` would be simpler but
+    # would include another author's uncommitted module, and this gate does not import
+    # it: the payment test drives payment -> fulfillment -> order -> inventory. Being
+    # precise is what lets the artifact say something true about the gate rather than
+    # something true about the whole working tree.
+    relevant_paths=(
+        "backend/app/core",
+        "backend/app/shared",
+        "backend/app/main.py",
+        "backend/app/api",
+        "backend/app/modules/payment",
+        "backend/app/modules/fulfillment",
+        "backend/app/modules/order",
+        "backend/app/modules/inventory",
+        "backend/migrations",
+        "backend/tests/concurrency",
+        "backend/tests/conftest.py",
+    ),
     json_out=ROOT / "artifacts" / "evidence" / "concurrency" / "fg11_payment_idempotency.json",
     infrastructure={
         "engine": "MySQL 8.4 (real container, not mocked)",

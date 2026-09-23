@@ -25,6 +25,11 @@ GATE = Gate(
     ),
     test_target="tests/integration/refund/test_refund_invariants.py",
     marker="integration",
+    relevant_paths=(
+        "backend/app",
+        "backend/migrations",
+        "backend/tests/integration/refund",
+    ),
     json_out=ROOT / "artifacts" / "evidence" / "integration" / "fg12_refund_invariants.json",
     infrastructure={
         "engine": "MySQL 8.4 (real container, not mocked)",

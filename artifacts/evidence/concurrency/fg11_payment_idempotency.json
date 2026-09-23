@@ -1,0 +1,126 @@
+{
+  "gate_id": "FG-11",
+  "name": "Payment Idempotency",
+  "mandatory": true,
+  "spec": "REQ-PAY-004 / section 44 - a duplicate callback produces exactly one business effect: one payment confirm, one inventory effect, one fulfillment, no duplicate outbox side effect; mandatory condition 2 of section 147",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/concurrency/test_payment_idempotency.py -v --no-header -p no:cacheprovider -m concurrency",
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-23T09:38:21.467109+00:00",
+  "duration_ms": 5795,
+  "exit_code": 0,
+  "summary": "11 passed in 3.54s",
+  "verdict": "PASS",
+  "fail_reasons": [],
+  "git": {
+    "revision": "dc3e9f8744db1fdef3d3732928df2b6206108579\n",
+    "subject": "﻿Docs: name the real ship path; drop two phantom ShipWorkflow references\n",
+    "relevant_paths": [
+      "backend/app/core",
+      "backend/app/shared",
+      "backend/app/main.py",
+      "backend/app/api",
+      "backend/app/modules/payment",
+      "backend/app/modules/fulfillment",
+      "backend/app/modules/order",
+      "backend/app/modules/inventory",
+      "backend/migrations",
+      "backend/tests/concurrency",
+      "backend/tests/conftest.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": true,
+    "other_paths_dirty_files": [
+      " M scripts/emit_fg11_evidence.py",
+      " M scripts/emit_fg12_evidence.py",
+      " M scripts/gate_evidence.py",
+      "?? backend/app/modules/aftersales/api/",
+      "?? backend/app/modules/aftersales/enums.py",
+      "?? backend/app/modules/aftersales/refunds.py",
+      "?? backend/app/modules/aftersales/schemas.py",
+      "?? backend/app/modules/aftersales/serializers.py",
+      "?? backend/app/modules/aftersales/service.py",
+      "?? backend/app/modules/aftersales/views.py",
+      "?? backend/app/modules/aftersales/workflow.py",
+      "?? backend/scratch_anchor.txt",
+      "?? backend/tests/integration/aftersales/",
+      "?? backend/tests/integration/refund/",
+      "?? backend/tests/unit/modules/aftersales/"
+    ]
+  },
+  "infrastructure": {
+    "engine": "MySQL 8.4 (real container, not mocked)",
+    "why_real": "The property under test is a database behaviour: UNIQUE (provider, provider_event_id) is the serialisation point that makes the callback idempotent, and UNIQUE (idempotency_key) on inventory_movements is what makes a retried deduction impossible. Threads racing on a real InnoDB index behave differently from a single-threaded loop over a mock, which is why section 113 forbids proving a mandatory gate against one. A mock that agrees with the implementation proves only that the implementation agrees with itself.",
+    "concurrency": "N worker threads open their own sessions and deliver the same provider event simultaneously; the assertion counts durable rows afterwards, so a second effect that commits late is still caught."
+  },
+  "junit_report": null,
+  "assertions": [
+    {
+      "name": "test_the_same_event_delivered_ten_times_settles_exactly_once",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_distinct_event_for_an_already_settled_payment_applies_no_second_effect",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_closed_payment_is_refused_by_the_state_guard",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_closed_payment_is_still_settleable_after_a_new_attempt",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_an_unsigned_delivery_is_refused_and_settles_nothing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_workflow_commits_the_transaction_exactly_once",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_no_deduction_happens_when_the_amount_does_not_match",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_service_marks_the_order_paying_without_marking_it_paid",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_claim_is_attempted_not_pre_checked",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_callback_process_status_vocabulary_is_the_one_the_table_accepts",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_gate_fixture_is_isolated",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "stderr_tail": ""
+}

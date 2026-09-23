@@ -60,6 +60,19 @@ class Gate:
     test_target: str
     #: pytest marker expression, e.g. ``integration`` or ``concurrency``.
     marker: str = "integration"
+    #: The paths whose dirty/clean state decides whether this run is reproducible.
+    #:
+    #: NOT the whole repo. The first version of this check scoped to
+    #: ``backend/{app,tests,migrations}``, which meant a gate could never produce a
+    #: PASS while any teammate had uncommitted work anywhere - and during a phase
+    #: with four writers that is always. FG-11 was emitted green and recorded FAIL
+    #: because another author's unfinished module was on disk, which is a true
+    #: statement about the tree and a false one about the gate.
+    #:
+    #: The gate's RESULT depends on the application code, the migration state, and
+    #: its own test file. It does not depend on another author's uncommitted tests,
+    #: so those are reported as information and do not decide the verdict.
+    relevant_paths: tuple[str, ...] = ()
     json_out: pathlib.Path = field(default=pathlib.Path())
     #: Set for gates whose frozen proof path is a JUnit XML file.
     xml_out: pathlib.Path | None = None
@@ -133,7 +146,7 @@ def _summary_from_stdout(stdout: str) -> str:
     return ""
 
 
-def _git_state() -> dict[str, object]:
+def _git_state(relevant_paths: tuple[str, ...] = ()) -> dict[str, object]:
     """The revision this artifact was produced against, and whether it was dirty.
 
     An evidence file that says "PASS" without saying *what* passed is only half a
@@ -149,12 +162,20 @@ def _git_state() -> dict[str, object]:
     """
     revision = _run_git(["rev-parse", "HEAD"])
     subject = _run_git(["log", "-1", "--format=%s", "HEAD"])
-    dirty = _run_git(["status", "--porcelain", "--", "backend/app", "backend/tests", "backend/migrations"])
+    paths = list(relevant_paths) or ["backend/app", "backend/migrations"]
+    dirty = _run_git(["status", "--porcelain", "--", *paths])
+    # Information, not a verdict input: what else is dirty in the shared tree. During
+    # a phase with four writers this is usually non-empty, which is exactly why it
+    # must not decide whether this gate is reproducible.
+    others = _run_git(["status", "--porcelain", "--", "backend", "scripts", "docs"])
     return {
         "revision": revision,
         "subject": subject,
-        "tested_paths_dirty": bool(dirty.strip()),
-        "tested_paths_dirty_files": [line for line in dirty.splitlines() if line.strip()],
+        "relevant_paths": paths,
+        "relevant_paths_dirty": bool(dirty.strip()),
+        "relevant_paths_dirty_files": [line for line in dirty.splitlines() if line.strip()],
+        "other_paths_dirty": bool(others.strip()),
+        "other_paths_dirty_files": [line for line in others.splitlines() if line.strip()],
     }
 
 
@@ -210,6 +231,11 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
         spec=gate.spec,
         test_target=args.test_target,
         marker=gate.marker,
+        # Carried explicitly: this reconstruction is what applies --test-target, and
+        # omitting a field here silently reverts it to its default. relevant_paths
+        # was omitted on the first pass, so the scoped dirty check fell back to
+        # backend/app and reported another author's module as the gate's problem.
+        relevant_paths=gate.relevant_paths,
         json_out=gate.json_out,
         xml_out=gate.xml_out,
         timeout_seconds=args.timeout_seconds,
@@ -280,15 +306,16 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
     if exit_code != 0:
         reasons.append(f"pytest exit_code={exit_code}")
 
-    git_state = _git_state()
-    if git_state["tested_paths_dirty"]:
+    git_state = _git_state(gate.relevant_paths)
+    if git_state["relevant_paths_dirty"]:
         # Not a gate failure - the code may be perfectly correct - but it must not
         # be reported as PASS, because a reader cannot reproduce the run from the
         # recorded revision. Phase 5's own rule: a verdict that was not observed
         # against an identifiable tree is not evidence.
         reasons.append(
-            "the tested paths were modified relative to the recorded commit "
-            f"({git_state['revision']}), so this run cannot be reproduced from it"
+            "the paths this gate depends on were modified relative to the recorded "
+            f"commit ({git_state['revision']}): "
+            + ", ".join(git_state["relevant_paths_dirty_files"])
         )
 
     verdict = "PASS" if not reasons else "FAIL"
