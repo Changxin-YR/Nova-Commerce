@@ -58,26 +58,36 @@ AI 在这里不是一个聊天窗口，而是一个**有边界、有预算、需
 
 ## 快速开始
 
-> 环境要求：Docker、Python 3.11、Node.js 20+。
-> 详细部署说明见 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)。
+> 环境要求：Docker、Python 3.11、Node.js 22.12+。
+> 以下为本地开发启动方式；已实现范围及门禁状态见 [`FINAL_GATE.md`](FINAL_GATE.md)。
 
-```bash
-cp .env.example .env          # 填入密钥；.env 永不提交
-make up                       # 启动 mysql / redis / qdrant / minio / keycloak
-make migrate                  # Alembic 迁移（独立一次性服务）
-make seed                     # 幂等种子数据
-make dev                      # 启动 api / worker / scheduler / mcp / web
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }  # 按需填写密钥；.env 不提交
+py -3.11 -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -e .\backend
+docker compose --env-file .env -f ops/docker-compose.yml up -d
+Set-Location backend
+& ..\.venv\Scripts\python.exe -m alembic upgrade head
+& ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-然后打开：
+在另一个终端启动前端：
+
+```powershell
+Set-Location frontend
+npm ci
+npm run dev
+```
+
+然后打开本地页面：
 
 | 入口 | 地址 |
 |---|---|
-| 消费者商城 | http://localhost:18000 |
-| 商家控制台 | http://localhost:18000/console |
-| AI 工作台 | http://localhost:18000/console/ai |
-| 知识中心 | http://localhost:18000/console/knowledge |
-| MCP 端点 | http://localhost:18002/mcp |
+| 消费者商城 | http://127.0.0.1:5173 |
+| 商家控制台 | http://127.0.0.1:5173/console |
+| API 文档 | http://127.0.0.1:8000/docs |
+
+异步 outbox 的 worker 与 beat 启动命令见 [`backend/README.md`](backend/README.md)。
 | API 文档 | http://localhost:18000/api/docs |
 
 ---

@@ -21,7 +21,7 @@ Emit (inside a business transaction):
 
 Publish (a separate, retryable step):
 
-    run_publish_cycle(transport=SomeBrokerTransport())
+    run_publish_cycle()
 
 The three marked seams that call ``enqueue`` are ``CreateOrderWorkflow`` step 9,
 ``PaymentSuccessWorkflow`` step 10 and ``RefundWorkflow`` step 7. A row that
@@ -51,6 +51,7 @@ from app.shared.outbox.publisher import (
     publish_due,
     run_publish_cycle,
 )
+from app.shared.outbox.redis_transport import RedisStreamTransport
 from app.shared.outbox.writer import OutboxWriter
 
 __all__ = [
@@ -66,6 +67,7 @@ __all__ = [
     "OutboxTransport",
     "OutboxWriter",
     "PublishOutcome",
+    "RedisStreamTransport",
     "order_created_payload",
     "payment_settled_payload",
     "publish_due",

@@ -11,9 +11,9 @@ not depend on a broker being up, and a broker that is down must not lose the
 event. So the publisher reads committed rows, hands each to a
 :class:`OutboxTransport`, and records what happened.
 
-The transport is a seam, deliberately: today the only implementation is a log
-line (there is no broker in this stack yet), and a later increment swaps in
-Celery/Redis without touching the selection, the retry arithmetic, or the tests.
+The default transport writes to a Redis Stream. Consumers deduplicate on the
+stable outbox row id: a Redis write may succeed while the subsequent database
+commit fails, in which case the worker will deliver the same event again.
 
 ## Selection: ``FOR UPDATE SKIP LOCKED``
 
@@ -29,8 +29,9 @@ the very next scan.
 
 ## Retry arithmetic
 
-``attempt_count`` is incremented **before** the delivery is attempted, so a crash
-mid-delivery is counted rather than invisible. Backoff is exponential from
+``attempt_count`` is incremented before delivery in the current transaction.
+A process crash rolls that transaction back; the row stays eligible for retry.
+Backoff is exponential from
 ``base_backoff_seconds`` and capped, and ``attempt_count >= max_attempts`` moves
 the row to terminal ``DEAD`` - a row that retries forever is an outage nobody is
 paged about.
@@ -171,8 +172,8 @@ def publish_due(
 
     published = failed = dead = 0
     for message in messages:
-        # Count the attempt before making it: a crash mid-delivery is then
-        # recorded, and the retry ceiling still advances.
+        # Count an attempt in the same transaction as its outcome. A process
+        # crash rolls this back and the event remains eligible for retry.
         message.attempt_count += 1
         try:
             transport.deliver(message)
@@ -222,9 +223,11 @@ def run_publish_cycle(
     """Worker entry point: one cycle in its own transaction.
 
     Uses ``session_scope`` so the status writes commit together or not at all.
-    Safe to call repeatedly; a future Celery beat entry point wraps this and adds
-    the schedule (spec §50).
+    Celery beat schedules this every five seconds (spec §50).
     """
-    resolved = transport or LoggingTransport()
+    if transport is None:
+        from app.shared.outbox.redis_transport import RedisStreamTransport
+
+        transport = RedisStreamTransport()
     with session_scope() as session:
-        return publish_due(session, transport=resolved, limit=limit, now=now)
+        return publish_due(session, transport=transport, limit=limit, now=now)

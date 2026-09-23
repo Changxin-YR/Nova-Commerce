@@ -36,7 +36,9 @@ show a row going ``PENDING -> FAILED -> PUBLISHED`` rather than only that it goe
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier, Lock
 from typing import Any
 
 import pytest
@@ -663,3 +665,52 @@ def test_the_publisher_does_not_commit_for_the_caller(shop: Shop) -> None:
     assert state["status"] == OutboxStatus.PENDING.value
     assert state["attempt_count"] == 0
     assert state["published_at"] is None
+
+
+def test_two_publishers_claim_distinct_rows_while_both_hold_locks(shop: Shop) -> None:
+    """Two real MySQL transactions must make progress on different due rows.
+
+    Each transport waits for the other before returning. Without SKIP LOCKED,
+    worker two waits on worker one's row and the barrier breaks; a serial run
+    cannot accidentally satisfy this test.
+    """
+    factory = get_session_factory()
+    with factory() as session:
+        enqueue_order_event(session, shop, aggregate_id=109_001, suffix="worker-one")
+        enqueue_order_event(session, shop, aggregate_id=109_002, suffix="worker-two")
+        session.commit()
+
+    rendezvous = Barrier(2)
+    delivered: list[int] = []
+    delivered_lock = Lock()
+
+    class RendezvousTransport:
+        def deliver(self, message: OutboxMessage) -> None:
+            rendezvous.wait(timeout=10)
+            with delivered_lock:
+                delivered.append(message.aggregate_id)
+
+    def publish_one(_worker: int) -> PublishOutcome:
+        with factory() as session:
+            outcome = publish_due(
+                session,
+                transport=RendezvousTransport(),
+                now=whole_second(),
+                limit=1,
+            )
+            session.commit()
+            return outcome
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(publish_one, range(2)))
+
+    assert outcomes == [PublishOutcome(published=1), PublishOutcome(published=1)]
+    assert sorted(delivered) == [109_001, 109_002]
+    rows = {
+        row.aggregate_id: row
+        for row in rows_for_merchant(merchant_id=shop.merchant_id)
+        if row.aggregate_id in (109_001, 109_002)
+    }
+    assert set(rows) == {109_001, 109_002}
+    assert all(row.status == OutboxStatus.PUBLISHED.value for row in rows.values())
+    assert all(row.attempt_count == 1 for row in rows.values())
