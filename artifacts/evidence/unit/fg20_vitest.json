@@ -7,12 +7,12 @@
     "--outputFile=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\unit\\fg20_vitest.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-23T14:50:09.021538+00:00",
-  "duration_ms": 19820,
+  "timestamp": "2026-09-23T23:46:39.496464+00:00",
+  "duration_ms": 6602,
   "exit_code": 0,
   "git": {
-    "revision": "7d7eca683c89ab69a410dbf552b2f19bcb353f92\n",
-    "subject": "Add revision-bound frontend gate evidence emitter\n",
+    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
+    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,7 +32,7 @@
   "junit_report": {
     "path": "artifacts\\evidence\\unit\\fg20_vitest.xml",
     "parses": true,
-    "testcase_count": 292
+    "testcase_count": 294
   },
   "browser_report": null,
   "assertions": [
@@ -1778,6 +1778,18 @@
     },
     {
       "name": "console Orders — §108 states > renders the PermissionDenied state (not a generic error) for a forbidden list call",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkout sends server-owned order inputs > previews selected SKU quantities with numeric address and coupon IDs",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "checkout sends server-owned order inputs > creates an order with the same business inputs and one idempotency value",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

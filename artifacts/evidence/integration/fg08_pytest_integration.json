@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T18:04:23.521834+00:00",
-  "duration_ms": 74473,
+  "timestamp": "2026-09-23T23:43:52.642492+00:00",
+  "duration_ms": 86023,
   "exit_code": 0,
-  "summary": "350 passed, 1 warning in 71.80s (0:01:11)",
+  "summary": "358 passed, 1 warning in 83.58s (0:01:23)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "8f2a6a4bc9bbd937dd872825daf09f4fe152299f\n",
-    "subject": "feat(marketing): persist and apply previewed promotions\n",
+    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
+    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 350,
+    "testcase_count": 358,
     "outcomes": [
       {
         "name": "test_apply_then_read_back_through_the_frozen_paths",
@@ -1016,6 +1016,38 @@
       },
       {
         "name": "test_the_movement_key_survives_a_discount",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_coupon_locks_on_order_and_releases_on_cancel",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_two_orders_cannot_lock_the_same_coupon",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_concurrent_claims_respect_template_and_user_limits",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_selected_coupon_fails_if_threshold_is_not_met",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_failed_stock_reservation_rolls_coupon_lock_back",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_mock_payment_marks_locked_coupon_used",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_coupon_http_preview_create_claim_and_admin_list",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_expiry_reconciler_skips_locked_coupons_and_expires_unused",
         "actual": "PASSED"
       },
       {
@@ -2910,6 +2942,54 @@
     },
     {
       "name": "test_the_movement_key_survives_a_discount",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_coupon_locks_on_order_and_releases_on_cancel",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_two_orders_cannot_lock_the_same_coupon",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_concurrent_claims_respect_template_and_user_limits",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_selected_coupon_fails_if_threshold_is_not_met",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_failed_stock_reservation_rolls_coupon_lock_back",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_mock_payment_marks_locked_coupon_used",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_coupon_http_preview_create_claim_and_admin_list",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_expiry_reconciler_skips_locked_coupons_and_expires_unused",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

@@ -1,0 +1,43 @@
+{
+  "gate_id": "FG-03",
+  "command": [
+    "npm.cmd",
+    "run",
+    "build"
+  ],
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
+  "timestamp": "2026-09-23T23:46:30.541548+00:00",
+  "duration_ms": 7669,
+  "exit_code": 0,
+  "git": {
+    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
+    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
+    "relevant_paths": [
+      "frontend/src",
+      "frontend/tests",
+      "frontend/e2e",
+      "frontend/package.json",
+      "frontend/package-lock.json",
+      "frontend/vite.config.ts",
+      "frontend/playwright.config.ts",
+      "scripts/emit_frontend_evidence.py",
+      "scripts/gate_evidence.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "junit_report": null,
+  "browser_report": null,
+  "assertions": [
+    {
+      "name": "vue-tsc and Vite build",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "stderr_tail": "",
+  "verdict": "PASS"
+}
