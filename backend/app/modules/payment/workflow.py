@@ -89,6 +89,12 @@ from app.modules.payment.repository import (
     PaymentRepository,
 )
 from app.shared.db.base import utc_now
+from app.shared.outbox import (
+    OutboxAggregateType,
+    OutboxEventType,
+    OutboxWriter,
+    payment_settled_payload,
+)
 
 logger = get_logger(__name__)
 
@@ -204,6 +210,10 @@ class PaymentSuccessWorkflow:
         self._orders = OrderRepository(session)
         self._logs = OrderStatusLogRepository(session)
         self._inventory = InventoryService(session)
+        #: The outbox seam (step 10). Shares the caller's session on purpose: the
+        #: event row must commit with the settlement, so it is appended to *this*
+        #: transaction rather than written after the caller commits.
+        self._outbox = OutboxWriter(session)
 
     # -- public ----------------------------------------------------------
     def execute(self, request: CallbackRequest) -> CallbackExecution:
@@ -536,17 +546,39 @@ class PaymentSuccessWorkflow:
         # goods had left when they are still on the shelf.
 
         # -- step 10: the outbox seam ---------------------------------------
-        # PHASE 6 INSERTS THE `outbox_messages` ROW HERE, in this same
-        # transaction - the same marked block `CreateOrderWorkflow` step 9 carries.
+        # §49: the event row joins *this* transaction, so it commits with the
+        # settlement or not at all - that is what the position is for.
         #
-        # REQ-PAY-004's fourth clause applies with full force at this position: a
-        # **duplicate callback must not produce a second outbox row.** That is
-        # already guaranteed by where this line sits rather than by a check - a
-        # duplicate never reaches step 10, because it is answered in step 1 (the
-        # unique index) or caught by the SUCCESS/PAID guards in steps 3 and 5. A
-        # Phase 6 author must therefore not move this block above those guards, and
-        # must not add a pre-check of its own: an outbox row is emitted exactly once
-        # per settlement because a settlement happens exactly once.
+        # REQ-PAY-004's fourth clause is served by TWO independent guards, and it is
+        # worth naming both because either one alone looks sufficient:
+        #   * the guards above make a duplicate **unreachable** - a repeat delivery is
+        #     answered in step 1 (the unique index) or caught by the SUCCESS/PAID
+        #     guards in steps 3 and 5, so this block runs once per settlement;
+        #   * `enqueue` additionally dedups on `(event_type, aggregate_type,
+        #     aggregate_id)`, so even a block moved above those guards could not emit
+        #     a second row for the same payment.
+        # A mutation that moves this block above the guards therefore does NOT redden
+        # FG-11 on its own - `uq_event_type_aggregate` masks it, and the masking was
+        # measured. That is a fact about the test's sensitivity, not a licence to move
+        # it: do not move this block, and do not add a pre-check of its own, because a
+        # pre-check is a check-then-act race and the unique index already decides
+        # correctly.
+        self._outbox.enqueue(
+            event_type=OutboxEventType.PAYMENT_SETTLED.value,
+            aggregate_type=OutboxAggregateType.PAYMENT.value,
+            aggregate_id=payment.id,
+            # The emitter's own key: the provider event that caused the settlement,
+            # namespaced by provider so two providers' ids cannot be confused. It is
+            # traceability; the dedup anchor is the aggregate above.
+            idempotency_key=f"{request.provider}:{request.event_id}",
+            payload=payment_settled_payload(
+                payment_no=payment.payment_no,
+                order_no=order.order_no,
+                amount=payment.amount,
+                provider=request.provider,
+            ),
+            merchant_id=payment.merchant_id,
+        )
 
         # -- step 11: finalise the callback ---------------------------------
         self._callbacks.mark_processed(callback)

@@ -102,6 +102,12 @@ from app.modules.pricing import (
 )
 from app.shared.db.base import utc_now
 from app.shared.db.models.idempotency import IdempotencyRecord
+from app.shared.outbox import (
+    OutboxAggregateType,
+    OutboxEventType,
+    OutboxWriter,
+    order_created_payload,
+)
 
 logger = get_logger(__name__)
 
@@ -462,6 +468,10 @@ class CreateOrderWorkflow:
         self._idempotency = IdempotencyRepository(session)
         self._inventory = InventoryService(session)
         self._addresses = AddressService(session)
+        #: The outbox seam (step 9). Shares the caller's session on purpose: the
+        #: event row must commit with the order, so it is appended to *this*
+        #: transaction rather than written after the commit.
+        self._outbox = OutboxWriter(session)
         #: The claim taken in step 1, finalised in step 8. ``None`` until then.
         self._record: IdempotencyRecord | None = None
 
@@ -672,10 +682,24 @@ class CreateOrderWorkflow:
         )
 
         # -- step 9: the outbox seam ----------------------------------------
-        # PHASE 6 INSERTS THE `outbox_messages` ROW HERE, in this same transaction
-        # (搂49). Deliberately left as a marked no-op rather than a TODO with no
-        # owner: the row must commit with the order, so its position in this method
-        # is load-bearing and a later author needs to know exactly where it goes.
+        # §49: the event row is appended to *this* transaction, so it commits
+        # with the order or not at all. The position is load-bearing - after step
+        # 7's INV-006 assertion (nothing is announced that could still turn out to
+        # be wrong) and before the single commit() in `execute()`. `enqueue` neither
+        # commits nor opens a transaction, and dedups on the aggregate, so a replay
+        # that somehow reached here would not queue a second `order.created`.
+        self._outbox.enqueue(
+            event_type=OutboxEventType.ORDER_CREATED.value,
+            aggregate_type=OutboxAggregateType.ORDER.value,
+            aggregate_id=order.id,
+            idempotency_key=idempotency_key,
+            payload=order_created_payload(
+                order_no=order.order_no,
+                payable_amount=order.payable_amount,
+                item_count=order.item_count,
+            ),
+            merchant_id=order.merchant_id,
+        )
 
         logger.info(
             "order created",

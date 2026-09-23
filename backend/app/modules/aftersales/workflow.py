@@ -103,6 +103,12 @@ from app.modules.payment.enums import PaymentRecordStatus
 from app.modules.payment.models import Payment
 from app.modules.payment.repository import PaymentRepository
 from app.shared.db.base import utc_now
+from app.shared.outbox import (
+    OutboxAggregateType,
+    OutboxEventType,
+    OutboxWriter,
+    refund_succeeded_payload,
+)
 
 logger = get_logger(__name__)
 
@@ -204,6 +210,10 @@ class RefundWorkflow:
         self._orders = OrderRepository(session)
         self._payments = PaymentRepository(session)
         self._inventory = InventoryService(session)
+        #: The outbox seam (step 7). Shares the caller's session on purpose: the
+        #: event row must commit with the refund, so it is appended to *this*
+        #: transaction rather than written after the caller commits.
+        self._outbox = OutboxWriter(session)
 
     # ------------------------------------------------------------------
     # Entry point
@@ -312,20 +322,35 @@ class RefundWorkflow:
         self._mark_order_after_sale_axis(order=order)
 
         # -- step 7: outbox seam ------------------------------------------
-        # PHASE 6 OWNS THE OUTBOX TABLE. This is the *seam only*: nothing is written
-        # here, and nothing may be written here until Phase 6 lands the table. The
-        # consumer will need at least:
-        #   event_type  = refund.succeeded
-        #   aggregate   = refund / after_sale / order (see the payload below)
-        #   payload     = {refund_no, refund_id, after_sale_no, order_no, amount,
-        #                  order_refunded_amount, order_paid_amount, payment_status,
-        #                  after_sale_status, claim_status}
-        #   emitted_in  = this transaction (before the commit below)
-        # The idempotency rule Phase 6 must respect: one refund row produces exactly
-        # one outbox row. A replayed request never reaches this point - it returns at
-        # `_existing_refund_for_key` above - so a retried POST cannot emit twice, and
-        # the outbox row must be written with the refund's own idempotency key so a
-        # crash-and-retry after this commit is deduplicated the same way the refund is.
+        # §49: the row joins *this* transaction, so the refund and its event
+        # commit together or not at all - it sits above the one commit below.
+        #
+        # One refund row produces exactly one event. A replayed request never reaches
+        # this point - it returns at `_existing_refund_for_key` or on the
+        # `_ReplayDetectedError` race above - so a retried POST cannot emit twice, and
+        # `enqueue` dedups on the aggregate as a second guard.
+        self._outbox.enqueue(
+            event_type=OutboxEventType.REFUND_SUCCEEDED.value,
+            aggregate_type=OutboxAggregateType.REFUND.value,
+            aggregate_id=refund.id,
+            # The seam is explicit: the refund's *own* idempotency key, so a
+            # crash-and-retry is deduplicated the same way the refund is.
+            idempotency_key=idempotency_key,
+            payload=refund_succeeded_payload(
+                refund_no=refund.refund_no,
+                refund_id=refund.id,
+                after_sale_no=claim.after_sale_no,
+                order_no=claim.order_no,
+                amount=amount,
+                order_refunded_amount=order.refunded_amount,
+                order_paid_amount=order.paid_amount,
+                payment_status=order.payment_status,
+                after_sale_status=order.after_sale_status,
+                claim_status=claim.claim_status,
+            ),
+            merchant_id=order.merchant_id,
+        )
+
         logger.info(
             "refund executed",
             extra={

@@ -7,5 +7,18 @@ either a shared model or a duplicated one, and a duplicated one drifts.
 """
 
 from app.shared.db.models.idempotency import IdempotencyRecord, IdempotencyStatus
+from app.shared.db.models.outbox import (
+    MAX_PUBLISH_ATTEMPTS,
+    OUTBOX_STATUSES,
+    OutboxMessage,
+    OutboxStatus,
+)
 
-__all__ = ["IdempotencyRecord", "IdempotencyStatus"]
+__all__ = [
+    "MAX_PUBLISH_ATTEMPTS",
+    "OUTBOX_STATUSES",
+    "IdempotencyRecord",
+    "IdempotencyStatus",
+    "OutboxMessage",
+    "OutboxStatus",
+]
