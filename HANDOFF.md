@@ -965,7 +965,7 @@ requirements), `docs/architecture/ORDER_WORKFLOW.md`, and start Phase 5.
 
 ---
 
-﻿## 18. Session handoff - Phase 5 CLOSED, start Phase 6 here
+## 18. Session handoff - Phase 5 CLOSED, start Phase 6 here
 
 > Written at the end of Phase 5 for the next conversation. **Read 18.1 (state),
 > 18.2 (what is proven) and 18.5 (what is still open) first.** Section 18.4 is the
