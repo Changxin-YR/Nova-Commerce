@@ -416,3 +416,60 @@ row action gated by a pure, unit-tested availability module instead of an inline
 | `npx vite build` | EXIT=0, `2384 modules transformed` |
 | `npx vitest run` | EXIT=0, `19 files`, **`276 passed`** (floor 246) |
 | `npx eslint .` | EXIT=0 |
+
+---
+
+## Refundable bridge: the three conditions (captain ruling)
+
+The bridge is KEPT — deleting it before the backend ships `OrderDetail.refundable_amount` would
+replace a dead UI with a harder-to-find failure, and a dead UI at least gets debugged. But a second
+source of truth for a money figure in the DOMAIN layer is the shape section 15 forbids, so it is
+tolerated only while it is labelled, noisy, and dated.
+
+| Condition | Status |
+| --- | --- |
+| 1. It must SPEAK | DONE. Dev-only `console.warn` naming the missing field and the removal trigger. Guarded by `import.meta.env.DEV` — **verified by absence**: the warning text does not appear in `dist/assets/*.js` after a real `vite build`, so it is tree-shaken from production. Warns once per session, because the function is called from computed values and templates and a per-call warning would flood the console. |
+| 2. It must be NAMED for what it is | DONE. `@deprecated` JSDoc on `refundableAmount` + `TODO(phase-5)` at the fallback branch, both stating the removal trigger. Signature unchanged on purpose: the call sites are meant to keep reading the same name. |
+| 3. Deletion must have an OWNER | The captain owns this in `HANDOFF.md` (outside `frontend/`). **NOT YET PRESENT** as of commit `0c26686` — a grep of `HANDOFF.md` for `refundable_amount`/`bridge` returns nothing. Flagged, because an unowned TODO is exactly the permanent comment the condition exists to prevent. |
+
+Three tests pin the behaviour: the fallback warns and names both the field and the trigger; the server
+path does NOT warn (so the signal stays meaningful); and it warns only once per session.
+
+## Second contract batch consumed (§12.1) and what it still leaves open
+
+`API_CONTRACT.md` section 12 froze promotion/coupon creation and system management. Coupon creation is
+now wired to the real endpoints: `POST /marketing/coupons/preview` then `POST /marketing/coupons`,
+carrying the `preview_token` the preview returned.
+
+**Preview-then-confirm is now a COMPILE-TIME property**, not a convention:
+`CouponCreatePayload` requires `preview_token`, so a single-submit create flow cannot be written
+against the signature. Editing after a preview discards the token, because the approval covers the
+values the operator actually saw. Six tests assert the flow property rather than a layout.
+
+**A third wrong path, same class as the knowledge one:** `createCoupon` posted to
+`/marketing/admin/coupons`, which is only the LIST route; section 12.1 freezes creation at
+`/marketing/coupons`. The route existed and was simply the wrong one, so nothing failed loudly.
+
+### Still not built, and why (§12.3's pattern repeats for SHAPES)
+
+section 12.3 names the pattern "the rule was frozen and the interface was not". Batch 2 freezes the
+**paths** but still defines no **response shape** for any of the new endpoints:
+
+| Frozen path | Response named in §4 | Shape defined anywhere? |
+| --- | --- | --- |
+| `POST /marketing/promotions/preview` | `PromotionPreview` | NO |
+| `POST /marketing/promotions` | `Promotion` | NO (`Promotion.rule` is a local assumption) |
+| `POST /marketing/coupons/preview` | `CouponPreview` | NO — narrow local view model used, marked as an assumption |
+| `POST /marketing/coupons` | `CouponTemplate` | NO |
+| `PUT /system/roles/{id}/permissions` | `Role` | NO |
+| `POST /system/users/{user_id}/roles` | `User` | NO |
+
+So two flows remain unbuildable without guessing:
+1. **Promotion creation** — needs the promotion RULE shape; a form cannot be built from
+   `Record<string, unknown>`.
+2. **Role / permission editing** — needs `Role`/`User` shapes, plus the section 65 semantics (the
+   server must refuse a change lowering a write tool's risk level without separate audited approval).
+   Building the checkbox UI before that rule has a concrete shape would make the forbidden operation
+   one click away again, which is what section 12.2 exists to prevent.
+
+Both are reported rather than filled, per the rule the captain restated twice.
