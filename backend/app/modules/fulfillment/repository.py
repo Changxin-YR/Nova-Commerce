@@ -268,6 +268,15 @@ class FulfillmentRepository:
         write pending in the session - so it saw ``{}`` for a package that had just
         shipped and wrote the order axis one state behind. Fixed by flushing the package
         status before the recompute. A query is not a session view; if a caller needs a
+
+        (On `fulfillment_items.sku_id`, ruled in, out and finally in: the captain's
+        closing argument settles how to read the baseline, so it is worth keeping.
+        `REQ-FUL-002` lists `fulfillment_id, order_item_id, quantity` and omits
+        `id`, `created_at`, `updated_at`, `product_name` and `sku_name` - all
+        of which this table has, and nobody objected to any of them. The requirement
+        therefore enumerates what **must** exist, not what may; it never forbade
+        `sku_id`. Reading a required-list as an exhaustive list is what produced four
+        rounds of reversal on this column.)
         pending write visible to SQL, it must flush first.
 
         ``planned_quantities_for_order`` remains the deliberately unfiltered counterpart,
