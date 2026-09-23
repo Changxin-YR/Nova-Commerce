@@ -631,3 +631,161 @@ Named so absence is not read as permission:
 - The full `AgentRun` / `PendingAction` shapes (Phase 10/13).
 - Promotion lifecycle beyond `DRAFT` | `ACTIVE` | `ENDED`, and coupon issuance to users.
 - Sort parameters and export formats.
+
+---
+
+## 14. Response shapes for Phase 4 — order preview and creation (2026-09-23, fourth batch)
+
+§96 froze the order **paths**, and §38 froze the **input rule** ("business inputs only,
+never a client price"). Neither froze the wire shape of the two request bodies, and the
+frontend had guessed one (`source: cart|direct`, nested `items_amount`, `coupon_code`).
+Freezing it here before the backend implements it is the same move as §11–§13.
+
+### 14.1 The cart is not a server resource in V1
+
+§29 says the cart price is preview-only; §105 keeps `cart` in Pinia. There is therefore
+no `/cart` resource, no cart table and no cart item id in V1. The client holds the
+selection and sends it to the preview endpoint. A server-persisted cart would create a
+second place where a price exists, which is exactly what §37 forbids.
+
+### 14.2 `POST /api/v1/orders/preview` and `POST /api/v1/orders`
+
+Both accept the same business inputs. `client_request_id` is required on create only.
+
+```json
+{
+  "items": [ { "sku_id": 3, "quantity": 1 } ],
+  "address_id": 9,
+  "coupon_id": null,
+  "remark": null,
+  "client_request_id": "8f3a4c1e-..." 
+}
+```
+
+* `items` carries **SKU and quantity only**. There is deliberately no `unit_price`,
+  `discount_amount` or `payable_amount` field anywhere in the request: the schema is
+  `extra="forbid"`, so a client that sends one is rejected with 422 rather than ignored
+  (§38, §110).
+* `coupon_id` is accepted because §38 freezes it as a business input. Coupon
+  *resolution and locking* is marketing's job and lands in Phase 6; until then a
+  non-null `coupon_id` is refused with `COUPON_NOT_FOUND (90004)` — it is never
+  silently dropped, because a coupon the customer selected must not vanish without a
+  message.
+* `address_id` must belong to the caller. The address is snapshotted onto the order at
+  creation; later edits to the address never change a historical order.
+* Duplicate `sku_id` lines are merged (quantities summed) before pricing, so one order
+  has at most one line per SKU.
+
+**Preview response `data`** (200; one pricing authority, so the create path recomputes
+the same numbers rather than trusting this response):
+
+```json
+{
+  "items": [
+    {
+      "sku_id": 3,
+      "product_id": 7,
+      "product_name": "Nova Phone 15 Pro",
+      "sku_name": "原色钛金属 256GB",
+      "image_url": null,
+      "unit_price": 299900,
+      "quantity": 1,
+      "original_amount": 299900,
+      "promotion_discount_amount": 0,
+      "coupon_discount_amount": 0,
+      "allocated_discount_amount": 0,
+      "payable_amount": 299900
+    }
+  ],
+  "original_amount": 299900,
+  "promotion_discount_amount": 0,
+  "coupon_discount_amount": 0,
+  "shipping_amount": 0,
+  "payable_amount": 299900,
+  "warnings": []
+}
+```
+
+**Create response `data`** is the frozen `OrderDetail` of §6, returned with HTTP 200.
+200 rather than 201 because an idempotent replay returns the *same* order: a client that
+cannot tell "created" from "replayed" would have to guess whether its retry was safe.
+
+### 14.3 Idempotency: header + body, two guards
+
+`POST /api/v1/orders` requires **both** an `Idempotency-Key` header and a
+`client_request_id` body field (§96).
+
+| Situation | Result |
+|---|---|
+| Missing `Idempotency-Key` | `IDEMPOTENCY_KEY_REQUIRED (10010)` |
+| Same key, same body | 200, the original order (no second order, no second stock movement) |
+| Same key, different body | `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD (10011)` |
+| Different key, same `client_request_id`, same body | 200, the original order (the body field is the second guard for a client that lost its header) |
+| Different key, same `client_request_id`, different body | `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD (10011)` |
+
+`client_request_id` is unique per customer in the database, so the second guard is a
+constraint rather than a convention. The record in `idempotency_records` commits in the
+same transaction as the order: a rolled-back create leaves no key behind, so a genuine
+retry after a failure is allowed.
+
+### 14.4 Money: one allocation algorithm, one exact sum
+
+`payable_amount = original_amount − promotion_discount_amount − coupon_discount_amount + shipping_amount`.
+
+Order-level discounts are allocated **pro-rata by each item's original amount, with the
+remainder absorbed by the last eligible item** (§41) — the remainder rule is what makes
+INV-006 exact rather than exact-to-the-cent. `allocated_discount_amount` is the sum of
+the two allocations, and `item.payable_amount = item.original_amount − item.allocated_discount_amount`.
+
+**`shipping_amount` is 0 in V1.** `PricingService.calculate_shipping` exists because §37
+freezes the method, and the V1 policy is a free-shipping policy object. A non-zero
+order-level shipping charge has no per-item field to allocate to, so including it in
+`payable_amount` would break `SUM(item.payable_amount) == order.payable_amount` (INV-006)
+by construction; the pricing service therefore refuses to build a snapshot in which that
+equality does not hold. Enabling paid shipping requires a decision about allocation (or
+about the invariant) and is **not frozen here** — do not switch it on silently.
+
+### 14.5 Order status machine (Phase 4 subset)
+
+* create → `PENDING_PAYMENT` (`payment_status=UNPAID`, `fulfillment_status=UNFULFILLED`,
+  `after_sale_status=NONE`)
+* `PENDING_PAYMENT` → `CANCELLED` via `POST /orders/{order_no}/cancel`; releases the
+  reserved stock (coupon release is Phase 6)
+* `PROCESSING` → `COMPLETED` via `POST /orders/{order_no}/confirm-receipt`
+* `PENDING_PAYMENT` → `PROCESSING` is written by `PaymentSuccessWorkflow` (Phase 5)
+* `PENDING_PAYMENT` → `CLOSED` is written by the expiry reconciliation (Phase 6)
+* **Shipping never changes `order_status`** (§31); the four status fields are never
+  inferred from one another.
+
+`POST /orders/{order_no}/cancel` body (both fields optional):
+
+```json
+{ "reason": "用户主动取消" }
+```
+
+`cancel_reason` is null unless `order_status` is `CANCELLED`/`CLOSED`, and is
+server-owned: the client cannot infer it. Cancelling anything other than a
+`PENDING_PAYMENT` order is `ORDER_NOT_CANCELLABLE (50010)`.
+
+### 14.6 Reads, filters and masking
+
+* Consumer list `GET /api/v1/orders` — paged envelope (§3), own orders only. Filters:
+  `order_status`. Default order: `created_at DESC`.
+* Consumer detail `GET /api/v1/orders/{order_no}` — `OrderDetail` of §6, own order only.
+* Console list `GET /api/v1/orders/admin` — filters `order_status`, `payment_status`,
+  `fulfillment_status`, `order_no`.
+* Console detail `GET /api/v1/orders/admin/{order_no}`.
+* A consumer asking for an order that is not theirs gets `ORDER_NOT_FOUND (50003)`, never
+  403: distinguishing the two would turn the endpoint into an existence oracle (IDOR).
+
+`receiver_name` and `receiver_phone` are already masked (§94) on both surfaces. The
+`full_address` on detail is the masked address snapshot; the client must not attempt to
+un-mask it.
+
+### 14.7 What is still unfrozen after this batch
+
+* Sort/order parameter names (`sort=-created_at` is still only a plan).
+* Promotion/coupon **application on the live order path** (Phase 6 resolves the rules;
+  Phase 4 implements and unit-tests the arithmetic against the §13.1/§13.3 shapes).
+* The paid-shipping rule and its interaction with INV-006 (see §14.4).
+* Return/refund shapes (Phase 5).

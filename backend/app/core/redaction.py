@@ -233,6 +233,20 @@ def mask_address(value: str) -> str:
     return f"{value[:6]}****"
 
 
+def mask_name(value: str) -> str:
+    """Keep only the first character of a personal name.
+
+    The order API returns receiver names already masked (§94): an order list is a
+    common exfiltration target and an operator rarely needs the full value. A
+    one-character name still loses something - leaving it untouched would make the
+    mask a no-op for exactly the shortest (and most identifying) names.
+    """
+    if not value:
+        return value
+    stars = max(1, min(len(value) - 1, 3))
+    return f"{value[:1]}{'*' * stars}"
+
+
 def redact_text(value: str, purpose: RedactionPurpose) -> str:
     """Scrub credentials - and, where the purpose demands it, PII - from free text.
 
@@ -407,6 +421,7 @@ __all__ = [
     "llm_payload",
     "mask_address",
     "mask_email",
+    "mask_name",
     "mask_phone",
     "mcp_payload",
     "redact",

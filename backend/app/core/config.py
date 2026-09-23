@@ -231,6 +231,17 @@ class Settings(BaseSettings):
     CHECKPOINTER_BACKEND: CheckpointerBackend = "memory"
 
     # ------------------------------------------------------------------
+    # Commerce / orders (spec sections 30, 31, 48)
+    # ------------------------------------------------------------------
+    #: Prefix of the human-readable order number: NV<YYYYMMDD><sequence>.
+    #: Configurable because it is an ops/display concern, not business logic.
+    ORDER_NO_PREFIX: str = Field(default="NV", min_length=1, max_length=8)
+    #: How long an unpaid order holds its reserved stock before the expiry
+    #: reconciliation closes it (spec section 50). The stock is *reserved* for
+    #: this window, which is why it is bounded rather than infinite.
+    ORDER_PAYMENT_TIMEOUT_MINUTES: int = Field(default=15, ge=1, le=1440)
+
+    # ------------------------------------------------------------------
     # PII redaction + logging (§94, §131, §132)
     # ------------------------------------------------------------------
     PII_MASK_PHONE: bool = True
