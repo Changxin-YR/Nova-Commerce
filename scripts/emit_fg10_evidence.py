@@ -226,13 +226,18 @@ def main(argv: list[str] | None = None) -> int:
         if stale.is_file():
             stale.unlink()
 
-    test_file_exists = (BACKEND / args.test_target).is_file()
+    # A pytest target may be a module OR a directory (the captain may rule that FG-10
+    # runs the whole tests/integration/order package rather than one frozen module).
+    # is_file() would report a valid directory target as "not found" and fail closed.
+    test_file_exists = (BACKEND / args.test_target).exists()
 
     started = datetime.now(UTC)
     timed_out = False
     if not test_file_exists:
         # Do not invent a run. Record the truth: the gate has nothing to execute.
-        stdout, stderr, exit_code = "", f"test target not found: {BACKEND / args.test_target}\n", 4
+        stdout = ""
+        stderr = f"test target not found: {BACKEND / args.test_target}\n"
+        exit_code = 4
     else:
         try:
             # Fixed argv, no shell=True, no shell interpolation.
@@ -263,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
     failures = [a for a in assertions if not a["pass"]]
     reasons: list[str] = []
     if not test_file_exists:
-        reasons.append(f"test target not found: {args.test_target}")
+        reasons.append(f"test target not found: {args.test_target} (neither a file nor a directory)")
     if timed_out:
         reasons.append(f"pytest timed out after {args.timeout_seconds}s")
     if not assertions:
