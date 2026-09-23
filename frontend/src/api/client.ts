@@ -47,7 +47,7 @@ import {
 import { TRACE_ID_HEADER, newTraceId, readTraceIdHeader, setLastTraceId } from '@/utils/trace'
 
 /** Per-request options understood by our interceptors. */
-export interface NexoraExtras {
+export interface NovaExtras {
   /** Absolute path (e.g. '/health/ready') —never prefixed with the base URL. */
   absoluteUrl?: string
   /** Set on the refresh request itself and on the replay to break the 401 loop. */
@@ -65,10 +65,10 @@ export interface NexoraExtras {
  * instance, a plain object, or undefined) —narrowing it here produced a config
  * that no caller could satisfy. The interceptors normalize it before use.
  */
-export type NexoraRequestConfig = AxiosRequestConfig & NexoraExtras
+export type NovaRequestConfig = AxiosRequestConfig & NovaExtras
 
 
-export interface NexoraClientOptions {
+export interface NovaClientOptions {
   baseURL?: string
   timeoutMs?: number
   /**
@@ -112,13 +112,13 @@ function clientRequestId(): string {
   return newTraceId()
 }
 
-export class NexoraHttpClient {
+export class NovaHttpClient {
   readonly axios: AxiosInstance
   private refreshPromise: Promise<void> | null = null
   private readonly refreshHandler: () => Promise<void>
   private readonly onSessionExpired: () => void
 
-  constructor(options: NexoraClientOptions = {}) {
+  constructor(options: NovaClientOptions = {}) {
     this.axios = axios.create({
       baseURL: options.baseURL ?? API_BASE_URL,
       timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -134,7 +134,7 @@ export class NexoraHttpClient {
   // -- public API ---------------------------------------------------------
 
   /** Full envelope —use when the caller needs `trace_id` or `message`. */
-  async request<T>(config: NexoraRequestConfig): Promise<ApiEnvelope<T>> {
+  async request<T>(config: NovaRequestConfig): Promise<ApiEnvelope<T>> {
     const response = await this.axios.request<ApiEnvelope<T>>(config)
     return response.data
   }
@@ -147,7 +147,7 @@ export class NexoraHttpClient {
    * list endpoints do), `envelope.data` IS that array; `Paged<T>` is only for
    * endpoints that wrap items in `{items, meta}`. API modules declare which.
    */
-  async requestData<T>(config: NexoraRequestConfig): Promise<T> {
+  async requestData<T>(config: NovaRequestConfig): Promise<T> {
     const envelope = await this.request<T>(config)
     return envelope.data as T
   }
@@ -159,7 +159,7 @@ export class NexoraHttpClient {
   post<T>(
     url: string,
     body?: unknown,
-    config: NexoraRequestConfig = {},
+    config: NovaRequestConfig = {},
   ): Promise<T> {
     return this.requestData<T>({
       ...config,
@@ -170,20 +170,20 @@ export class NexoraHttpClient {
     })
   }
 
-  put<T>(url: string, body?: unknown, config: NexoraRequestConfig = {}): Promise<T> {
+  put<T>(url: string, body?: unknown, config: NovaRequestConfig = {}): Promise<T> {
     return this.requestData<T>({ ...config, method: 'PUT', url, data: body })
   }
 
-  patch<T>(url: string, body?: unknown, config: NexoraRequestConfig = {}): Promise<T> {
+  patch<T>(url: string, body?: unknown, config: NovaRequestConfig = {}): Promise<T> {
     return this.requestData<T>({ ...config, method: 'PATCH', url, data: body })
   }
 
-  delete<T>(url: string, config: NexoraRequestConfig = {}): Promise<T> {
+  delete<T>(url: string, config: NovaRequestConfig = {}): Promise<T> {
     return this.requestData<T>({ ...config, method: 'DELETE', url })
   }
 
   /** Multipart upload. Overrides the JSON content type for this call only. */
-  upload<T>(url: string, form: FormData, config: NexoraRequestConfig = {}): Promise<T> {
+  upload<T>(url: string, form: FormData, config: NovaRequestConfig = {}): Promise<T> {
     return this.requestData<T>({
       ...config,
       method: 'POST',
@@ -211,7 +211,7 @@ export class NexoraHttpClient {
   }
 
   /** Request a path OUTSIDE the `/api/v1` prefix (e.g. `/health/ready`). */
-  absolute<T>(url: string, config: NexoraRequestConfig = {}): Promise<T> {
+  absolute<T>(url: string, config: NovaRequestConfig = {}): Promise<T> {
     return this.requestData<T>({
       ...config,
       url,
@@ -231,7 +231,7 @@ export class NexoraHttpClient {
       // Axios guarantees a concrete `AxiosHeaders` instance at this point, while
       // the public config type loosely allows an object or undefined. Our extras
       // (idempotencyKey / absoluteUrl / skipAuthRefresh) ride along unchanged.
-      const cfg = config as InternalAxiosRequestConfig & NexoraExtras
+      const cfg = config as InternalAxiosRequestConfig & NovaExtras
       if (!cfg.absoluteUrl) {
         if (!cfg.headers.has(TRACE_ID_HEADER)) cfg.headers.set(TRACE_ID_HEADER, newTraceId())
       } else {
@@ -270,7 +270,7 @@ export class NexoraHttpClient {
   }
 
   private async handleResponseError(error: AxiosError): Promise<AxiosResponse> {
-    const cfg = (error.config ?? {}) as InternalAxiosRequestConfig & NexoraExtras
+    const cfg = (error.config ?? {}) as InternalAxiosRequestConfig & NovaExtras
     const responseTrace = readTraceIdHeader(error.response?.headers as unknown)
     if (responseTrace) setLastTraceId(responseTrace)
 
@@ -299,7 +299,7 @@ export class NexoraHttpClient {
       const headers = AxiosHeaders.from(cfg.headers as AxiosHeaders)
       const freshToken = getAccessToken()
       if (freshToken) headers.set('Authorization', `Bearer ${freshToken}`)
-      const replay: NexoraRequestConfig = { ...cfg, headers, __retried: true }
+      const replay: NovaRequestConfig = { ...cfg, headers, __retried: true }
       return this.axios.request(replay)
     }
 
@@ -335,7 +335,7 @@ export class NexoraHttpClient {
       url: '/auth/refresh',
       data: { refresh_token: refreshToken },
       skipAuthRefresh: true,
-    } as NexoraRequestConfig)
+    } as NovaRequestConfig)
 
     const payload = response.data.data ?? {}
     const accessToken = payload.access_token ?? payload.accessToken ?? ''
@@ -353,7 +353,7 @@ export class NexoraHttpClient {
 }
 
 /** App-wide singleton. */
-export const http = new NexoraHttpClient()
+export const http = new NovaHttpClient()
 
 /** Named export for readability in API modules: `httpClient.get<T>(...)`. */
 export const httpClient = http

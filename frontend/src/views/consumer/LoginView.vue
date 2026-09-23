@@ -47,7 +47,7 @@ async function submit(): Promise<void> {
   <div class="nx-container login">
     <form class="login__card nx-card" @submit.prevent="submit">
       <div class="nx-card__body">
-        <h1 class="nx-page-title">登录 Nexora</h1>
+        <h1 class="nx-page-title">登录 Nova</h1>
         <p class="nx-muted login__hint">登录后可使用购物车、订单、售后与商家后台。</p>
 
         <label class="login__field">

@@ -1,5 +1,5 @@
 /**
- * Nexora design tokens + Element Plus theme overrides.
+ * Nova design tokens + Element Plus theme overrides.
  *
  * DESIGN DIRECTION: information-dense Chinese B2C commerce — the conventions Chinese
  * shoppers already know. Tight type scale, 1px hairlines, ~0 radius, grey page with white
@@ -8,7 +8,7 @@
  *
  * SCOPE / LEGAL (spec §127): only the *design language* is referenced. No third-party
  * logo, image asset, brand name or proprietary graphic is used or reproduced anywhere in
- * this app — the brand is Nexora, and all copy, badges and artwork are ours.
+ * this app — the brand is Nova, and all copy, badges and artwork are ours.
  *
  * HOW ELEMENT PLUS IS THEMED: Element Plus is driven by CSS custom properties
  * (`--el-*`). Overriding them reskins every component, so no component library is swapped
@@ -20,7 +20,7 @@
  */
 
 /* ===========================================================================
-   1. Nexora brand tokens — the private layer components consume
+   1. Nova brand tokens — the private layer components consume
    =========================================================================== */
 :root {
   /* -- brand / price red ------------------------------------------------- */
@@ -66,6 +66,14 @@
   --nx-radius-stage: 2px;
   --nx-radius-control: 2px;
   --nx-radius-pill: 2px;
+
+  /* -- legacy aliases: files still referencing the pre-redesign names.
+        `--nx-primary` must stay defined — an undefined custom property makes the
+        declaration invalid at computed-value time, so the text would silently fall
+        back to the inherited colour instead of the brand red. ------------ */
+  --nx-primary: var(--nx-brand);
+  --nx-primary-hover: var(--nx-brand-hover);
+  --nx-primary-soft: var(--nx-brand-soft);
 
   /* -- borders instead of shadows ---------------------------------------- */
   --nx-shadow-card: none;
@@ -579,6 +587,99 @@ h4 {
       background: var(--nx-brand);
     }
   }
+}
+
+/* ===========================================================================
+   8b. Compatibility aliases
+   The redesign renamed the structural primitives (`nx-card` -> `nx-block`, etc.).
+   These aliases keep existing markup rendering the NEW dense look, so the migration
+   can proceed view by view instead of in one broken jump. Each alias only maps onto
+   tokens/patterns defined above; none introduces a second visual language.
+   Retire an alias once nothing references it (`grep -rn "nx-card" src`).
+   =========================================================================== */
+.nx-card {
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius);
+
+  &__body {
+    padding: 12px;
+  }
+
+  &__stage {
+    margin: 0;
+    background: var(--nx-surface-stage);
+  }
+
+  &--interactive:hover {
+    border-color: var(--nx-border-hover);
+    box-shadow: var(--nx-shadow-card-hover);
+  }
+}
+
+.nx-page-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.nx-section-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* Pill bar -> flat underline tabs. The markup keeps `nx-pill`/`nx-pills`, but the
+   rendered control is the commerce tab strip, because pills read as Western SaaS. */
+.nx-pills {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--nx-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.nx-pill {
+  position: relative;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--nx-text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--nx-brand);
+  }
+
+  &--active {
+    background: transparent;
+    color: var(--nx-brand);
+    font-weight: 700;
+    box-shadow: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--nx-brand);
+    }
+  }
+}
+
+html.dark .nx-pill--active {
+  background: transparent;
+  color: var(--nx-brand);
 }
 
 /* ===========================================================================

@@ -96,7 +96,7 @@ const PREVIEW_ROWS: ProductSummary[] = [
     original_price_amount: 699900,
     sales_count: 12800,
     rating: 4.9,
-    brand_name: 'Nexora',
+    brand_name: 'Nova',
     tags: ['自营', '秒杀', '预览数据'],
     status: 'PUBLISHED',
   },
@@ -108,7 +108,7 @@ const PREVIEW_ROWS: ProductSummary[] = [
     original_price_amount: 129900,
     sales_count: 45600,
     rating: 4.8,
-    brand_name: 'Nexora',
+    brand_name: 'Nova',
     tags: ['自营', '领券', '预览数据'],
     status: 'PUBLISHED',
   },
@@ -120,7 +120,7 @@ const PREVIEW_ROWS: ProductSummary[] = [
     original_price_amount: 149900,
     sales_count: 8300,
     rating: 4.7,
-    brand_name: 'Nexora',
+    brand_name: 'Nova',
     tags: ['满减', '新品', '预览数据'],
     status: 'PUBLISHED',
   },
@@ -132,7 +132,7 @@ const PREVIEW_ROWS: ProductSummary[] = [
     original_price_amount: 19900,
     sales_count: 96000,
     rating: 4.9,
-    brand_name: 'Nexora',
+    brand_name: 'Nova',
     tags: ['自营', '秒杀', '预览数据'],
     status: 'PUBLISHED',
   },
@@ -144,7 +144,7 @@ const PREVIEW_ROWS: ProductSummary[] = [
     original_price_amount: 299900,
     sales_count: 3400,
     rating: 4.6,
-    brand_name: 'Nexora',
+    brand_name: 'Nova',
     tags: ['自营', '满减', '预览数据'],
     status: 'PUBLISHED',
   },
@@ -156,7 +156,7 @@ const PREVIEW_ROWS: ProductSummary[] = [
     original_price_amount: 189900,
     sales_count: 5100,
     rating: 4.8,
-    brand_name: 'Nexora',
+    brand_name: 'Nova',
     tags: ['领券', '预览数据'],
     status: 'PUBLISHED',
   },
@@ -235,7 +235,7 @@ const SERVICE_ICONS = [
             {{ auth.isLoggedIn ? auth.displayName.slice(0, 1) : '游' }}
           </div>
           <p class="home__user-name">
-            {{ auth.isLoggedIn ? auth.displayName : '欢迎来到 Nexora' }}
+            {{ auth.isLoggedIn ? auth.displayName : '欢迎来到 Nova' }}
           </p>
           <p class="nx-muted home__user-hint">
             {{ auth.isLoggedIn ? '查看我的订单与售后进度' : '登录后可同步购物车与订单' }}

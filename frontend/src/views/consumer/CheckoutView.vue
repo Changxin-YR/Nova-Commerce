@@ -1,14 +1,13 @@
 <script setup lang="ts">
 /**
- * Checkout: address + coupon + SERVER-COMPUTED totals.
+ * Checkout — the highest-stakes page, so every number on it is SERVER-COMPUTED:
+ * `items_amount`, `discount_amount`, `shipping_amount`, `payable_amount` all come from
+ * `POST /orders/preview`. This page never adds, subtracts or rounds money; `<PriceText>`
+ * only formats. The amount panel lists each line separately (商品金额 / 促销优惠 / 优惠券 /
+ * 运费 / 应付) because a shopper must be able to audit the total.
  *
- * Two rules this page exists to demonstrate:
- *  1. Every number shown (`items_amount`, `discount_amount`, `shipping_amount`,
- *     `payable_amount`) comes from `POST /orders/preview`. The page never adds,
- *     subtracts or rounds money itself.
- *  2. Creating the order sends BOTH an `Idempotency-Key` header and a
- *     `client_request_id`. A double-clicked button therefore creates ONE order; the
- *     client retries nothing on its own, and a network retry is safe.
+ * Order creation sends BOTH an `Idempotency-Key` header and a `client_request_id`, so a
+ * double-clicked submit creates ONE order and a network retry is safe.
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -16,10 +15,10 @@ import { addressApi, orderApi, paymentApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useCartStore } from '@/stores/cart'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
+import PriceText from '@/components/ui/PriceText.vue'
 
 const router = useRouter()
 const cart = useCartStore()
@@ -27,6 +26,15 @@ const notifications = useNotificationStore()
 
 const selectedAddressId = ref('')
 const couponCode = ref('')
+const remark = ref('')
+/** Our own payment-channel labels; the mock channel drives the server callback path. */
+const channel = ref<'MOCK' | 'ALIPAY' | 'WECHAT'>('MOCK')
+
+const CHANNELS = [
+  { value: 'MOCK' as const, label: '模拟支付（演示用）', hint: '走服务端回调校验，可验证幂等' },
+  { value: 'ALIPAY' as const, label: '在线支付 A', hint: '未接入真实通道' },
+  { value: 'WECHAT' as const, label: '在线支付 B', hint: '未接入真实通道' },
+]
 
 const {
   data: addresses,
@@ -35,7 +43,7 @@ const {
   execute: loadAddresses,
 } = useAsyncState(() => addressApi.list(), { immediate: true })
 
-const addressesList = computed(() => addresses.value ?? [])
+const addressList = computed(() => addresses.value ?? [])
 
 const {
   data: preview,
@@ -53,15 +61,14 @@ const {
 )
 
 const submitting = ref(false)
-// One idempotency key per checkout attempt. It is regenerated only after a
-// successful order, so a retry of the SAME attempt reuses it.
+/** One idempotency key per checkout attempt; regenerated only after success. */
 const clientRequestId = ref(newTraceId())
 const idempotencyKey = computed(() => `order-${clientRequestId.value}`)
 
 onMounted(async () => {
   if (cart.isEmpty) await cart.load().catch(() => undefined)
   await loadAddresses()
-  const preferred = addressesList.value.find((address) => address.is_default) ?? addressesList.value[0]
+  const preferred = addressList.value.find((a) => a.is_default) ?? addressList.value[0]
   if (preferred) selectedAddressId.value = preferred.id
   await loadPreview()
 })
@@ -78,25 +85,23 @@ async function createOrder(): Promise<void> {
       client_request_id: idempotencyKey.value,
       source: 'cart',
       coupon_code: couponCode.value || undefined,
+      remark: remark.value || undefined,
     })
 
-    // The payment record is created server-side; the client only navigates to the
-    // mock pay page and then RE-READS server state.
     const payment = await paymentApi.create({
       order_no: order.order_no,
-      channel: 'MOCK',
+      channel: channel.value,
       client_request_id: `pay-${clientRequestId.value}`,
     })
 
-    // A new attempt must use a new key.
     clientRequestId.value = newTraceId()
     notifications.success('订单已创建', `订单号 ${order.order_no}`)
     await router.push({ name: 'mock-pay', params: { paymentId: payment.id } })
   } catch (e) {
     const normalized = normalizeError(e)
     notifications.error('下单失败', normalized.message, normalized.code, normalized.traceId)
-    // A changed price or a stock race is not a bug in the UI: refresh the preview
-    // so the user sees the authoritative numbers instead of a stale total.
+    // A price change or a stock race is not a UI bug: refresh the preview so the shopper
+    // sees the authoritative numbers instead of a stale total.
     await loadPreview()
   } finally {
     submitting.value = false
@@ -105,310 +110,447 @@ async function createOrder(): Promise<void> {
 </script>
 
 <template>
-  <div class="nx-container checkout">
-    <h1 class="nx-page-title">确认订单</h1>
+  <div class="checkout">
+    <div class="nx-container">
+      <h1 class="checkout__page-title">确认订单</h1>
 
-    <StateView
-      :state="previewStatus"
-      :error="previewError"
-      @retry="loadPreview()"
-    >
-      <div class="checkout__layout">
-        <div class="checkout__main">
-          <section class="nx-card checkout__section">
-            <div class="nx-card__body">
-              <h2 class="nx-section-title">收货地址</h2>
+      <StateView :state="previewStatus" :error="previewError" @retry="loadPreview()">
+        <!-- step 1: address ------------------------------------------------- -->
+        <section class="nx-block checkout__step">
+          <div class="nx-block__head">
+            <h2 class="nx-block__title">收货地址</h2>
+            <button type="button" class="nx-btn nx-btn--sm" @click="router.push({ name: 'addresses' })">
+              管理地址
+            </button>
+          </div>
+          <div class="nx-block__body">
+            <StateView :state="addressStatus" :error="addressError" compact @retry="loadAddresses()">
+              <p v-if="addressList.length === 0" class="checkout__empty">
+                还没有收货地址，请先
+                <RouterLink :to="{ name: 'addresses' }">添加一个地址</RouterLink>
+                。
+              </p>
 
-              <StateView
-                :state="addressStatus"
-                :error="addressError"
-                compact
-                @retry="loadAddresses()"
-              >
-                <div v-if="addressesList.length === 0" class="checkout__empty-address">
-                  <p class="nx-muted">还没有收货地址，请先添加一个。</p>
-                  <button type="button" class="nx-btn" @click="router.push({ name: 'addresses' })">
-                    去添加地址
-                  </button>
-                </div>
-
-                <div v-else class="checkout__addresses">
-                  <label
-                    v-for="address in addressesList"
-                    :key="address.id"
-                    class="checkout__address"
-                    :class="{ 'checkout__address--active': address.id === selectedAddressId }"
-                  >
-                    <input
-                      v-model="selectedAddressId"
-                      type="radio"
-                      name="address"
-                      :value="address.id"
-                      @change="loadPreview()"
-                    />
-                    <span class="checkout__address-body">
-                      <strong>{{ address.receiver_name }}</strong>
-                      <span class="nx-muted">{{ address.receiver_phone }}</span>
-                      <span class="nx-muted">
-                        {{ address.province }}{{ address.city }}{{ address.district }}{{ address.detail }}
-                      </span>
-                      <span v-if="address.is_default" class="checkout__tag">默认</span>
+              <div v-else class="checkout__addresses">
+                <label
+                  v-for="address in addressList"
+                  :key="address.id"
+                  class="checkout__address"
+                  :class="{ 'checkout__address--active': address.id === selectedAddressId }"
+                >
+                  <input
+                    v-model="selectedAddressId"
+                    type="radio"
+                    name="address"
+                    :value="address.id"
+                    @change="loadPreview()"
+                  />
+                  <span class="checkout__address-body">
+                    <span class="checkout__address-line">
+                      <b>{{ address.receiver_name }}</b>
+                      <span>{{ address.receiver_phone }}</span>
+                      <span v-if="address.is_default" class="nx-badge nx-badge--self">默认</span>
                     </span>
-                  </label>
-                </div>
-              </StateView>
-            </div>
-          </section>
-
-          <section class="nx-card checkout__section">
-            <div class="nx-card__body">
-              <h2 class="nx-section-title">商品清单</h2>
-              <ul class="checkout__items">
-                <li v-for="(item, index) in preview?.items ?? []" :key="`${item.sku_id}-${index}`">
-                  <img v-if="item.cover_url" :src="item.cover_url" :alt="item.product_title" />
-                  <span v-else class="checkout__item-placeholder" aria-hidden="true">无图</span>
-                  <span class="checkout__item-info">
-                    <strong>{{ item.product_title }}</strong>
-                    <span class="nx-muted">{{ Object.values(item.sku_specs).join(' / ') }}</span>
+                    <span class="nx-muted">
+                      {{ address.province }}{{ address.city }}{{ address.district }}{{ address.detail }}
+                    </span>
                   </span>
-                  <span class="nx-muted">× {{ item.quantity }}</span>
-                  <span class="nx-money">{{ formatMoney(item.subtotal_amount) }}</span>
-                </li>
-              </ul>
-            </div>
-          </section>
-
-          <section class="nx-card checkout__section">
-            <div class="nx-card__body">
-              <h2 class="nx-section-title">优惠券</h2>
-              <div class="checkout__coupon">
-                <input
-                  v-model="couponCode"
-                  type="text"
-                  placeholder="输入优惠券码后重新预览"
-                  class="checkout__input"
-                />
-                <button type="button" class="nx-btn" @click="loadPreview()">应用</button>
+                </label>
               </div>
-              <p v-if="preview?.coupon" class="nx-muted">
-                已应用：{{ preview.coupon.name }}，抵扣 {{ formatMoney(preview.coupon.discount_amount) }}
-              </p>
-              <p v-for="warning in preview?.warnings ?? []" :key="warning" class="checkout__warning">
-                {{ warning }}
+            </StateView>
+          </div>
+        </section>
+
+        <!-- step 2: payment method ------------------------------------------ -->
+        <section class="nx-block checkout__step">
+          <div class="nx-block__head">
+            <h2 class="nx-block__title">支付方式</h2>
+          </div>
+          <div class="nx-block__body">
+            <div class="checkout__channels">
+              <label
+                v-for="item in CHANNELS"
+                :key="item.value"
+                class="checkout__channel"
+                :class="{ 'checkout__channel--active': channel === item.value }"
+              >
+                <input v-model="channel" type="radio" name="channel" :value="item.value" />
+                <span>
+                  <b>{{ item.label }}</b>
+                  <em class="nx-muted">{{ item.hint }}</em>
+                </span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- step 3: item table --------------------------------------------- -->
+        <section class="nx-block checkout__step">
+          <div class="nx-block__head">
+            <h2 class="nx-block__title">商品清单</h2>
+            <span class="nx-muted">共 {{ preview?.items?.length ?? 0 }} 种商品</span>
+          </div>
+
+          <div class="checkout__table">
+            <div class="checkout__thead">
+              <span class="checkout__th checkout__th--product">商品信息</span>
+              <span class="checkout__th checkout__th--num">单价</span>
+              <span class="checkout__th checkout__th--num">数量</span>
+              <span class="checkout__th checkout__th--num">小计</span>
+            </div>
+
+            <div v-for="(item, index) in preview?.items ?? []" :key="`${item.sku_id}-${index}`" class="checkout__trow">
+              <div class="checkout__td checkout__td--product">
+                <img v-if="item.cover_url" :src="item.cover_url" :alt="item.product_title" class="checkout__thumb" />
+                <span v-else class="checkout__thumb checkout__thumb--empty" aria-hidden="true">暂无图片</span>
+                <span class="checkout__product-info">
+                  <b>{{ item.product_title }}</b>
+                  <em class="nx-muted">{{ Object.values(item.sku_specs).join(' / ') }}</em>
+                </span>
+              </div>
+              <span class="checkout__td checkout__td--num">
+                <PriceText :amount="item.unit_price_amount" size="sm" muted />
+              </span>
+              <span class="checkout__td checkout__td--num">× {{ item.quantity }}</span>
+              <span class="checkout__td checkout__td--num">
+                <PriceText :amount="item.subtotal_amount" size="sm" />
+              </span>
+            </div>
+          </div>
+
+          <div class="nx-block__body checkout__extras">
+            <label class="checkout__extra">
+              <span class="checkout__extra-label">优惠券</span>
+              <input v-model="couponCode" class="nx-input checkout__coupon" placeholder="输入优惠券码后重新计价" />
+              <button type="button" class="nx-btn nx-btn--sm" @click="loadPreview()">使用</button>
+            </label>
+
+            <p v-if="preview?.coupon" class="checkout__coupon-ok">
+              已使用「{{ preview.coupon.name }}」，抵扣
+              <PriceText :amount="preview.coupon.discount_amount" size="sm" />
+            </p>
+
+            <label class="checkout__extra">
+              <span class="checkout__extra-label">订单备注</span>
+              <input v-model="remark" class="nx-input checkout__remark" maxlength="120" placeholder="选填，如送货时间要求" />
+            </label>
+
+            <p v-for="warning in preview?.warnings ?? []" :key="warning" class="checkout__warning">
+              {{ warning }}
+            </p>
+          </div>
+        </section>
+
+        <!-- step 4: sticky amount panel ------------------------------------ -->
+        <div class="checkout__settle">
+          <div class="checkout__settle-inner">
+            <div class="checkout__settle-left">
+              <p class="nx-muted">
+                提交时携带幂等键 <code class="checkout__idem">{{ idempotencyKey }}</code>
+                ，重复点击不会重复下单。
               </p>
             </div>
-          </section>
-        </div>
 
-        <aside class="checkout__summary nx-card">
-          <div class="nx-card__body">
-            <h2 class="nx-section-title">金额明细</h2>
-            <dl class="checkout__totals">
+            <dl class="nx-rows checkout__amounts">
               <div>
                 <dt>商品金额</dt>
-                <dd class="nx-money">{{ formatMoney(preview?.items_amount ?? 0) }}</dd>
+                <dd><PriceText :amount="preview?.items_amount ?? 0" size="sm" muted /></dd>
               </div>
               <div>
-                <dt>优惠</dt>
-                <dd class="nx-money">−{{ formatMoney(preview?.discount_amount ?? 0) }}</dd>
+                <dt>促销优惠</dt>
+                <dd>
+                  −<PriceText :amount="preview?.discount_amount ?? 0" size="sm" muted />
+                </dd>
               </div>
               <div>
                 <dt>运费</dt>
-                <dd class="nx-money">{{ formatMoney(preview?.shipping_amount ?? 0) }}</dd>
+                <dd><PriceText :amount="preview?.shipping_amount ?? 0" size="sm" muted /></dd>
               </div>
-              <div class="checkout__totals-total">
-                <dt>应付</dt>
-                <dd class="nx-money">{{ formatMoney(preview?.payable_amount ?? 0) }}</dd>
+              <div class="nx-rows--total">
+                <dt>应付总额</dt>
+                <dd><PriceText :amount="preview?.payable_amount ?? 0" size="xl" /></dd>
               </div>
             </dl>
 
             <button
               type="button"
-              class="nx-btn nx-btn--primary checkout__submit"
+              class="nx-btn nx-btn--primary nx-btn--lg checkout__submit"
               :disabled="submitting || !selectedAddressId || (preview?.items?.length ?? 0) === 0"
               @click="createOrder()"
             >
               {{ submitting ? '提交中…' : '提交订单' }}
             </button>
-            <p class="nx-muted checkout__hint">
-              提交时携带幂等键 <code>{{ idempotencyKey }}</code>，重复点击不会重复下单。
-            </p>
           </div>
-        </aside>
-      </div>
-    </StateView>
+        </div>
+      </StateView>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .checkout {
-  &__layout {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 20px;
-    margin-top: 16px;
+  &__page-title {
+    margin: 0 0 10px;
+    font-size: 18px;
+    font-weight: 700;
   }
 
-  &__main {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+  &__step {
+    margin-bottom: 10px;
   }
 
+  /* -- address ------------------------------------------------------------ */
   &__addresses {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 8px;
   }
 
   &__address {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 8px;
+    padding: 8px 10px;
     border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
     cursor: pointer;
 
+    &:hover {
+      border-color: var(--nx-border-strong);
+    }
+
     &--active {
-      border-color: var(--nx-primary);
-      background: var(--nx-primary-soft);
+      border-color: var(--nx-brand);
+      background: var(--nx-brand-soft);
     }
   }
 
   &__address-body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    font-size: 13px;
+    gap: 3px;
+    font-size: 12px;
   }
 
-  &__tag {
-    align-self: flex-start;
-    margin-top: 2px;
-    padding: 1px 6px;
-    border-radius: var(--nx-radius-pill);
-    background: var(--nx-primary);
-    color: #fff;
-    font-size: 10px;
-  }
-
-  &__empty-address {
+  &__address-line {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
   }
 
-  &__items {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  &__empty {
     margin: 0;
-    padding: 0;
-    list-style: none;
+    font-size: 12px;
+    color: var(--nx-text-secondary);
+  }
 
-    li {
-      display: grid;
-      grid-template-columns: 48px 1fr auto auto;
-      align-items: center;
-      gap: 12px;
-      font-size: 13px;
+  /* -- payment channels --------------------------------------------------- */
+  &__channels {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__channel {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 220px;
+    padding: 8px 10px;
+    border: 1px solid var(--nx-border);
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--nx-brand);
+      background: var(--nx-brand-soft);
     }
 
-    img,
-    .checkout__item-placeholder {
-      width: 48px;
-      height: 48px;
-      border-radius: 8px;
-      background: var(--nx-surface-stage);
-      object-fit: contain;
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 12px;
     }
 
-    .checkout__item-placeholder {
+    em {
+      font-style: normal;
+      font-size: 12px;
+    }
+  }
+
+  /* -- item table --------------------------------------------------------- */
+  &__table {
+    border-top: 1px solid var(--nx-border);
+  }
+
+  &__thead,
+  &__trow {
+    display: grid;
+    grid-template-columns: 1fr 110px 90px 120px;
+    gap: 10px;
+    padding: 0 12px;
+    align-items: center;
+  }
+
+  &__thead {
+    height: 32px;
+    background: var(--nx-surface-sunken);
+    border-bottom: 1px solid var(--nx-border);
+    font-size: 12px;
+    color: var(--nx-text-secondary);
+  }
+
+  &__th--num,
+  &__td--num {
+    text-align: right;
+  }
+
+  &__trow {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--nx-border);
+    font-size: 12px;
+  }
+
+  &__td--product {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  &__thumb {
+    width: 60px;
+    height: 60px;
+    border: 1px solid var(--nx-border);
+    background: var(--nx-surface-stage);
+    object-fit: contain;
+
+    &--empty {
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--nx-text-muted);
-      font-size: 10px;
+      font-size: 12px;
     }
   }
 
-  &__item-info {
+  &__product-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
+    min-width: 0;
+
+    b {
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 18px;
+    }
+
+    em {
+      font-style: normal;
+    }
   }
 
-  &__coupon {
+  /* -- extras ------------------------------------------------------------- */
+  &__extras {
     display: flex;
+    flex-direction: column;
     gap: 8px;
   }
 
-  &__input {
+  &__extra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  &__extra-label {
+    flex: 0 0 60px;
+    color: var(--nx-text-secondary);
+  }
+
+  &__coupon {
+    width: 220px;
+  }
+
+  &__remark {
     flex: 1;
-    height: 34px;
-    padding: 0 12px;
-    border: 1px solid var(--nx-border-strong);
-    border-radius: var(--nx-radius-control);
-    background: var(--nx-surface);
-    color: var(--nx-text);
-    font-family: inherit;
-    font-size: 13px;
+    max-width: 420px;
+  }
+
+  &__coupon-ok {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--nx-brand);
+    font-size: 12px;
   }
 
   &__warning {
-    margin: 6px 0 0;
+    margin: 0;
     color: var(--nx-warning);
     font-size: 12px;
   }
 
-  &__totals {
-    margin: 0 0 18px;
+  /* -- sticky settlement bar --------------------------------------------- */
+  &__settle {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    background: var(--nx-surface);
+    border: 1px solid var(--nx-border);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  }
 
-    > div {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 7px 0;
-      font-size: 13px;
-    }
+  &__settle-inner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 12px;
+  }
 
-    dt {
-      color: var(--nx-text-muted);
-    }
+  &__settle-left {
+    flex: 1;
+    min-width: 0;
 
-    dd {
+    p {
       margin: 0;
+      font-size: 12px;
+      line-height: 1.6;
     }
   }
 
-  &__totals-total {
-    margin-top: 6px;
-    padding-top: 12px !important;
-    border-top: 1px solid var(--nx-border);
-    font-size: 15px !important;
+  &__idem {
+    word-break: break-all;
+  }
+
+  &__amounts {
+    flex: 0 0 260px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: right;
 
     dd {
-      color: var(--nx-danger);
-      font-size: 18px;
+      text-align: right;
     }
   }
 
   &__submit {
-    width: 100%;
-    min-height: 42px;
-  }
-
-  &__hint {
-    margin: 8px 0 0;
-    font-size: 11px;
-    word-break: break-all;
+    flex: 0 0 180px;
   }
 }
 
-@media (max-width: 960px) {
-  .checkout__layout {
-    grid-template-columns: 1fr;
+@media (max-width: 1000px) {
+  .checkout__settle-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .checkout__amounts,
+  .checkout__submit {
+    flex: 1 1 auto;
   }
 }
 </style>

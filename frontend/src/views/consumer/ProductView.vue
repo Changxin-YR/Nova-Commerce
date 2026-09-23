@@ -154,7 +154,7 @@ async function buyNow(): Promise<void> {
           </div>
 
           <!-- SKU chips -------------------------------------------------- -->
-          <dl v-if="skuGroups.length" class="pdetail__specs">
+          <dl v-if="specGroups.length" class="pdetail__specs">
             <div v-for="[key, values] in specGroups" :key="key">
               <dt>{{ key }}</dt>
               <dd>

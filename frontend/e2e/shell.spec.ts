@@ -17,7 +17,7 @@ test.describe('application shell', () => {
     await expect(page.locator('.home__title')).toBeVisible()
 
     // The document title is set by the router's afterEach hook.
-    await expect(page).toHaveTitle(/Nexora/)
+    await expect(page).toHaveTitle(/Nova/)
   })
 
   test('client-side routing reaches the search page', async ({ page }) => {

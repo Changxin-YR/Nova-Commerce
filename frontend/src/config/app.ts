@@ -1,8 +1,8 @@
 /** Product-level constants shared by the shell, the document title and the router. */
 
-export const APP_TITLE = import.meta.env.VITE_APP_TITLE ?? 'Nexora Commerce'
+export const APP_TITLE = import.meta.env.VITE_APP_TITLE ?? 'Nova Commerce'
 
-export const APP_SHORT_NAME = 'Nexora'
+export const APP_SHORT_NAME = 'Nova'
 
 /** Agent tabs (§101). `value` matches the backend `agent_name` routing key. */
 export const AGENT_TABS = [

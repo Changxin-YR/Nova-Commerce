@@ -1,4 +1,4 @@
-# Nexora Commerce — Frontend (Vue 3 + TypeScript)
+# Nova Commerce — Frontend (Vue 3 + TypeScript)
 
 One Vue 3 application serving **two shells**: the consumer store (`/`) and the merchant
 console (`/console`), plus the AI workspace. Composition API with
@@ -104,6 +104,74 @@ The pinned set is deliberately exact; `npm install` must not float it.
 * **ESLint has no type-aware rules.** `@typescript-eslint/parser` declares
   `typescript >=4.8.4 <6.1.0`; `vue-tsc` is the authoritative type check, so lint focuses
   on syntax and correctness rules that need no type information.
+
+## Theming — how the dense-commerce look is produced
+
+**File: `src/styles/tokens.scss`** (imported once, after Element Plus, in `main.ts`).
+
+Element Plus is themed **only** through CSS custom properties, so no component library is
+swapped (§6 freezes Element Plus). The file has three layers:
+
+1. **`--nx-*` brand tokens** — the private palette/geometry the app's own CSS consumes:
+   brand red `#e1251b`, price red `#e1251b`, link blue `#1d7de0`, text `#333/#666/#999`,
+   border `#e8e8e8`, page `#f5f5f5`, radii `2px`, dense 12px base type, 1190px container.
+2. **`--el-*` overrides** — **61 Element Plus variables**, all declared in one block so the
+   theme surface is auditable in one place.
+3. **Structural primitives** — `.nx-block`, `.nx-floor-title`, `.nx-table`,
+   `.nx-filterbar`, `.nx-tabs/.nx-tab`, `.nx-badge`, `.nx-btn`, `.nx-rows`.
+
+### Element Plus variables overridden (61)
+
+| Group | Variables |
+| --- | --- |
+| Brand colours | `--el-color-primary` + the derived ramp `-light-3/5/7/8/9` and `-dark-2` |
+| Semantic colours | `--el-color-success`, `-warning`, `-danger`, `-error`, `-info` (+ `-light-9` for success/warning/danger) |
+| Text | `--el-text-color-primary`, `-regular`, `-secondary`, `-placeholder`, `-disabled` |
+| Surfaces | `--el-bg-color`, `--el-bg-color-page`, `--el-bg-color-overlay`, `--el-fill-color` (+ `-light`, `-lighter`, `-blank`) |
+| Borders | `--el-border-color` (+ `-light`, `-lighter`, `-extra-light`, `-dark`, `-darker`) |
+| Geometry | `--el-border-radius-base`, `-small`, `-round` → all `2px` |
+| Type + controls | `--el-font-family`, `--el-font-size-base/-small/-extra-small`, `--el-component-size` (+ `-small`, `-large`) |
+| Elevation | `--el-box-shadow`, `-light`, `-lighter` (reduced: the design separates with borders) |
+
+Dark mode is a compact token swap under `html.dark` — not a second stylesheet.
+
+**Legal scope (§127):** only the *design language* is referenced. No third-party logo,
+image asset, brand name or proprietary graphic appears anywhere in this app; all copy,
+badges, banners and gradients are ours, and the brand is Nova.
+
+### `<PriceText>` — the single price renderer
+
+**File: `src/components/ui/PriceText.vue`**, tested in
+`src/components/ui/__tests__/PriceText.spec.ts` (12 tests).
+
+Display rule — the integer dominates, the symbol and cents recede:
+
+```
+¥ 2,999 .00
+↑   ↑     ↑
+│   │     └── 12px, regular       (.00)
+│   └──────── 16px, 700, tabular  (2,999)
+└──────────── 12px, regular       (¥)
+```
+
+Conversion rule: **minor units in, major units out, in exactly one place.**
+`utils/money.ts::splitMoney()` is the only implementation of cents→yuan; `PriceText`
+consumes it. Business components pass `299900` and never write `/100`, `toFixed()` or a
+`¥` literal, so rounding cannot drift between pages.
+
+| Prop | Behaviour |
+| --- | --- |
+| `amount` | **Required, integer minor units.** There is no float overload. |
+| `size` | `sm` (14px) / `md` (16px, default) / `lg` (22px) / `xl` (30px) integers |
+| `showDecimal` | Hides the cents by **truncating, never rounding** — a checkout must not display more than the server will charge |
+| `grouping` | Thousands separators; off inside narrow table cells |
+| `originalAmount` | Struck-through list price, shown only when genuinely higher |
+| `muted` | Grey, for de-emphasised secondary figures (实付 / 已退款 / 可退余额) |
+| `noSymbol` | Hides `¥` when a column header already says 金额 |
+
+Accessibility: the visible span is `aria-hidden`-free but the digits are followed by a
+visually-hidden sentence (`价格 2,999.00 元`) so screen readers do not read "yen two comma
+nine nine nine dot zero zero".
 
 ## Backend contract
 

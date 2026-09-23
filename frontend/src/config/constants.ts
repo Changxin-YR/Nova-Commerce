@@ -22,11 +22,11 @@ export const CONTENT_TYPE_JSON = 'application/json'
 
 /** Storage keys. Tokens live in localStorage so a refresh survives a page reload. */
 export const STORAGE_KEYS = {
-  accessToken: 'nexora.access_token',
-  refreshToken: 'nexora.refresh_token',
-  traceId: 'nexora.last_trace_id',
-  theme: 'nexora.theme',
-  locale: 'nexora.locale',
+  accessToken: 'nova.access_token',
+  refreshToken: 'nova.refresh_token',
+  traceId: 'nova.last_trace_id',
+  theme: 'nova.theme',
+  locale: 'nova.locale',
 } as const
 
 /** Success business code. Everything else is a failure (§95). */

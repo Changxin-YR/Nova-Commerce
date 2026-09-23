@@ -11,7 +11,7 @@
 
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NexoraHttpClient } from '@/api/client'
+import { NovaHttpClient } from '@/api/client'
 import { __resetTokenStoreForTests, getAccessToken, setTokens } from '@/api/tokenStore'
 import { ErrorCode } from '@/types/api'
 import { TRACE_ID_HEADER } from '@/utils/trace'
@@ -74,7 +74,7 @@ function makeAdapter(options: { failFirstWith401: boolean }): AdapterHarness {
   return { adapter, calls }
 }
 
-describe('NexoraHttpClient single-flight refresh', () => {
+describe('NovaHttpClient single-flight refresh', () => {
   let refreshCalls = 0
   let resolveRefresh: (() => void) | null = null
 
@@ -104,7 +104,7 @@ describe('NexoraHttpClient single-flight refresh', () => {
         }),
     )
 
-    const client = new NexoraHttpClient({ refreshHandler })
+    const client = new NovaHttpClient({ refreshHandler })
     client.axios.defaults.adapter = adapter
 
     // Fire five requests that will all fail with 401 at roughly the same time.
@@ -141,7 +141,7 @@ describe('NexoraHttpClient single-flight refresh', () => {
     const { adapter } = makeAdapter({ failFirstWith401: true })
     const refreshHandler = vi.fn(() => Promise.resolve())
 
-    const client = new NexoraHttpClient({ refreshHandler })
+    const client = new NovaHttpClient({ refreshHandler })
     client.axios.defaults.adapter = adapter
 
     const result = await client.get<{ ok: boolean }>('/catalog/public/products')
@@ -156,7 +156,7 @@ describe('NexoraHttpClient single-flight refresh', () => {
       setTokens({ accessToken: 'fresh-token' })
     })
 
-    const client = new NexoraHttpClient({ refreshHandler })
+    const client = new NovaHttpClient({ refreshHandler })
     client.axios.defaults.adapter = adapter
 
     await client.get('/orders/orders')
@@ -176,7 +176,7 @@ describe('NexoraHttpClient single-flight refresh', () => {
       setTokens({ accessToken: 'stale-token' })
     })
 
-    const client = new NexoraHttpClient({ refreshHandler })
+    const client = new NovaHttpClient({ refreshHandler })
     client.axios.defaults.adapter = adapter
 
     await expect(client.get('/orders/orders')).rejects.toMatchObject({
@@ -191,7 +191,7 @@ describe('NexoraHttpClient single-flight refresh', () => {
   it('propagates a trace id on every attempt and stores it for error reporting', async () => {
     setTokens({ accessToken: 'good-token' })
     const { adapter, calls } = makeAdapter({ failFirstWith401: false })
-    const client = new NexoraHttpClient({})
+    const client = new NovaHttpClient({})
     client.axios.defaults.adapter = adapter
 
     await client.get('/catalog/public/products')
@@ -207,7 +207,7 @@ describe('NexoraHttpClient single-flight refresh', () => {
       throw new Error('refresh rejected')
     })
 
-    const client = new NexoraHttpClient({ refreshHandler, onSessionExpired })
+    const client = new NovaHttpClient({ refreshHandler, onSessionExpired })
     client.axios.defaults.adapter = adapter
 
     await expect(client.get('/orders/orders')).rejects.toBeTruthy()

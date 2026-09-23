@@ -9,8 +9,8 @@
  * axios. This barrel exists so the rule is easy to follow.
  */
 
-export { http, httpClient, NexoraHttpClient } from '@/api/client'
-export type { NexoraClientOptions, NexoraRequestConfig } from '@/api/client'
+export { http, httpClient, NovaHttpClient } from '@/api/client'
+export type { NovaClientOptions, NovaRequestConfig } from '@/api/client'
 
 export { API, path } from '@/api/endpoints'
 

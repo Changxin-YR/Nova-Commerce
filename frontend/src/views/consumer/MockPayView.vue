@@ -13,9 +13,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { paymentApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import StateView from '@/components/ui/StateView.vue'
+import PriceText from '@/components/ui/PriceText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,7 +81,7 @@ async function checkStatus(): Promise<void> {
           <p class="mock-pay__badge">模拟支付通道</p>
           <h1 class="nx-page-title">订单 {{ payment?.order_no }}</h1>
 
-          <p class="mock-pay__amount nx-money">{{ formatMoney(payment?.paid_amount || payment?.amount || 0) }}</p>
+          <PriceText class="mock-pay__amount" :amount="payment?.paid_amount || payment?.amount || 0" size="xl" />
 
           <dl class="mock-pay__meta">
             <div>

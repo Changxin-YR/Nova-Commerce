@@ -126,22 +126,26 @@ const items = computed(() => props.blocks)
 .blocks {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 
   &__text {
     margin: 0;
+    font-size: 13px;
+    line-height: 1.7;
     white-space: pre-wrap;
     word-break: break-word;
   }
 
+  /* -- Metric: a clear numeric hierarchy, not a decorative card -----------
+     label 12px/muted  ->  value 24px/700/tabular  ->  unit 12px  ->  trend */
   &__metric {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 10px 14px;
-    border-radius: var(--nx-radius-stage);
+    gap: 4px;
+    padding: 10px 12px;
     background: var(--nx-surface);
     border: 1px solid var(--nx-border);
+    border-left: 3px solid var(--nx-brand);
   }
 
   &__metric-label {
@@ -150,12 +154,16 @@ const items = computed(() => props.blocks)
   }
 
   &__metric-value {
-    font-size: 22px;
-    font-weight: 600;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 24px;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    color: var(--nx-text);
 
     small {
-      margin-left: 4px;
       font-size: 12px;
       font-weight: 400;
       color: var(--nx-text-muted);
@@ -163,15 +171,16 @@ const items = computed(() => props.blocks)
   }
 
   &__metric-trend {
-    margin-left: 6px;
-    font-size: 14px;
+    margin-left: 4px;
+    font-size: 13px;
+    font-weight: 400;
 
     &--up {
-      color: var(--nx-success);
+      color: var(--nx-brand);
     }
 
     &--down {
-      color: var(--nx-danger);
+      color: var(--nx-success);
     }
 
     &--flat {
@@ -179,28 +188,37 @@ const items = computed(() => props.blocks)
     }
   }
 
+  /* -- Table: operations density (36px rows, tabular figures) ------------ */
   &__table-wrap {
     overflow-x: auto;
     border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
   }
 
   &__table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 12px;
 
     th,
     td {
-      padding: 8px 12px;
+      padding: 8px 10px;
       border-bottom: 1px solid var(--nx-border);
       white-space: nowrap;
     }
 
     th {
       background: var(--nx-surface-sunken);
-      font-weight: 600;
+      border-right: 1px solid var(--nx-border);
       color: var(--nx-text-secondary);
+      font-weight: 700;
+
+      &:last-child {
+        border-right: none;
+      }
+    }
+
+    tbody tr:hover {
+      background: var(--nx-surface-hover);
     }
 
     tr:last-child td {
@@ -214,33 +232,34 @@ const items = computed(() => props.blocks)
 
   &__chart {
     padding: 10px 12px 4px;
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
     background: var(--nx-surface);
+    border: 1px solid var(--nx-border);
   }
 
   &__chart-title {
     margin: 0 0 8px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
+  /* -- Citations --------------------------------------------------------- */
   &__citations {
     padding: 10px 12px;
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
     background: var(--nx-surface);
+    border: 1px solid var(--nx-border);
 
     ol {
-      margin: 0;
-      padding: 0;
-      list-style: none;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
     }
 
     li {
+      padding-left: 8px;
+      border-left: 2px solid var(--nx-border);
       font-size: 12px;
       line-height: 1.6;
     }
@@ -248,19 +267,19 @@ const items = computed(() => props.blocks)
 
   &__citations-title {
     margin: 0 0 8px;
-    font-size: 12px;
-    font-weight: 600;
     color: var(--nx-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
   }
 
   &__citation-index {
-    color: var(--nx-primary);
-    font-weight: 600;
+    color: var(--nx-brand);
+    font-weight: 700;
   }
 
   &__citation-doc {
     margin-left: 6px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   &__citation-score {
@@ -271,20 +290,22 @@ const items = computed(() => props.blocks)
 
   &__citation-snippet {
     margin: 2px 0 0;
-    color: var(--nx-text-muted);
+    color: var(--nx-text-secondary);
   }
 
+  /* -- ToolProgress: a one-line ledger entry ----------------------------- */
   &__tool {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 12px;
-    border-radius: var(--nx-radius-control);
+    padding: 5px 10px;
     background: var(--nx-surface-sunken);
-    font-size: 12.5px;
+    border: 1px solid var(--nx-border);
+    font-size: 12px;
 
     &--running {
-      color: var(--nx-primary);
+      color: var(--nx-info);
+      border-color: var(--nx-info);
     }
 
     &--succeeded {
@@ -293,16 +314,18 @@ const items = computed(() => props.blocks)
 
     &--failed {
       color: var(--nx-danger);
+      border-color: var(--nx-danger);
     }
   }
 
   &__tool-name {
-    font-weight: 600;
+    color: var(--nx-text);
+    font-weight: 700;
   }
 
   &__tool-summary {
-    color: var(--nx-text-muted);
     overflow: hidden;
+    color: var(--nx-text-secondary);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -317,16 +340,17 @@ const items = computed(() => props.blocks)
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 10px 12px;
-    border-radius: var(--nx-radius-stage);
+    padding: 8px 10px;
     background: var(--nx-danger-soft);
+    border: 1px solid var(--nx-danger);
     color: var(--nx-danger);
-    font-size: 13px;
+    font-size: 12px;
+    line-height: 1.6;
   }
 
   &__error-label {
-    font-size: 11.5px;
-    opacity: 0.9;
+    font-size: 12px;
+    font-weight: 700;
   }
 }
 </style>

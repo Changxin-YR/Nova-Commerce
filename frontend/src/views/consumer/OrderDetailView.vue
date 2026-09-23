@@ -12,7 +12,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { afterSaleApi, orderApi, paymentApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
@@ -156,13 +155,13 @@ async function applyRefundForRemaining(): Promise<void> {
                     <strong>{{ item.product_title }}</strong>
                     <span class="nx-muted">{{ Object.values(item.sku_specs).join(' / ') }}</span>
                     <span v-if="item.refunded_amount > 0" class="order-detail__refunded">
-                      已退 {{ formatMoney(item.refunded_amount) }}
+                      已退 <PriceText :amount="item.refunded_amount" size="sm" />
                     </span>
                   </span>
                   <span class="nx-muted">
-                    {{ formatMoney(item.unit_price_amount) }} × {{ item.quantity }}
+                    <PriceText :amount="item.unit_price_amount" size="sm" muted /> × {{ item.quantity }}
                   </span>
-                  <span class="nx-money">{{ formatMoney(item.subtotal_amount) }}</span>
+                  <PriceText :amount="item.subtotal_amount" size="md" />
                 </li>
               </ul>
             </div>
@@ -175,16 +174,16 @@ async function applyRefundForRemaining(): Promise<void> {
                 <div><dt>收货人</dt><dd>{{ order.snapshot.receiver_name }}</dd></div>
                 <div><dt>联系电话</dt><dd>{{ order.snapshot.receiver_phone }}</dd></div>
                 <div><dt>收货地址</dt><dd>{{ order.snapshot.full_address }}</dd></div>
-                <div><dt>商品金额</dt><dd class="nx-money">{{ formatMoney(order.snapshot.items_amount) }}</dd></div>
-                <div><dt>优惠</dt><dd class="nx-money">−{{ formatMoney(order.snapshot.discount_amount) }}</dd></div>
-                <div><dt>运费</dt><dd class="nx-money">{{ formatMoney(order.snapshot.shipping_amount) }}</dd></div>
+                <div><dt>商品金额</dt><dd><PriceText :amount="order.snapshot.items_amount" size="sm" muted /></dd></div>
+                <div><dt>优惠</dt><dd>−<PriceText :amount="order.snapshot.discount_amount" size="sm" muted /></dd></div>
+                <div><dt>运费</dt><dd><PriceText :amount="order.snapshot.shipping_amount" size="sm" muted /></dd></div>
                 <div class="order-detail__snapshot-total">
                   <dt>应付</dt>
-                  <dd class="nx-money">{{ formatMoney(order.snapshot.payable_amount) }}</dd>
+                  <dd><PriceText :amount="order.snapshot.payable_amount" size="lg" /></dd>
                 </div>
-                <div><dt>实付</dt><dd class="nx-money">{{ formatMoney(order.paid_amount) }}</dd></div>
-                <div><dt>已退款</dt><dd class="nx-money">{{ formatMoney(order.refunded_amount) }}</dd></div>
-                <div><dt>可退余额</dt><dd class="nx-money">{{ formatMoney(order.refundable_amount) }}</dd></div>
+                <div><dt>实付</dt><dd><PriceText :amount="order.paid_amount" size="sm" muted /></dd></div>
+                <div><dt>已退款</dt><dd><PriceText :amount="order.refunded_amount" size="sm" muted /></dd></div>
+                <div><dt>可退余额</dt><dd><PriceText :amount="order.refundable_amount" size="sm" muted /></dd></div>
               </dl>
             </div>
           </section>
@@ -237,7 +236,7 @@ async function applyRefundForRemaining(): Promise<void> {
                 :disabled="busy"
                 @click="applyRefundForRemaining()"
               >
-                申请退款 {{ formatMoney(refundable) }}
+                申请退款 <PriceText :amount="refundable" size="sm" />
               </button>
               <RouterLink
                 v-if="order.after_sale_status !== 'NONE'"
