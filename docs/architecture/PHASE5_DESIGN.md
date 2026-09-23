@@ -832,6 +832,19 @@ Two consequences, and the second is the one that matters for evidence:
   stopped - which is what the freeze window in 13.7 is for, and it is the reason the
   emitters record a residue line and a revision.
 
+**A related measurement caveat, contributed by the data-layer author:** a
+`residue: 0` reading is only meaningful *together with the concurrency state*, exactly
+as a test count is only meaningful together with the database state. The residue tool
+reports rows and orphans but says nothing about who else is running, so `residue: 0`
+can be true mid-fixture while another process is mid-insert. Quote it with the process
+count or not at all.
+
+**And the two-way trap that follows from this whole section:** a flake whose failing
+**set moves** between runs, and which disappears when run alone, is environmental
+evidence - a deterministic bug does not behave that way. But once you have seen one such
+flake, the mirror error is to dismiss a **stable** failure as environmental. The moving
+set is the signal, not the mere fact that a failure vanished in isolation.
+
 The durable fix is per-worker schema isolation (a distinct `MYSQL_DATABASE` per
 process) or serialised runs. Neither was implemented in this phase; both are recorded
 here as the next structural improvement, and until one lands the freeze window is the
