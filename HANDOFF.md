@@ -1322,3 +1322,10 @@ explicitly rather than reverting it quietly.
   RESTRICT FK, so any cleanup that deletes a merchant must delete its outbox rows
   first or fail with errno 1451. It is fixed for the suites that exist; a new
   suite that deletes a merchant inherits the problem.
+
+## 20. Current continuation — 2026-09-24
+
+Read [`docs/handoff/phase6-continuation.md`](docs/handoff/phase6-continuation.md)
+for the current measured state, changes after §19, remaining Phase 6 work, and
+the next code entry point. `FINAL_GATE.md` is the live evidence index; §19 and
+earlier are historical handoffs.
