@@ -257,12 +257,18 @@ class FulfillmentRepository:
 
         This method is now the **single** implementation of that rule: the 70001 guard and
         ``FulfillmentService._recompute_order_axis`` both read it, so the two cannot
-        disagree about how much has gone out. The service-side workaround that existed
-        while this filter was missing (``_shipped_quantities``) has been deleted, on the
-        captain's ruling, and a second filtered total should not be reintroduced here -
-        one rule, one query. (An earlier version of this docstring claimed that workaround
-        still existed and ran the same filter independently; it did not, and describing
-        code that is not there is its own kind of defect.)
+        disagree about how much has gone out. Retrieving the service-side workaround that
+        existed while this filter was missing (``_shipped_quantities``) is a mistake - it
+        was deleted in ``7bb877d`` on the captain's ruling, and a second filtered total
+        must not be reintroduced: one rule, one query.
+
+        That retirement exposed a defect worth remembering, because it was a *consequence*
+        of this method existing: once the guard read this aggregate, the guard could only
+        see rows the **database** had, while ``ship()`` still had the package's ``SHIPPED``
+        write pending in the session - so it saw ``{}`` for a package that had just
+        shipped and wrote the order axis one state behind. Fixed by flushing the package
+        status before the recompute. A query is not a session view; if a caller needs a
+        pending write visible to SQL, it must flush first.
 
         ``planned_quantities_for_order`` remains the deliberately unfiltered counterpart,
         so the distinction is carried by two method *names* rather than by one method's
