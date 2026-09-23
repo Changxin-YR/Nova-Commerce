@@ -85,6 +85,12 @@ Spec §99: state changes are **task verbs**, never `PATCH {status}`.
 | Reprocess document | `POST /api/v1/knowledge/documents/{id}/reprocess` | KnowledgeDocument |
 | Archive document | `POST /api/v1/knowledge/documents/{id}/archive` | KnowledgeDocument |
 | Cancel agent run | `POST /api/v1/agent/runs/{run_id}/cancel` | AgentRun |
+| Preview a promotion | `POST /api/v1/marketing/promotions/preview` | PromotionPreview |
+| Create a promotion | `POST /api/v1/marketing/promotions` | Promotion |
+| Preview a coupon template | `POST /api/v1/marketing/coupons/preview` | CouponPreview |
+| Create a coupon template | `POST /api/v1/marketing/coupons` | CouponTemplate |
+| Update a role's permissions | `PUT /api/v1/system/roles/{id}/permissions` | Role |
+| Assign a role to a user | `POST /api/v1/system/users/{user_id}/roles` | User |
 | Log out everywhere | `POST /api/v1/auth/logout-all` | `{ "revoked_sessions": 3 }` |
 
 **Task endpoints return the updated entity, not `204`.** A state transition that
@@ -359,3 +365,70 @@ Two process notes worth keeping:
    is not a display convenience; it is INV-005 exposed to the client. Deriving it
    locally means the client enforces an accounting rule, which is exactly the
    arrangement §15 forbids.
+
+---
+
+## 12. Addenda — promotion creation and system management (2026-09-23, second batch)
+
+Two gaps the frontend reported rather than filled. Both were real omissions from the
+first freeze, and the second one is the more interesting.
+
+### 12.1 Promotion and coupon creation
+
+§47 requires promotion creation to be **previewed first**, and
+`PROMOTION_PREVIEW_REQUIRED` (90003) already exists as a business code — which means
+the rule was frozen while the endpoints that implement it were not. The frontend
+correctly shipped status transitions only and said so in the UI rather than build a
+create flow against a guessed endpoint.
+
+Frozen now: `POST /marketing/promotions/preview` then `POST /marketing/promotions`,
+and the coupon equivalents.
+
+**The preview response is the exact payload the create call will accept.** That is
+deliberate: if preview returned a display-only rendering, the two would drift and an
+operator would approve one thing and submit another. The frontend builds the payload
+once and renders it, so preview and submit cannot diverge — which is also why
+`PROMOTION_PREVIEW_REQUIRED` can be enforced server-side by requiring the create call
+to carry the same `preview_token` the preview returned.
+
+### 12.2 System management, and why the obvious endpoint is the wrong one
+
+The frontend was asked for "user/role/permission management" and deliberately built
+only the read half, stating the boundary in the UI instead of shipping a control it
+could not honour. The reason it gave is the right one, and it deserves to be frozen
+explicitly:
+
+> §65 forbids a normal console user from downgrading a `CRITICAL` write tool to
+> `READ`. A role editor is exactly that write. A generic
+> `PUT /system/roles/{id}` that accepts a permission blob makes the forbidden
+> operation one checkbox away.
+
+So the endpoint is **not** a generic role update. It is:
+
+- `PUT /api/v1/system/roles/{id}/permissions` — body carries the **complete, explicit**
+  permission set, not a delta. A delta invites a caller to omit a permission it did
+  not know about and silently revoke it.
+- The server must refuse any change that lowers the `risk_level` of a tool marked
+  `is_write` without a separate, audited approval. Encoding this as a blanket
+  permission edit is precisely the mistake §65 anticipates.
+- `POST /api/v1/system/users/{user_id}/roles` — role assignment, likewise explicit and
+  audited, because a role change is an authorization change and every one of them
+  should be reconstructable from the audit log (§133).
+
+Two rules that follow from the above and apply to the whole system surface:
+
+1. **A permission change is an audit event, not a settings save.** It must carry the
+   actor, the before/after permission set, and a reason.
+2. **Deny by default.** A role's permissions are what the row says, never
+   "everything except". A wildcard grant cannot be audited, which is why §90's MCP
+   scope intersection needs a concrete set to intersect against.
+
+### 12.3 The pattern worth naming
+
+Both gaps in this batch, and all three in §11, share a shape: **the rule was frozen and
+the interface was not.** The frontend kept finding them because it tried to build the
+UI and discovered there was nothing to call.
+
+That is a useful signal in the other direction too — a page that cannot be built from
+the frozen contract is evidence the contract is incomplete, not evidence the page is
+unnecessary.
