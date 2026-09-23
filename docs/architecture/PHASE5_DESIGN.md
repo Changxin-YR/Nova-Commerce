@@ -445,10 +445,19 @@ Trigger: `POST /after-sales/admin/after-sales/{after_sale_no}/refund`.
    availability until the next stock count found it.
 7. Outbox seam comment as in 6.1. Commit once.
 
-`orders` also gets `fulfillment_status -> DELIVERED` when the claim is
-`RETURN_REFUND` and all lines have come back; that is the one place a refund
-touches the fulfillment axis, and it is deliberate (a returned parcel *was*
-delivered).
+**STRUCK during the build - the refund must NOT write `orders.fulfillment_status`.**
+An earlier version of this step said a `RETURN_REFUND` whose lines have all come back
+sets the axis to `DELIVERED`, reasoning that "a returned parcel *was* delivered". The
+reasoning is backwards: a parcel that came back was delivered **earlier**, by a delivery
+fact, and that fact is what should have set `DELIVERED` - not the return. Making the
+refund the writer would mean a refund *creates* a delivery, which is precisely the
+axis-collapsing section 31 forbids: it would let money movement assert a logistics fact.
+
+So `RefundWorkflow` writes `orders.refunded_amount`, `payment_status` and
+`after_sale_status`, and **nothing else**. `DELIVERED` arrives from a delivery event,
+which Phase 5 does not have; when one lands it is the only writer of that value.
+Raised by the after-sales author from a grep against the design, and recorded here
+rather than in a handoff so the next reader does not implement the sentence.
 
 ### 6.3 `ShipWorkflow` (fulfillment)
 
