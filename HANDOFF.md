@@ -16,12 +16,13 @@ payment, refund) whose invariants are proven by concurrency tests against real
 MySQL, and a *controlled* agent layer that can read facts, analyse, and propose —
 but can only write through a tool gateway with human approval.
 
-**Where it stands:** Phases 0, 1, 2 complete. **Phase 3 is complete and FG-09 —
-the first mandatory gate — is GREEN against real MySQL.** The inventory API is
-reachable over HTTP. The frontend is well ahead of the backend.
+**Where it stands:** Phases 0-4 complete. **FG-09 (inventory concurrency) and
+FG-10 (order workflows, including INV-006/INV-014) both PASS on real MySQL.**
+The order API is live, the frontend is well ahead of the backend, and the next
+mandatory gates are FG-11/FG-12 in Phase 5.
 
-**The single most important next task is Phase 4 (Cart + Pricing + Order)**, which
-is what turns the inventory primitive into a real transaction (§7 of this document).
+**Phase 4 is complete; the next task is Phase 5 (Payment + Fulfillment +
+AfterSales + Refund) - start with section 17 of this document.**
 
 **The one-line rule that governs everything:** every claim must be backed by
 command output that someone else can re-run. Not "it should work" — the spec
@@ -31,13 +32,15 @@ command output that someone else can re-run. Not "it should work" — the spec
 
 ## 1. Verify the current state in 5 minutes
 
+> **NOTE (Phase 4 done):** the expected numbers below are from Phase 3. Current expectations are in section 17.1/17.6 - `pytest tests` = **700 passed**, `pytest backend/tests/unit` = **493 passed**.
+
 ```powershell
 # Repo
 cd C:\Users\27363\Desktop\store
 git log --oneline -5
 git status --short
 
-# Backend — must be 147 passed
+# Backend — expect 521 passed (section 17.6; full suite is 700)
 cd backend
 C:\Users\27363\Desktop\store\.venv\Scripts\python.exe -m pytest tests/unit tests/integration/identity -q
 C:\Users\27363\Desktop\store\.venv\Scripts\python.exe -m ruff check app tests migrations
@@ -374,6 +377,8 @@ again.
 
 ## 7. THE NEXT TASK — Phase 4: Cart + Pricing + Order
 
+> **STATUS: DONE.** Phase 4 was completed and FG-10 passes (see section 16). This section is kept as the specification record; **the next task is Phase 5, described in section 17.**
+
 FG-09 is done. The next mandatory gates are **FG-10 (workflow tests / order
 snapshot correctness)** and, in Phase 5, FG-11 and FG-12.
 
@@ -521,7 +526,7 @@ is in good shape:
 ```powershell
 cd C:\Users\27363\Desktop\store
 git log --oneline -3
-& .\.venv\Scripts\python.exe -m pytest backend\tests\unit -q   # expect 119 passed
+& .\.venv\Scripts\python.exe -m pytest backend\tests\unit -q   # expect 493 passed (section 17.6; full suite is 700)
 docker compose --env-file .env -f ops/docker-compose.yml ps     # expect 5/5 healthy
 ```
 
@@ -836,3 +841,112 @@ their own assertions, not the authors':
 The shared dev database was left clean afterwards: 0 rows in all four Phase 4
 tables and no leftover scratch schemas.
 
+---
+
+## 17. Session handoff - Phase 4 closed, start Phase 5 here
+
+> Written 2026-09-23 for the next conversation. **Read this section first**, then
+> section 6 (MySQL/Alembic traps) and the Phase 5 entry in section 8.
+
+### 17.1 Repository state
+
+* `HEAD = 405c88b`, **pushed**; `origin/main == local`; working tree clean.
+* `pytest tests` = **700 passed**; `ruff check app tests migrations` clean;
+  `alembic check` = no new operations; `docker compose ps` = 5/5 healthy.
+* **FG-10 PASS**: `artifacts/evidence/integration/fg10_workflow.xml` (frozen proof
+  path) + `.json` - 170/170 assertions, exit 0, regenerated with the emitter's
+  default directory target. Independent verification is recorded at the end of
+  section 16.
+* Backend modules present: `identity`, `catalog`, `inventory`, `pricing`, `order`.
+
+### 17.2 What Phase 4 delivered (do not redo)
+
+`PricingService` (single price authority, 269 unit tests), the four tables
+(`orders`, `order_items`, `order_status_logs`, `idempotency_records`, migration
+`a7c4e91b2d63`), `CreateOrderWorkflow`, the eight frozen order endpoints, the status
+machine, and `order/{schemas,serializers,state_machine,service,workflow}.py`.
+Read `docs/architecture/ORDER_WORKFLOW.md` and section 16 for the decisions that
+must not be re-opened (cart is client-side; shipping is 0 in V1; coupon_id is
+refused with 90004 until Phase 6; shipping never changes `order_status`).
+
+### 17.3 Team state (AgentTeams)
+
+The team `phase4-orders` exists at `.agent-teams/phase4-orders` with three idle,
+durable members: **pricing-author**, **order-data**, **verifier** (`order-flow` was
+removed after its work was committed). A new captain may create its own team; if the
+harness exposes the existing members they can be reused. Hard rule from this phase
+(section 15.3): **one file, one writer; commit path-scoped, never `git add -A`** -
+another agent session may still be editing `frontend/**` in this same working tree.
+
+### 17.4 Phase 5 scope (Payment + Fulfillment + AfterSales + Refund)
+
+Gates: **FG-11 (payment idempotency, mandatory)** and **FG-12 (refund invariants,
+mandatory)**. Required reading: baseline `REQ-PAY-*`, `REQ-FUL-*`, `REQ-AFS-*`;
+`ORDER_WORKFLOW.md` section 11; `API_CONTRACT.md` sections 4-6; HANDOFF section 6.
+
+* `payments` + `payment_callbacks` with `UNIQUE(provider, provider_event_id)`;
+  callback payload snapshot sensitive-field filtered; mock pay DEV/DEMO only and
+  never settable by a normal JWT user (INV-008); payment success can only come from
+  a verified callback.
+* `PaymentSuccessWorkflow`: callback idempotency -> payment `SUCCESS` -> order
+  `PENDING_PAYMENT -> PROCESSING` -> `ORDER_DEDUCT` movements -> fulfillment shell
+  -> outbox row (the outbox table itself is Phase 6; keep/emit at the marked seam in
+  `CreateOrderWorkflow`).
+* `fulfillments` + `fulfillment_items`; `POST /fulfillments/{id}/ship` takes exactly
+  `{carrier, tracking_no, item_quantities}`; **shipping never changes
+  `order_status`**; multi-package per order.
+* `after_sales` (claim) and `refunds` (money fact) are separate domains;
+  `refunded_amount <= paid_amount`, item refund `<= item.payable_amount`; refunded
+  and after-sale statuses are separate writers.
+* FG-11 evidence wants concurrency on real MySQL (same provider event delivered N
+  times -> exactly one payment confirm, one deduction, one fulfillment, no duplicate
+  outbox effect); FG-12 wants the cap invariants proven at the database boundary.
+
+### 17.5 Obligations carried into Phase 5
+
+1. **Delete the frontend `refundable_amount` bridge** once `OrderDetail.refundable_amount`
+   is confirmed over a real HTTP response (section 12, `ORDER_WORKFLOW.md` section 11).
+   The backend field already exists; the deletion is the proof it is delivered.
+2. Wire the **outbox seam** marked in `CreateOrderWorkflow` when Phase 6 lands.
+3. **Single-merchant coupling**: per-order warehouse resolution is equivalent to
+   per-line only because a multi-merchant cart is refused; relaxing that guard
+   requires per-line resolution in the same change.
+4. `tests/conftest.py`'s shared `client` fixture is broken (httpx 0.28
+   `ASGITransport` is async-only); Phase 5 should fix it at source.
+5. `alembic downgrade base` still fails at the **Phase 1** catalog revision (errno
+   1553); Phase 4's own downgrade is canonical (up->down->up identical). Minimal fix
+   recorded in section 16.
+6. Pre-existing and not gating: `scripts/emit_fg09_evidence.py` lint;
+   `ruff format --check .` panics inside ruff 0.16.8's renderer (use `ruff check`);
+   top-level `scripts/` is outside `backend/pyproject.toml`'s per-file-ignores.
+
+### 17.6 How to verify before claiming anything
+
+```powershell
+cd C:\Users\27363\Desktop\store
+.\.venv\Scripts\python.exe -m pytest backend\tests\unit -q      # fast
+cd backend
+& ..\.venv\Scripts\python.exe -m pytest tests -q                            # 700 expected
+& ..\.venv\Scripts\python.exe -m ruff check app tests migrations
+& ..\.venv\Scripts\python.exe -m alembic check
+cd .. ; docker compose --env-file .env -f ops/docker-compose.yml ps
+```
+
+Rule from the spec (sections 143/149): implement -> static check -> migration ->
+test -> run -> fix -> evidence -> docs -> commit, and never write a verdict that
+was not observed. The mandatory-gate pattern to copy is FG-09/FG-10: a test file on
+real MySQL, a negative control, and a JSON/XML evidence artifact under
+`artifacts/evidence/`.
+
+### 17.7 First commands for the new conversation
+
+```powershell
+cd C:\Users\27363\Desktop\store
+git log --oneline -5
+git status --short
+.\.venv\Scripts\python.exe -m pytest backend\tests\unit -q   # expect 493
+docker compose --env-file .env -f ops/docker-compose.yml ps                 # expect 5/5
+```
+
+Then: `docs/architecture/API_CONTRACT.md`, `PROJECT_BASELINE.yaml` (Phase 5
+requirements), `docs/architecture/ORDER_WORKFLOW.md`, and start Phase 5.
