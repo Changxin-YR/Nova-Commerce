@@ -7,13 +7,7 @@
  * else in the app has to change.
  */
 
-import type {
-  Address,
-  Coupon,
-  Citation,
-  RetrievalStage,
-  ToolProgress,
-} from '@/types/domain'
+import type { Citation, RetrievalStage, ToolProgress } from '@/types/domain'
 import type { PageQuery } from '@/types/api'
 
 // ---------------------------------------------------------------------------
@@ -122,12 +116,11 @@ export interface SelectCartItemsRequest {
 // ---------------------------------------------------------------------------
 
 export interface OrderPreviewRequest {
-  /** Source of the line items. Checkout can preview from cart or from a buy-now list. */
-  source: 'cart' | 'direct'
-  item_ids?: string[]
-  direct_items?: { sku_id: string; quantity: number }[]
-  address_id?: string
-  coupon_code?: string
+  /** Business inputs only; the server loads current SKU prices. */
+  items: { sku_id: number; quantity: number }[]
+  address_id?: number
+  coupon_id?: number
+  remark?: string
 }
 
 /**
@@ -136,37 +129,37 @@ export interface OrderPreviewRequest {
  */
 export interface OrderPreview {
   items: {
-    sku_id: string
-    product_title: string
-    sku_specs: Record<string, string>
-    cover_url?: string
+    sku_id: number
+    product_id: number
+    product_name: string
+    sku_name: string
+    image_url: string | null
     quantity: number
-    unit_price_amount: number
-    subtotal_amount: number
+    unit_price: number
+    original_amount: number
+    promotion_discount_amount: number
+    coupon_discount_amount: number
+    allocated_discount_amount: number
+    payable_amount: number
   }[]
   /** Integer minor units. */
-  items_amount: number
+  original_amount: number
   /** Integer minor units. */
-  discount_amount: number
+  promotion_discount_amount: number
+  /** Integer minor units. */
+  coupon_discount_amount: number
   /** Integer minor units. */
   shipping_amount: number
   /** Integer minor units. */
   payable_amount: number
-  coupon?: Coupon | null
-  address?: Address | null
-  /** Non-fatal warnings, e.g. a SKU went unavailable. */
-  warnings?: string[]
+  /** Server warning codes; translated at the view boundary. */
+  warnings: string[]
 }
 
-export interface CreateOrderRequest {
-  address_id: string
+export interface CreateOrderRequest extends OrderPreviewRequest {
+  address_id: number
   /** Both required: Idempotency-Key header + this field (§96). */
   client_request_id: string
-  source: 'cart' | 'direct'
-  item_ids?: string[]
-  direct_items?: { sku_id: string; quantity: number }[]
-  coupon_code?: string
-  remark?: string
 }
 
 export interface CancelOrderRequest {

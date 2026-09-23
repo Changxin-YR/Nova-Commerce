@@ -9,21 +9,25 @@
 import { httpClient } from '@/api/client'
 import { API } from '@/api/endpoints'
 import type { Paged } from '@/types/domain'
-import type { Coupon } from '@/types/domain'
 import type { PageQuery } from '@/types/api'
-import type { Promotion, PromotionPreview } from '@/types/frozen-contract'
+import type { CouponPreview, CouponTemplate, Promotion, PromotionPreview } from '@/types/frozen-contract'
 
-export interface CouponPayload {
-  code: string
-  name: string
-  /** Integer minor units off. */
-  discount_amount: number
-  /** Integer minor units minimum spend. */
-  threshold_amount: number
+export interface OwnedCoupon {
+  id: number
+  template_id: number
+  merchant_id: number
+  status: 'UNUSED' | 'LOCKED' | 'USED' | 'EXPIRED'
   valid_from: string
   valid_to: string
-  total_quantity?: number
+  order_id: number | null
+  locked_at: string | null
+  used_at: string | null
 }
+
+export type CouponPayload = Omit<
+  CouponTemplate,
+  'id' | 'template_no' | 'merchant_id' | 'status' | 'issued_count' | 'created_at'
+>
 
 /**
  * §13.1 froze the real promotion shape, which REPLACES the local invented one that used to live here
@@ -56,12 +60,12 @@ export type PromotionDraft = Omit<
 export type PromotionCreatePayload = PromotionDraft & { preview_token: string }
 
 export const marketingApi = {
-  async myCoupons(status?: string): Promise<Coupon[]> {
-    return httpClient.get<Coupon[]>(API.marketing.myCoupons, { params: { status } })
+  async myCoupons(): Promise<OwnedCoupon[]> {
+    return httpClient.get<OwnedCoupon[]>(API.marketing.myCoupons)
   },
 
-  async claim(couponId: string): Promise<Coupon> {
-    return httpClient.post<Coupon>(API.marketing.claim(couponId), {})
+  async claim(templateId: string | number): Promise<OwnedCoupon> {
+    return httpClient.post<OwnedCoupon>(API.marketing.claim(String(templateId)), {})
   },
 
   async promotions(): Promise<Promotion[]> {
@@ -77,22 +81,7 @@ export const marketingApi = {
  * The one field that is certain is `preview_token`: §12.1 states the create call must carry the same
  * token the preview returned, so the server can prove the operator approved what is being written.
  */
-export interface CouponPreviewResult {
-  preview_token: string
-  /**
-   * The contract says the preview response IS the exact payload the create call accepts, so the
-   * previewed values are echoed back here. They are optional in the TYPE because their names come
-   * from the request shape rather than from a frozen response shape.
-   */
-  code?: string
-  name?: string
-  discount_amount?: number
-  threshold_amount?: number
-  valid_from?: string
-  valid_to?: string
-  /** Server-side findings, e.g. an overlapping promotion or an unusable validity window. */
-  warnings?: string[]
-}
+export type CouponPreviewResult = CouponPreview
 
 /**
  * A coupon create MUST carry the preview token (§12.1), and the server enforces it with
@@ -125,8 +114,8 @@ export const marketingAdminApi = {
     return httpClient.post<Promotion>(API.marketing.unpublishPromotion(id), {})
   },
 
-  async coupons(query: PageQuery = {}): Promise<Paged<Coupon>> {
-    return httpClient.get<Paged<Coupon>>(API.marketing.adminCoupons, { params: query })
+  async coupons(query: PageQuery = {}): Promise<Paged<CouponTemplate>> {
+    return httpClient.get<Paged<CouponTemplate>>(API.marketing.adminCoupons, { params: query })
   },
 
   /**
@@ -156,8 +145,16 @@ export const marketingAdminApi = {
    * `/marketing/admin/coupons`, which is only the LIST route. Pointing create at the admin path was a
    * real mismatch, the same class of defect as the knowledge task endpoints.
    */
-  async createCoupon(payload: CouponCreatePayload): Promise<Coupon> {
-    return httpClient.post<Coupon>(API.marketing.couponsCreate, payload)
+  async createCoupon(payload: CouponCreatePayload): Promise<CouponTemplate> {
+    return httpClient.post<CouponTemplate>(API.marketing.couponsCreate, payload)
+  },
+
+  async publishCoupon(id: number): Promise<CouponTemplate> {
+    return httpClient.post<CouponTemplate>(`${API.marketing.coupons}/${id}/publish`, {})
+  },
+
+  async unpublishCoupon(id: number): Promise<CouponTemplate> {
+    return httpClient.post<CouponTemplate>(`${API.marketing.coupons}/${id}/unpublish`, {})
   },
 
   async promotions(query: PageQuery = {}): Promise<Paged<Promotion>> {

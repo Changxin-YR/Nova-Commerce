@@ -420,6 +420,8 @@ export interface CouponPreview {
     template_no: string | null
   }
   estimated_impact: {
+    affected_sku_count: number
+    affected_order_count_30d: number
     estimated_issue_count: number
     /** Integer minor units. */
     estimated_discount_amount: number

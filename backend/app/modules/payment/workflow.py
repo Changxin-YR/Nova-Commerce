@@ -69,6 +69,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.modules.inventory.enums import OperatorType as MovementOperatorType, ReferenceType
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.coupon_service import CouponService
 from app.modules.order.enums import OperatorType as LogOperatorType, OrderStatus, PaymentStatus
 from app.modules.order.models import Order, OrderItem
 from app.modules.order.repository import OrderRepository, OrderStatusLogRepository
@@ -515,6 +516,7 @@ class PaymentSuccessWorkflow:
             reason=ORDER_PROCESSING_REASON,
             trace_id=None,
         )
+        CouponService(self._session).mark_used(order=order, now=now)
 
         # -- step 7: the deduction, one movement per line -------------------
         items = self._orders.items_for(order.id)
@@ -764,5 +766,4 @@ class _Refusal:
 
     code: str
     detail: str
-
 

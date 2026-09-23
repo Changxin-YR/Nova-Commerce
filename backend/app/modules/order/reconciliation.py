@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.inventory.enums import OperatorType as InventoryOperatorType, ReferenceType
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.coupon_service import CouponService
 from app.modules.order.enums import OperatorType, OrderStatus, PaymentStatus
 from app.modules.order.models import Order
 from app.modules.order.repository import OrderStatusLogRepository
@@ -50,6 +51,7 @@ def close_expired_order(session: Session, *, order_id: int, now: datetime) -> bo
         return False
 
     assert_transition(order.order_status, OrderStatus.CLOSED)
+    CouponService(session).release(order=order, now=now)
     inventory = InventoryService(session)
     for item in sorted(order.items, key=lambda row: row.sku_id):
         inventory.release(

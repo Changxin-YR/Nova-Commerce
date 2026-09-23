@@ -82,7 +82,6 @@ CLASSES_NOT_YET_DEFINED = frozenset(
         "ADDRESS_NOT_OWNED",
         # marketing
         "PROMOTION_RULE_INVALID",
-        "COUPON_THRESHOLD_NOT_MET",
         # knowledge / RAG (Phase 11)
         "KNOWLEDGE_BASE_NOT_FOUND",
         "DOCUMENT_DUPLICATE",

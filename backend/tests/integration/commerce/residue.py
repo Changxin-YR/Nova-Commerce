@@ -47,6 +47,13 @@ from app.modules.catalog.models import Product, ProductImage, ProductSku
 from app.modules.fulfillment.models import Fulfillment, FulfillmentItem
 from app.modules.identity.models import Merchant, User, UserAddress
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
+from app.modules.marketing.models import (
+    CouponTemplate,
+    CouponUsageRecord,
+    Promotion,
+    PromotionProduct,
+    UserCoupon,
+)
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.modules.payment.models import Payment, PaymentCallback
 from app.shared.db.models.idempotency import IdempotencyRecord
@@ -267,6 +274,17 @@ def report_residue(session: Session) -> ResidueReport:
     report.counts["outbox_messages"] = count(
         OutboxMessage, OutboxMessage.merchant_id.in_(merchant_ids)
     )
+    report.counts["promotions"] = count(Promotion, Promotion.merchant_id.in_(merchant_ids))
+    report.counts["promotion_products"] = count(
+        PromotionProduct, PromotionProduct.merchant_id.in_(merchant_ids)
+    )
+    report.counts["coupon_templates"] = count(
+        CouponTemplate, CouponTemplate.merchant_id.in_(merchant_ids)
+    )
+    report.counts["user_coupons"] = count(UserCoupon, UserCoupon.merchant_id.in_(merchant_ids))
+    report.counts["coupon_usage_records"] = count(
+        CouponUsageRecord, CouponUsageRecord.merchant_id.in_(merchant_ids)
+    )
     # Attribute the event-shaped callbacks exactly once. Those a marker reaches are
     # residue and are swept; the rest are reported separately (see below) and never
     # touched, because this tool cannot prove they are test output.
@@ -283,7 +301,13 @@ def report_residue(session: Session) -> ResidueReport:
     ]
     attributed = [eid for eid in event_ids if any(m and m in eid for m in markers)]
     report.unattributable_callbacks = len(event_ids) - len(attributed)
-    report.counts["payment_callbacks"] = len(attributed)
+    report.counts["payment_callbacks"] = count(
+        PaymentCallback,
+        or_(
+            PaymentCallback.merchant_id.in_(merchant_ids),
+            PaymentCallback.provider_event_id.in_(attributed),
+        ),
+    )
     report.counts["order_status_logs"] = count(OrderStatusLog, OrderStatusLog.order_id.in_(orders))
     report.counts["order_items"] = count(OrderItem, OrderItem.order_id.in_(orders))
     report.counts["orders"] = count(Order, Order.id.in_(orders))
@@ -348,6 +372,20 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
     if merchant_ids:
         session.execute(
             delete(OutboxMessage).where(OutboxMessage.merchant_id.in_(merchant_ids))
+        )
+        session.execute(
+            delete(CouponUsageRecord).where(CouponUsageRecord.merchant_id.in_(merchant_ids))
+        )
+        session.execute(delete(UserCoupon).where(UserCoupon.merchant_id.in_(merchant_ids)))
+        session.execute(
+            delete(CouponTemplate).where(CouponTemplate.merchant_id.in_(merchant_ids))
+        )
+        session.execute(
+            delete(PromotionProduct).where(PromotionProduct.merchant_id.in_(merchant_ids))
+        )
+        session.execute(delete(Promotion).where(Promotion.merchant_id.in_(merchant_ids)))
+        session.execute(
+            delete(PaymentCallback).where(PaymentCallback.merchant_id.in_(merchant_ids))
         )
 
     # --- children before parents -------------------------------------------

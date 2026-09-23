@@ -53,6 +53,7 @@ from app.modules.identity.enums import DataScope, PermissionCode
 from app.modules.identity.service import AddressService, Principal
 from app.modules.inventory.enums import ReferenceType
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.coupon_service import CouponService, require_applicable_discount
 from app.modules.marketing.service import PromotionService
 from app.modules.order.enums import (
     FULFILLMENT_STATUSES,
@@ -153,7 +154,8 @@ class OrderService:
             self._addresses.get(user_id=principal.user_id, address_id=address_id)
 
         rules = pricing_rules or PricingRules()
-        validate_coupon_input(coupon_id=coupon_id, rules=rules)
+        if pricing_rules is not None:
+            validate_coupon_input(coupon_id=coupon_id, rules=rules)
 
         priced_lines, merchant_id = load_priced_lines(self._session, lines)
         if pricing_rules is None:
@@ -163,13 +165,27 @@ class OrderService:
                 now=utc_now(),
                 for_update=False,
             )
-            rules = PricingRules(promotion=promotion_rule)
-        return self._pricing.calculate_cart_price(
+            coupon_rule = None
+            if coupon_id is not None:
+                coupon_rule, _coupon_row = CouponService(self._session).resolve_for_cart(
+                    coupon_id=coupon_id,
+                    user_id=principal.user_id,
+                    merchant_id=merchant_id,
+                    sku_ids={line.sku_id for line in lines},
+                    now=utc_now(),
+                    for_update=False,
+                )
+            rules = PricingRules(promotion=promotion_rule, coupon=coupon_rule)
+            validate_coupon_input(coupon_id=coupon_id, rules=rules)
+        cart = self._pricing.calculate_cart_price(
             priced_lines,
             promotion=rules.promotion,
             coupon=rules.coupon,
             shipping_policy=None,
         )
+        if coupon_id is not None:
+            require_applicable_discount(cart)
+        return cart
 
     # ------------------------------------------------------------------
     # Create
@@ -235,6 +251,7 @@ class OrderService:
         # 50010 for every refused transition, whatever state the order was in.
         OrderStateMachine.to_cancelled(order.order_status)
 
+        CouponService(self._session).release(order=order, now=utc_now())
         self._release_reserved_stock(principal=principal, order=order)
 
         order.order_status = OrderStatus.CANCELLED.value

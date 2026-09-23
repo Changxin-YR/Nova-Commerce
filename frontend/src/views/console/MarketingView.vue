@@ -12,28 +12,23 @@
  *  here is therefore a two-step flow: 预览 computes and shows exactly what will be sent, and only an
  *  explicit 确认提交 performs the write. Nothing is posted from the form step.
  *
- * WHAT THIS PAGE DELIBERATELY DOES NOT DO
- *  There is no promotion-create flow. §47 requires a preview step and `PROMOTION_PREVIEW_REQUIRED`
- *  (90003) exists as an error code, but no preview or create endpoint is frozen, so building the
- *  form would mean inventing an endpoint — reported instead (see the migration report).
- *
  * §104: the availability rules below decide only what is OFFERED. The server is the authority and
  * answers `PROMOTION_CONFLICT` (90001) / `COUPON_ALREADY_LOCKED` (90008).
  */
 import { computed, reactive, ref } from 'vue'
 import {
   marketingAdminApi,
+  type CouponPayload,
   type CouponPreviewResult,
   type PromotionDraft,
   type PromotionPreview,
 } from '@/api'
 
 import { useAsyncState } from '@/composables/useAsyncState'
-import type { PromotionType } from '@/types/frozen-contract'
+import type { CouponTemplate, PromotionType } from '@/types/frozen-contract'
 import {
   canPublishPromotion,
   canUnpublishPromotion,
-  isCouponAvailable,
   isPromotionTerminal,
   promotionActionBlockedReason,
 } from '@/domain/marketing/availability'
@@ -86,38 +81,76 @@ const step = ref<'form' | 'preview'>('form')
 const serverPreview = ref<CouponPreviewResult | null>(null)
 const busy = ref(false)
 const form = reactive({
-  code: '',
   name: '',
+  couponType: 'FIXED_AMOUNT' as 'FIXED_AMOUNT' | 'PERCENT_DISCOUNT',
   discountYuan: '',
+  discountBps: '',
   thresholdYuan: '',
+  maxDiscountYuan: '',
+  totalQuota: 1000,
+  perUserLimit: 1,
+  validityType: 'ABSOLUTE' as 'RELATIVE' | 'ABSOLUTE',
+  validDays: 30,
   validFrom: '',
   validTo: '',
+  allProducts: true,
+  productIds: '',
+  categoryIds: '',
 })
 
 /** The exact request that WOULD be sent, built once so preview and submit cannot diverge. */
-const draftPayload = computed(() => {
-  const discount = fromMajorString(form.discountYuan)
+const draftPayload = computed<CouponPayload | null>(() => {
+  const discount = form.couponType === 'FIXED_AMOUNT' ? fromMajorString(form.discountYuan) : null
+  const bps = form.couponType === 'PERCENT_DISCOUNT' ? Number(form.discountBps.trim()) : null
   const threshold = fromMajorString(form.thresholdYuan)
-  if (discount === null || threshold === null) return null
+  const cap = form.couponType === 'PERCENT_DISCOUNT' && form.maxDiscountYuan
+    ? fromMajorString(form.maxDiscountYuan)
+    : null
+  if (threshold === null || (form.couponType === 'FIXED_AMOUNT' && discount === null)) return null
+  if (form.couponType === 'PERCENT_DISCOUNT' && (bps === null || !Number.isInteger(bps))) return null
   return {
-    code: form.code.trim(),
     name: form.name.trim(),
-    discount_amount: discount,
+    coupon_type: form.couponType,
+    face_value_amount: discount,
+    discount_bps: bps,
     threshold_amount: threshold,
-    valid_from: form.validFrom || new Date().toISOString(),
-    valid_to: form.validTo || new Date(Date.now() + 30 * 86400_000).toISOString(),
+    max_discount_amount: cap,
+    total_quota: Number(form.totalQuota),
+    per_user_limit: Number(form.perUserLimit),
+    validity_type: form.validityType,
+    valid_days: form.validityType === 'RELATIVE' ? Number(form.validDays) : null,
+    valid_from: form.validityType === 'ABSOLUTE' && form.validFrom ? new Date(form.validFrom).toISOString() : null,
+    valid_to: form.validityType === 'ABSOLUTE' && form.validTo ? new Date(form.validTo).toISOString() : null,
+    applicable_scope: {
+      all_products: form.allProducts,
+      product_ids: form.allProducts ? [] : parseIds(form.productIds),
+      category_ids: form.allProducts ? [] : parseIds(form.categoryIds),
+    },
   }
 })
 
 const draftProblem = computed(() => {
-  if (!form.code.trim()) return '请填写券码'
   if (!form.name.trim()) return '请填写券名称'
-  const discount = fromMajorString(form.discountYuan)
   const threshold = fromMajorString(form.thresholdYuan)
-  if (discount === null) return '面额必须是数字'
   if (threshold === null) return '使用门槛必须是数字'
-  if (discount <= 0) return '面额必须大于 0'
   if (threshold < 0) return '使用门槛不能为负'
+  if (form.couponType === 'FIXED_AMOUNT') {
+    const discount = fromMajorString(form.discountYuan)
+    if (discount === null || discount <= 0) return '面额必须大于 0'
+  } else if (!Number.isInteger(Number(form.discountBps)) || Number(form.discountBps) < 1 || Number(form.discountBps) > 10000) {
+    return '折扣基点必须是 1 到 10000 的整数'
+  }
+  if (form.couponType === 'PERCENT_DISCOUNT' && form.maxDiscountYuan && (fromMajorString(form.maxDiscountYuan) ?? 0) <= 0) return '封顶金额必须大于 0'
+  if (!Number.isInteger(Number(form.totalQuota)) || Number(form.totalQuota) <= 0) return '总名额必须大于 0'
+  if (!Number.isInteger(Number(form.perUserLimit)) || Number(form.perUserLimit) <= 0) return '每人限领必须大于 0'
+  if (form.validityType === 'RELATIVE') {
+    if (!Number.isInteger(Number(form.validDays)) || Number(form.validDays) <= 0) return '有效天数必须大于 0'
+  } else if (!form.validFrom || !form.validTo || new Date(form.validFrom) >= new Date(form.validTo)) {
+    return '请选择正确的生效与失效时间'
+  }
+  if (!form.allProducts && parseIds(form.productIds).length === 0 && parseIds(form.categoryIds).length === 0) {
+    return '未勾选全场时，至少填写一个商品或品类 ID'
+  }
   return null
 })
 
@@ -175,9 +208,9 @@ async function confirmCreate(): Promise<void> {
     formOpen.value = false
     step.value = 'form'
     serverPreview.value = null
-    form.code = ''
     form.name = ''
     form.discountYuan = ''
+    form.discountBps = ''
     form.thresholdYuan = ''
     await loadCoupons()
   } catch (e) {
@@ -191,6 +224,27 @@ async function confirmCreate(): Promise<void> {
 /* -- promotion task actions ------------------------------------------------ */
 
 const busyPromotionId = ref('')
+const busyCouponId = ref(0)
+
+async function runCouponAction(action: 'publish' | 'unpublish', id: number): Promise<void> {
+  busyCouponId.value = id
+  try {
+    if (action === 'publish') {
+      await marketingAdminApi.publishCoupon(id)
+      notifications.success('券模板已开放领取')
+    } else {
+      await marketingAdminApi.unpublishCoupon(id)
+      notifications.success('券模板已停止领取')
+    }
+    await loadCoupons()
+  } catch (e) {
+    const normalized = normalizeError(e)
+    notifications.error('券状态更新失败', normalized.message, normalized.code, normalized.traceId)
+    await loadCoupons()
+  } finally {
+    busyCouponId.value = 0
+  }
+}
 
 async function runPromotionAction(action: 'publish' | 'unpublish', id: string | number): Promise<void> {
   busyPromotionId.value = String(id)
@@ -228,6 +282,16 @@ function stamp(iso: string): string {
   const date = new Date(iso)
   const pad = (n: number): string => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function couponValue(coupon: CouponTemplate): string {
+  if (coupon.coupon_type === 'FIXED_AMOUNT') return `减 ${toMajorString(coupon.face_value_amount ?? 0)} 元`
+  return `${(10000 - (coupon.discount_bps ?? 0)) / 1000} 折`
+}
+
+function couponValidity(coupon: CouponTemplate): string {
+  if (coupon.validity_type === 'RELATIVE') return `领券后 ${coupon.valid_days ?? 0} 天`
+  return `${stamp(coupon.valid_from ?? '')} ~ ${stamp(coupon.valid_to ?? '')}`
 }
 
 /** Template hint: shows the minor-unit convention instead of a bare example. */
@@ -445,29 +509,66 @@ async function confirmCreatePromotion(): Promise<void> {
             <template v-if="step === 'form'">
               <div class="marketing__fields">
                 <label>
-                  券码
-                  <input v-model="form.code" class="nx-input" maxlength="32" placeholder="例如 NOVA100" />
-                </label>
-                <label>
-                  名称
+                  券模板名称
                   <input v-model="form.name" class="nx-input" maxlength="60" placeholder="例如 满 1000 减 10" />
                 </label>
                 <label>
+                  优惠类型
+                  <select v-model="form.couponType" class="nx-input">
+                    <option value="FIXED_AMOUNT">固定金额</option>
+                    <option value="PERCENT_DISCOUNT">比例折扣</option>
+                  </select>
+                </label>
+                <label v-if="form.couponType === 'FIXED_AMOUNT'">
                   面额（元）
                   <input v-model="form.discountYuan" class="nx-input" inputmode="decimal" />
+                </label>
+                <label v-else>
+                  折扣基点（1250 = 减 12.5%）
+                  <input v-model="form.discountBps" class="nx-input" type="number" min="1" max="10000" />
                 </label>
                 <label>
                   使用门槛（元）
                   <input v-model="form.thresholdYuan" class="nx-input" inputmode="decimal" />
                 </label>
-                <label>
-                  生效日期
-                  <input v-model="form.validFrom" class="nx-input" type="date" />
+                <label v-if="form.couponType === 'PERCENT_DISCOUNT'">
+                  最高优惠（元，可留空）
+                  <input v-model="form.maxDiscountYuan" class="nx-input" inputmode="decimal" />
                 </label>
                 <label>
-                  失效日期
-                  <input v-model="form.validTo" class="nx-input" type="date" />
+                  总发行量
+                  <input v-model.number="form.totalQuota" class="nx-input" type="number" min="1" />
                 </label>
+                <label>
+                  每人限领
+                  <input v-model.number="form.perUserLimit" class="nx-input" type="number" min="1" />
+                </label>
+                <label>
+                  有效期类型
+                  <select v-model="form.validityType" class="nx-input">
+                    <option value="ABSOLUTE">固定时间</option>
+                    <option value="RELATIVE">领券后有效</option>
+                  </select>
+                </label>
+                <label v-if="form.validityType === 'RELATIVE'">
+                  领券后有效天数
+                  <input v-model.number="form.validDays" class="nx-input" type="number" min="1" />
+                </label>
+                <template v-else>
+                  <label>生效时间<input v-model="form.validFrom" class="nx-input" type="datetime-local" /></label>
+                  <label>失效时间<input v-model="form.validTo" class="nx-input" type="datetime-local" /></label>
+                </template>
+                <label>
+                  商品范围
+                  <select v-model="form.allProducts" class="nx-input">
+                    <option :value="true">全部商品</option>
+                    <option :value="false">指定商品或品类</option>
+                  </select>
+                </label>
+                <template v-if="!form.allProducts">
+                  <label>商品 ID（逗号分隔）<input v-model="form.productIds" class="nx-input" /></label>
+                  <label>品类 ID（逗号分隔）<input v-model="form.categoryIds" class="nx-input" /></label>
+                </template>
               </div>
               <p class="nx-muted marketing__hint">
                 示例：满 {{ sampleDiscount }} 元可用。金额以整数分提交，界面上是元。
@@ -493,18 +594,22 @@ async function confirmCreatePromotion(): Promise<void> {
                 <li v-for="(warning, index) in serverPreview.warnings" :key="index">{{ warning }}</li>
               </ul>
               <dl v-if="draftPayload" class="marketing__preview">
-                <div><dt>券码</dt><dd><code>{{ draftPayload.code }}</code></dd></div>
                 <div><dt>名称</dt><dd>{{ draftPayload.name }}</dd></div>
                 <div>
-                  <dt>面额</dt>
-                  <dd><PriceText :amount="draftPayload.discount_amount" size="sm" /></dd>
+                  <dt>优惠</dt>
+                  <dd v-if="draftPayload.coupon_type === 'FIXED_AMOUNT'">
+                    <PriceText :amount="draftPayload.face_value_amount ?? 0" size="sm" />
+                  </dd>
+                  <dd v-else>减 {{ (draftPayload.discount_bps ?? 0) / 100 }}%</dd>
                 </div>
                 <div>
                   <dt>使用门槛</dt>
                   <dd><PriceText :amount="draftPayload.threshold_amount" size="sm" /></dd>
                 </div>
-                <div><dt>生效</dt><dd>{{ stamp(draftPayload.valid_from) }}</dd></div>
-                <div><dt>失效</dt><dd>{{ stamp(draftPayload.valid_to) }}</dd></div>
+                <div><dt>总名额</dt><dd>{{ draftPayload.total_quota }}</dd></div>
+                <div><dt>每人限领</dt><dd>{{ draftPayload.per_user_limit }}</dd></div>
+                <div><dt>有效期</dt><dd>{{ draftPayload.validity_type === 'RELATIVE' ? `领券后 ${draftPayload.valid_days} 天` : `${stamp(draftPayload.valid_from ?? '')} ~ ${stamp(draftPayload.valid_to ?? '')}` }}</dd></div>
+                <div><dt>覆盖 SKU</dt><dd>{{ serverPreview?.estimated_impact?.affected_sku_count ?? 0 }}</dd></div>
               </dl>
               <div class="marketing__actions">
                 <button
@@ -527,26 +632,31 @@ async function confirmCreatePromotion(): Promise<void> {
           <table class="nx-table">
             <thead>
               <tr>
-                <th style="width: 140px">券码</th>
+                <th style="width: 140px">模板编号</th>
                 <th style="width: 200px">名称</th>
-                <th style="width: 90px">券状态</th>
-                <th style="width: 110px; text-align: right">面额</th>
+                <th style="width: 90px">模板状态</th>
+                <th style="width: 110px; text-align: right">优惠</th>
                 <th style="width: 110px; text-align: right">门槛</th>
                 <th style="width: 190px">有效期</th>
+                <th style="width: 110px; text-align: right">已领 / 总量</th>
+                <th style="width: 120px">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="coupon in coupons" :key="coupon.id">
-                <td><code>{{ coupon.code }}</code></td>
+                <td><code>{{ coupon.template_no }}</code></td>
                 <td>{{ coupon.name }}</td>
                 <td>
                   <StatusChip :status="coupon.status" kind="doc" dot />
-                  <!-- LOCKED means another order holds it; it must not read as available. -->
-                  <span v-if="!isCouponAvailable(coupon.status)" class="marketing__hint">不可用</span>
                 </td>
-                <td style="text-align: right"><PriceText :amount="coupon.discount_amount" size="sm" :grouping="false" /></td>
+                <td style="text-align: right">{{ couponValue(coupon) }}</td>
                 <td style="text-align: right"><PriceText :amount="coupon.threshold_amount" size="sm" muted :grouping="false" /></td>
-                <td class="nx-muted">{{ stamp(coupon.valid_from) }} ~ {{ stamp(coupon.valid_to) }}</td>
+                <td class="nx-muted">{{ couponValidity(coupon) }}</td>
+                <td style="text-align: right">{{ coupon.issued_count }} / {{ coupon.total_quota }}</td>
+                <td>
+                  <button v-if="coupon.status === 'DRAFT'" type="button" class="nx-btn nx-btn--sm" :disabled="busyCouponId === coupon.id" @click="runCouponAction('publish', coupon.id)">开放领取</button>
+                  <button v-else-if="coupon.status === 'ACTIVE'" type="button" class="nx-btn nx-btn--sm" :disabled="busyCouponId === coupon.id" @click="runCouponAction('unpublish', coupon.id)">停止领取</button>
+                </td>
               </tr>
             </tbody>
           </table>

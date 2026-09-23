@@ -78,6 +78,7 @@ from app.modules.identity.models import UserAddress
 from app.modules.identity.service import AddressService, Principal
 from app.modules.inventory.enums import OperatorType as MovementOperatorType, ReferenceType
 from app.modules.inventory.service import InventoryService
+from app.modules.marketing.coupon_service import CouponService, require_applicable_discount
 from app.modules.marketing.service import PromotionService
 from app.modules.order.enums import (
     AfterSaleStatus,
@@ -598,11 +599,13 @@ class CreateOrderWorkflow:
 
         # -- step 3: business-input validation that needs no I/O ------------
         rules = pricing_rules or PricingRules()
-        validate_coupon_input(coupon_id=coupon_id, rules=rules)
+        if pricing_rules is not None:
+            validate_coupon_input(coupon_id=coupon_id, rules=rules)
 
         # -- step 4: price (business inputs only, 搂38) ----------------------
         priced_lines, merchant_id = load_priced_lines(self._session, lines)
         promotion_row = None
+        coupon_row = None
         if pricing_rules is None:
             promotion_rule, promotion_row = PromotionService(self._session).resolve_for_cart(
                 merchant_id=merchant_id,
@@ -610,13 +613,26 @@ class CreateOrderWorkflow:
                 now=utc_now(),
                 for_update=True,
             )
-            rules = PricingRules(promotion=promotion_rule)
+            coupon_rule = None
+            if coupon_id is not None:
+                coupon_rule, coupon_row = CouponService(self._session).resolve_for_cart(
+                    coupon_id=coupon_id,
+                    user_id=principal.user_id,
+                    merchant_id=merchant_id,
+                    sku_ids={line.sku_id for line in lines},
+                    now=utc_now(),
+                    for_update=True,
+                )
+            rules = PricingRules(promotion=promotion_rule, coupon=coupon_rule)
+            validate_coupon_input(coupon_id=coupon_id, rules=rules)
         cart = self._pricing.calculate_cart_price(
             priced_lines,
             promotion=rules.promotion,
             coupon=rules.coupon,
             shipping_policy=None,
         )
+        if coupon_id is not None:
+            require_applicable_discount(cart)
         if promotion_row is not None and cart.promotion_discount_amount > 0:
             promotion_row.used_quota += 1
             self._session.flush()
@@ -648,6 +664,8 @@ class CreateOrderWorkflow:
             remark=remark,
             snapshot=snapshot,
         )
+        if coupon_row is not None:
+            CouponService(self._session).lock_for_order(coupon=coupon_row, order=order, now=utc_now())
 
         # -- step 6: reserve the stock, inside the lock ---------------------
         warehouse_id = self._reserve_stock(

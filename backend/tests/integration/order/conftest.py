@@ -29,6 +29,7 @@ from sqlalchemy import delete, text
 from sqlalchemy.orm import Session
 
 from app.modules.catalog.models import Product, ProductImage, ProductSku
+from app.modules.fulfillment.models import Fulfillment, FulfillmentItem
 from app.modules.identity.enums import DataScope, PermissionCode, UserType
 from app.modules.identity.models import (
     Merchant,
@@ -43,9 +44,15 @@ from app.modules.identity.service import Principal
 from app.modules.inventory.enums import MovementType, OperatorType, ReferenceType
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.inventory.service import InventoryService
-from app.modules.marketing.models import Promotion, PromotionProduct
+from app.modules.marketing.models import (
+    CouponTemplate,
+    CouponUsageRecord,
+    Promotion,
+    PromotionProduct,
+    UserCoupon,
+)
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
-from app.modules.payment.models import Payment
+from app.modules.payment.models import Payment, PaymentCallback
 from app.shared.db.base import utc_now
 from app.shared.db.models.idempotency import IdempotencyRecord
 from app.shared.db.models.outbox import OutboxMessage
@@ -392,6 +399,13 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
     factory = get_session_factory()
     sku_ids = tuple(created.get("sku_ids") or ())
     with factory() as session:
+        session.execute(
+            delete(CouponUsageRecord).where(CouponUsageRecord.merchant_id == created["merchant_id"])
+        )
+        session.execute(delete(UserCoupon).where(UserCoupon.merchant_id == created["merchant_id"]))
+        session.execute(
+            delete(CouponTemplate).where(CouponTemplate.merchant_id == created["merchant_id"])
+        )
         order_ids = [
             int(row)
             for row in session.execute(
@@ -401,6 +415,19 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
             .all()
         ]
         if order_ids:
+            fulfillment_ids = list(
+                session.execute(
+                    select(Fulfillment.id).where(Fulfillment.order_id.in_(order_ids))
+                ).scalars()
+            )
+            if fulfillment_ids:
+                session.execute(
+                    delete(FulfillmentItem).where(FulfillmentItem.fulfillment_id.in_(fulfillment_ids))
+                )
+                session.execute(delete(Fulfillment).where(Fulfillment.id.in_(fulfillment_ids)))
+            session.execute(
+                delete(PaymentCallback).where(PaymentCallback.merchant_id == created["merchant_id"])
+            )
             session.execute(delete(Payment).where(Payment.order_id.in_(order_ids)))
             session.execute(delete(OrderStatusLog).where(OrderStatusLog.order_id.in_(order_ids)))
             session.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))

@@ -52,11 +52,26 @@ function mountView() {
 
 /** Fill the coupon form with a valid payload. */
 async function fillForm(wrapper: ReturnType<typeof mountView>): Promise<void> {
-  const inputs = wrapper.findAll('.marketing__fields input')
-  await inputs[0]?.setValue('NOVA100')
-  await inputs[1]?.setValue('满 1000 减 10')
-  await inputs[2]?.setValue('10')
-  await inputs[3]?.setValue('1000')
+  await wrapper.find('.marketing__fields input').setValue('满 1000 减 10')
+  const money = wrapper.findAll('.marketing__fields input[inputmode="decimal"]')
+  await money.at(0)?.setValue('10')
+  await money.at(1)?.setValue('1000')
+  const dates = wrapper.findAll('.marketing__fields input[type="datetime-local"]')
+  await dates.at(0)?.setValue('2026-10-01T00:00')
+  await dates.at(1)?.setValue('2026-10-31T23:59')
+}
+
+function couponPreview(token: string, warnings: string[] = []) {
+  return {
+    preview_token: token,
+    estimated_impact: {
+      affected_sku_count: 3,
+      affected_order_count_30d: 0,
+      estimated_issue_count: 0,
+      estimated_discount_amount: 0,
+    },
+    warnings,
+  }
 }
 
 async function findButton(wrapper: ReturnType<typeof mountView>, label: string) {
@@ -85,7 +100,7 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
   })
 
   it('预览 calls the PREVIEW endpoint and still writes nothing', async () => {
-    previewCouponMock.mockResolvedValue({ preview_token: 'tok-1' })
+    previewCouponMock.mockResolvedValue(couponPreview('tok-1'))
 
     const wrapper = mountView()
     await flushPromises()
@@ -104,8 +119,8 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
   })
 
   it('确认提交 carries the preview_token the server returned', async () => {
-    previewCouponMock.mockResolvedValue({ preview_token: 'tok-abc' })
-    createCouponMock.mockResolvedValue({ id: '1', code: 'NOVA100' })
+    previewCouponMock.mockResolvedValue(couponPreview('tok-abc'))
+    createCouponMock.mockResolvedValue({ id: 1, template_no: 'NVC20260924000001' })
 
     const wrapper = mountView()
     await flushPromises()
@@ -121,15 +136,14 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
     const payload = createCouponMock.mock.calls[0]?.[0] as Record<string, unknown>
     // THE GUARANTEE: the write is bound to the approval the operator just saw.
     expect(payload.preview_token).toBe('tok-abc')
-    expect(payload.code).toBe('NOVA100')
+    expect(payload.coupon_type).toBe('FIXED_AMOUNT')
+    expect(payload.face_value_amount).toBe(1000)
+    expect(payload.total_quota).toBe(1000)
   })
 
   it('renders the SERVER preview warnings instead of swallowing them', async () => {
     // A preview that cannot disagree with the form would not be worth a round trip.
-    previewCouponMock.mockResolvedValue({
-      preview_token: 'tok-2',
-      warnings: ['该券码已存在，将被覆盖'],
-    })
+    previewCouponMock.mockResolvedValue(couponPreview('tok-2', ['预估未计入活动叠加']))
 
     const wrapper = mountView()
     await flushPromises()
@@ -139,7 +153,7 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
     ;(await findButton(wrapper, '预览'))?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('该券码已存在，将被覆盖')
+    expect(wrapper.text()).toContain('预估未计入活动叠加')
   })
 
   it('a preview failure surfaces an error and does NOT advance to the confirm step', async () => {
@@ -172,7 +186,7 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
   })
 
   it('editing after a preview DISCARDS the approval, so a stale token cannot be reused', async () => {
-    previewCouponMock.mockResolvedValue({ preview_token: 'tok-stale' })
+    previewCouponMock.mockResolvedValue(couponPreview('tok-stale'))
 
     const wrapper = mountView()
     await flushPromises()
@@ -185,8 +199,8 @@ describe('console Marketing — coupon creation is preview then confirm (§47, �
     // Go back and change a value, then return to the review step.
     ;(await findButton(wrapper, '返回修改'))?.trigger('click')
     await flushPromises()
-    const inputs = wrapper.findAll('.marketing__fields input')
-    await inputs[2]?.setValue('99')
+    const money = wrapper.findAll('.marketing__fields input[inputmode="decimal"]')
+    await money.at(0)?.setValue('99')
 
     // The confirm button is gone because the server preview was invalidated with the edit.
     expect(wrapper.text()).not.toContain('确认提交')

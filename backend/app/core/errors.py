@@ -634,6 +634,7 @@ CouponNotApplicableError = _error("Coupon is not applicable to this order", Erro
 CouponExpiredError = _error("Coupon has expired", ErrorCode.COUPON_EXPIRED, http_status=409)
 CouponAlreadyUsedError = _error("Coupon has already been used", ErrorCode.COUPON_ALREADY_USED, http_status=409)
 CouponAlreadyLockedError = _error("Coupon is locked by another order", ErrorCode.COUPON_ALREADY_LOCKED, http_status=409)
+CouponThresholdNotMetError = _error("Coupon threshold is not met", ErrorCode.COUPON_THRESHOLD_NOT_MET, http_status=409)
 
 # -- knowledge / RAG --------------------------------------------------------
 DocumentNotFoundError = _error("Document not found", ErrorCode.DOCUMENT_NOT_FOUND, http_status=404)

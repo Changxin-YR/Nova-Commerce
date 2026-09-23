@@ -9,16 +9,17 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
   for the current local lead over `origin/main`. No commits from this
   continuation have been pushed.
-- Backend: `python -m pytest tests -q` from `backend/` passed **1147 tests**
-  before the final scope-validation case was added; its four promotion integration
-  tests then passed. One upstream Starlette/AnyIO deprecation warning remains.
+- Backend: `python -m pytest tests -q` from `backend/` passed **1156 tests**;
+  the eight coupon integration tests passed again after the last service changes.
+  One upstream Starlette/AnyIO deprecation warning remains.
   `ruff check --no-cache backend/app backend/tests backend/migrations` passed.
-- Schema: Alembic head is `40c9914d7367`; `alembic check` found no drift.
-  The order expiry index and promotion checks, unique indexes, and foreign keys
-  were read back from MySQL.
+- Schema: Alembic head is `f0d29969cfb5`; `alembic check` found no drift.
+  The coupon amount columns were read back as BIGINT, and all coupon checks,
+  indexes, and foreign keys were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
-- Frontend: the recorded FG-03 build passed; FG-20 has 292 Vitest cases and
-  FG-21 has 5 Playwright shell cases. These are version-bound in their artifacts.
+- Frontend: current typecheck and production build pass, with **294 Vitest
+  cases**. The prior FG-03/20/21 artifacts are version-bound and must be
+  refreshed after this increment.
 - `FINAL_GATE.md` currently shows **9 PASS, 17 MISSING**, overall
   **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
   index, not a claim that the whole product is complete.
@@ -50,20 +51,29 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    promotion quota within its transaction. Real MySQL tests cover the HTTP
    routes, token replay and tampering, scope ownership, pricing, and two
    concurrent orders competing for the last quota slot.
+6. Coupon templates, customer coupons, and usage records now persist with
+   merchant scope, quota checks, a payload-bound preview token, and database
+   constraints. Console preview/create/publish/unpublish/list, customer
+   claim/mine, and order preview/create/cancel, expiry worker, and verified
+   payment settlement are connected. A coupon locks with its order, is marked
+   used only after verified settlement, and is released on cancellation.
+   Eight MySQL integration tests cover token replay, concurrency, quota,
+   threshold, rollback, payment, HTTP routes, and expiry.
+7. The checkout view now sends `items` and `coupon_id` per API_CONTRACT §14,
+   and renders the server's separate promotion and coupon amounts. Two view
+   tests assert the preview and create payloads.
 
 ## Remaining work, in execution order
 
-1. **Phase 6 Marketing** (`REQ-MKT-002` through `004`): implement coupon
-   templates, owned coupons and usage records with concurrent lock-on-order,
-   use-on-payment, release-on-cancel. Promotion stacking policy and quota
-   release on cancellation still need explicit business rules before extending
-   the first single-promotion implementation. The pricing value objects and
-   `PricingRules` seam already exist.
+1. **Phase 6 Marketing**: coupon core is implemented. The storefront still
+   needs a customer coupon discovery/claim surface; promotion stacking policy
+   and quota release on cancellation need explicit business rules before
+   extending the first single-promotion implementation.
 2. **Phase 6 Analytics**: backend metric queries and frozen admin API responses
    are absent. The frontend's marketing/analytics views are present but do not
    prove their backend paths work.
-3. **§50 reconciliation**: coupon expiry, expired pending actions, and knowledge
-   ingestion recovery remain. Outbox retry and expired-order closure are now
+3. **§50 reconciliation**: expired pending actions and knowledge ingestion
+   recovery remain. Outbox retry, expired-order closure, and coupon expiry are
    scheduled. The expired-order batch currently stops on a failed order and a
    consistently failing earliest batch can delay later orders; add per-row
    failure accounting and scan progress when operational policy is defined.
@@ -78,15 +88,16 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 6. **Remote sync**: all continuation commits remain local. Push only after the
    intended branch/review path is settled. Re-run affected evidence after each
    watched source change and regenerate `FINAL_GATE.md` at the end.
+7. **Frontend contract audit**: API_CONTRACT §14.1 freezes the cart as local
+   Pinia selection, but the current store still calls an absent `/cart`
+   backend router. The catalog customer API is also absent. These are actual
+   live checkout blockers despite the frontend compile and view tests passing;
+   implement the local cart and missing catalog API before claiming a browser
+   purchase flow.
 
 ## Next code entry point
 
-Promotion persistence and order integration are in progress on this branch.
-After they are committed and their watched gate evidence is refreshed, continue
-with `CouponRule` in `backend/app/modules/pricing/value_objects.py`, the
-`validate_coupon_input` guard and pricing seams in
-`backend/app/modules/order/workflow.py` and `backend/app/modules/order/service.py`,
-the payment settlement and order cancellation paths, and API_CONTRACT §13.3.
-A selected `coupon_id` currently returns `COUPON_NOT_FOUND (90004)` rather
-than silently charging full price; the real resolver must retain that behavior
-for missing, foreign, expired, or already locked coupons.
+After the source commit, refresh all source-watched gate artifacts and regenerate
+`FINAL_GATE.md`. Next implement the local cart contract (§14.1), then the
+missing customer catalog API and an end-to-end checkout browser case. Phase 6
+Analytics remains a separate backend and gate increment.

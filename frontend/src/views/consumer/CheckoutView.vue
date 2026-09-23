@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * Checkout — the highest-stakes page, so every number on it is SERVER-COMPUTED:
- * `items_amount`, `discount_amount`, `shipping_amount`, `payable_amount` all come from
+ * `original_amount`, `promotion_discount_amount`, `coupon_discount_amount`,
+ * `shipping_amount`, `payable_amount` all come from
  * `POST /orders/preview`. This page never adds, subtracts or rounds money; `<PriceText>`
  * only formats. The amount panel lists each line separately (商品金额 / 促销优惠 / 优惠券 /
  * 运费 / 应付) because a shopper must be able to audit the total.
@@ -11,7 +12,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { addressApi, orderApi, paymentApi } from '@/api'
+import { addressApi, marketingApi, orderApi, paymentApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useCartStore } from '@/stores/cart'
 import { useNotificationStore } from '@/stores/notification'
@@ -19,13 +20,15 @@ import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
 import PriceText from '@/components/ui/PriceText.vue'
+import type { OwnedCoupon } from '@/api/marketing'
 
 const router = useRouter()
 const cart = useCartStore()
 const notifications = useNotificationStore()
 
 const selectedAddressId = ref('')
-const couponCode = ref('')
+const selectedCouponId = ref('')
+const ownedCoupons = ref<OwnedCoupon[]>([])
 const remark = ref('')
 /** Our own payment-channel labels; the mock channel drives the server callback path. */
 const channel = ref<'MOCK' | 'ALIPAY' | 'WECHAT'>('MOCK')
@@ -41,9 +44,21 @@ const {
   status: addressStatus,
   error: addressError,
   execute: loadAddresses,
-} = useAsyncState(() => addressApi.list(), { immediate: true })
+} = useAsyncState(() => addressApi.list(), { immediate: false })
 
 const addressList = computed(() => addresses.value ?? [])
+const availableCoupons = computed(() => {
+  const now = Date.now()
+  return ownedCoupons.value.filter((coupon) =>
+    coupon.status === 'UNUSED' &&
+    new Date(coupon.valid_from).getTime() <= now &&
+    new Date(coupon.valid_to).getTime() > now,
+  )
+})
+const orderItems = computed(() => cart.selectedItems.map((item) => ({
+  sku_id: Number(item.sku_id),
+  quantity: item.quantity,
+})))
 
 const {
   data: preview,
@@ -53,9 +68,9 @@ const {
 } = useAsyncState(
   () =>
     orderApi.preview({
-      source: 'cart',
-      address_id: selectedAddressId.value || undefined,
-      coupon_code: couponCode.value || undefined,
+      items: orderItems.value,
+      address_id: selectedAddressId.value ? Number(selectedAddressId.value) : undefined,
+      coupon_id: selectedCouponId.value ? Number(selectedCouponId.value) : undefined,
     }),
   { immediate: false },
 )
@@ -64,13 +79,26 @@ const submitting = ref(false)
 /** One idempotency key per checkout attempt; regenerated only after success. */
 const clientRequestId = ref(newTraceId())
 const idempotencyKey = computed(() => `order-${clientRequestId.value}`)
+const pageStatus = computed(() => cart.error ? 'error' : orderItems.value.length === 0 ? 'empty' : previewStatus.value)
+const pageError = computed(() => cart.error ?? previewError.value)
+
+async function refreshPage(): Promise<void> {
+  try {
+    await cart.load()
+  } catch {
+    return
+  }
+  await Promise.all([
+    loadAddresses(),
+    marketingApi.myCoupons().then((coupons) => { ownedCoupons.value = coupons }).catch(() => undefined),
+  ])
+  const preferred = addressList.value.find((a) => a.is_default) ?? addressList.value[0]
+  if (preferred && !selectedAddressId.value) selectedAddressId.value = preferred.id
+  if (orderItems.value.length > 0) await loadPreview()
+}
 
 onMounted(async () => {
-  if (cart.isEmpty) await cart.load().catch(() => undefined)
-  await loadAddresses()
-  const preferred = addressList.value.find((a) => a.is_default) ?? addressList.value[0]
-  if (preferred) selectedAddressId.value = preferred.id
-  await loadPreview()
+  await refreshPage()
 })
 
 async function createOrder(): Promise<void> {
@@ -78,13 +106,17 @@ async function createOrder(): Promise<void> {
     notifications.warning('请先选择收货地址')
     return
   }
+  if (orderItems.value.length === 0) {
+    notifications.warning('请先选择商品')
+    return
+  }
   submitting.value = true
   try {
     const order = await orderApi.create({
-      address_id: selectedAddressId.value,
+      address_id: Number(selectedAddressId.value),
       client_request_id: idempotencyKey.value,
-      source: 'cart',
-      coupon_code: couponCode.value || undefined,
+      items: orderItems.value,
+      coupon_id: selectedCouponId.value ? Number(selectedCouponId.value) : undefined,
       remark: remark.value || undefined,
     })
 
@@ -114,7 +146,7 @@ async function createOrder(): Promise<void> {
     <div class="nx-container">
       <h1 class="checkout__page-title">确认订单</h1>
 
-      <StateView :state="previewStatus" :error="previewError" @retry="loadPreview()">
+      <StateView :state="pageStatus" :error="pageError" :description="pageStatus === 'empty' ? '请先在购物车选择要结算的商品。' : undefined" @retry="refreshPage()">
         <!-- step 1: address ------------------------------------------------- -->
         <section class="nx-block checkout__step">
           <div class="nx-block__head">
@@ -174,7 +206,7 @@ async function createOrder(): Promise<void> {
                 class="checkout__channel"
                 :class="{ 'checkout__channel--active': channel === item.value }"
               >
-                <input v-model="channel" type="radio" name="channel" :value="item.value" />
+                <input v-model="channel" type="radio" name="channel" :value="item.value" :disabled="item.value !== 'MOCK'" />
                 <span>
                   <b>{{ item.label }}</b>
                   <em class="nx-muted">{{ item.hint }}</em>
@@ -201,19 +233,19 @@ async function createOrder(): Promise<void> {
 
             <div v-for="(item, index) in preview?.items ?? []" :key="`${item.sku_id}-${index}`" class="checkout__trow">
               <div class="checkout__td checkout__td--product">
-                <img v-if="item.cover_url" :src="item.cover_url" :alt="item.product_title" class="checkout__thumb" />
+                <img v-if="item.image_url" :src="item.image_url" :alt="item.product_name" class="checkout__thumb" />
                 <span v-else class="checkout__thumb checkout__thumb--empty" aria-hidden="true">暂无图片</span>
                 <span class="checkout__product-info">
-                  <b>{{ item.product_title }}</b>
-                  <em class="nx-muted">{{ Object.values(item.sku_specs).join(' / ') }}</em>
+                  <b>{{ item.product_name }}</b>
+                  <em class="nx-muted">{{ item.sku_name }}</em>
                 </span>
               </div>
               <span class="checkout__td checkout__td--num">
-                <PriceText :amount="item.unit_price_amount" size="sm" muted />
+                <PriceText :amount="item.unit_price" size="sm" muted />
               </span>
               <span class="checkout__td checkout__td--num">× {{ item.quantity }}</span>
               <span class="checkout__td checkout__td--num">
-                <PriceText :amount="item.subtotal_amount" size="sm" />
+                <PriceText :amount="item.payable_amount" size="sm" />
               </span>
             </div>
           </div>
@@ -221,13 +253,16 @@ async function createOrder(): Promise<void> {
           <div class="nx-block__body checkout__extras">
             <label class="checkout__extra">
               <span class="checkout__extra-label">优惠券</span>
-              <input v-model="couponCode" class="nx-input checkout__coupon" placeholder="输入优惠券码后重新计价" />
-              <button type="button" class="nx-btn nx-btn--sm" @click="loadPreview()">使用</button>
+              <select v-model="selectedCouponId" class="nx-input checkout__coupon" @change="loadPreview()">
+                <option value="">不使用优惠券</option>
+                <option v-for="coupon in availableCoupons" :key="coupon.id" :value="String(coupon.id)">
+                  优惠券 #{{ coupon.id }} · 有效期至 {{ new Date(coupon.valid_to).toLocaleDateString('zh-CN') }}
+                </option>
+              </select>
             </label>
 
-            <p v-if="preview?.coupon" class="checkout__coupon-ok">
-              已使用「{{ preview.coupon.name }}」，抵扣
-              <PriceText :amount="preview.coupon.discount_amount" size="sm" />
+            <p v-if="selectedCouponId && preview?.coupon_discount_amount" class="checkout__coupon-ok">
+              已使用优惠券，抵扣 <PriceText :amount="preview.coupon_discount_amount" size="sm" />
             </p>
 
             <label class="checkout__extra">
@@ -254,13 +289,17 @@ async function createOrder(): Promise<void> {
             <dl class="nx-rows checkout__amounts">
               <div>
                 <dt>商品金额</dt>
-                <dd><PriceText :amount="preview?.items_amount ?? 0" size="sm" muted /></dd>
+                <dd><PriceText :amount="preview?.original_amount ?? 0" size="sm" muted /></dd>
               </div>
               <div>
                 <dt>促销优惠</dt>
                 <dd>
-                  −<PriceText :amount="preview?.discount_amount ?? 0" size="sm" muted />
+                  −<PriceText :amount="preview?.promotion_discount_amount ?? 0" size="sm" muted />
                 </dd>
+              </div>
+              <div>
+                <dt>优惠券</dt>
+                <dd>−<PriceText :amount="preview?.coupon_discount_amount ?? 0" size="sm" muted /></dd>
               </div>
               <div>
                 <dt>运费</dt>
