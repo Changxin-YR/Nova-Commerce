@@ -37,6 +37,11 @@ export default defineConfig({
       },
     },
   },  server: {
+    // Bind IPv4 loopback EXPLICITLY. Vite 8 resolves the default `localhost` to `::1`
+    // only, so anything that talks to `127.0.0.1:5173` (curl, Playwright, a
+    // container-to-host call) gets ECONNREFUSED. It also keeps the dev server off the
+    // LAN, which matters because the API proxy does not enforce HTTPS locally.
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
     proxy: {

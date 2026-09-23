@@ -217,15 +217,21 @@ router.beforeEach(async (to) => {
   if (!auth.bootstrapped) await auth.bootstrap()
 
   // --- UX-ONLY GATE (the backend is the real authority, §104) --------------
+  // Everything below decides what to RENDER, never what is ALLOWED. A user who edits
+  // the URL or replays the request with curl reaches the API exactly the same way; the
+  // server then answers FORBIDDEN (20008) / INSUFFICIENT_PERMISSION (20009) /
+  // DATA_SCOPE_VIOLATION (20010). Do not move an authorization decision into this file.
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   if (to.meta.console) {
-    // Hide the console from accounts without a console role. The API still enforces
-    // scope on every console request.
+    // UX only (§104): hides the console from accounts without a console role. The API
+    // still enforces merchant scope on every console request.
     if (!permission.canAccessConsole) return { name: 'forbidden' }
 
+    // UX only (§104): hides a page the account has no permission code for. The same
+    // GET/POST replayed directly still returns FORBIDDEN from the server.
     const required = to.meta.permission
     if (typeof required === 'string' && permission.loaded && !permission.hasAny([required])) {
       return { name: 'forbidden' }

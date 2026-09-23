@@ -257,7 +257,12 @@ dependency_versions:
   frontend:
     vue: "3.5.43"
     vite: "8.3.0"
-    typescript: "7.0.2"
+    # TS 7 (the Go-based compiler line) restructured its package exports and no
+    # longer exposes ./lib/tsc, which vue-tsc 3.3.11 resolves directly. Verified
+    # against the npm registry: 7.0.2 exports only ".", "./unstable/*" and
+    # "./package.json"; 6.0.3 declares no `exports` field, so file-path
+    # resolution still works. 6.0.3 is therefore the correct pin.
+    typescript: "6.0.3"
     vue-tsc: "3.3.11"
     vue-router: "5.3.1"
     pinia: "4.0.3"
@@ -268,6 +273,26 @@ dependency_versions:
     "@vue/test-utils": "2.5.1"
     "@playwright/test": "1.63.0"
     "@vitejs/plugin-vue": "6.0.9"
+  frontend_verified_constraints:
+    note: >
+      Discovered by actually building the app, not by reading release notes. Each
+      entry cost a real failed command.
+    vite_8_is_rolldown: >
+      Vite 8 builds with rolldown. The object form of `build.rollupOptions.output.manualChunks`
+      is removed and fails with "Expected Function but received Object"; the replacement is
+      `build.rolldownOptions.output.codeSplitting.groups`.
+    tsconfig_baseUrl_removed: >
+      `baseUrl` is a hard error (TS5101) from TS 6 onward. Paths are now tsconfig-relative.
+    dev_server_ipv6_only: >
+      The Vite dev server bound only to [::1]:5173, so 127.0.0.1 refused the connection -
+      which would break Playwright, curl and anything containerised. Pinned `server.host`
+      to 127.0.0.1, which also keeps the dev server off the LAN.
+    openapi_typescript_peer: >
+      openapi-typescript peers typescript ^5.x, so it stays out of package.json and runs
+      via `npm run gen:api` against the live backend.
+    backend_openapi_path: >
+      The backend mounts OpenAPI at /api/openapi.json (not the FastAPI default
+      /openapi.json). Everything that consumes it must use the real path.
     sass: "1.105.0"
     openapi-typescript: "7.13.0"
 
@@ -985,10 +1010,15 @@ open_items:
     detail: "Passing the legacy flag aborts startup (MY-000067)."
     action_taken: "Omit the flag; use utf8mb4 server defaults. Recorded in baseline smoke evidence."
   - id: RISK-005
-    severity: MEDIUM
+    severity: RESOLVED
     title: "Frontend toolchain is far newer than common references"
-    detail: "TypeScript 7.x, Vite 8.x, Pinia 4.x, vue-router 5.x, ECharts 6.x, vitest 5.x."
-    action_taken: "Build against installed versions; verify with vue-tsc + vite build before adding features."
+    detail: >
+      Confirmed real, not theoretical: TS 7 is incompatible with vue-tsc, Vite 8
+      replaced manualChunks, baseUrl is a hard error, and the dev server bound to
+      IPv6 only. Every one of these was hit during an actual build.
+    action_taken: >
+      Fixed and pinned; see dependency_versions.frontend_verified_constraints.
+      typecheck + build + vitest + eslint + playwright all exit 0.
   - id: RISK-006
     severity: INFO
     title: "Git push credentials unverified"

@@ -91,3 +91,12 @@ desktop.ini
 # project source - it changes on every message and would flood the history.
 # ---------------------------------------------------------------------------
 .agent-teams/
+
+# ---------------------------------------------------------------------------
+# Agent-host runtime state. The Codex host writes its own build cache, queue and
+# session databases into artifacts/. They are tool state, not project artefacts,
+# and must never be committed. Ignored rather than deleted: an open SQLite
+# database should not be removed from under a running process.
+# ---------------------------------------------------------------------------
+artifacts/codex-*/
+=ro
