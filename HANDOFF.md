@@ -1167,7 +1167,46 @@ say what changes - do not "tidy" it.
   meta-control belongs on a table the test owns outright.
 * **Mock payment surfaces are `{dev, test}` only.** `AppEnv` has no `demo` member.
 
-### 18.7 First commands for the new conversation
+### 18.7a Deferred prose refinements (small, non-blocking, captured before the session ended)
+
+These were agreed by their authors but only recorded in messages, so they are written
+here rather than lost with the conversation. Each is a documentation edit to a
+per-member handoff; none changes behaviour.
+
+1. **`docs/handoff/phase5-payment-workflow.md`** - add the second half of the
+   measurement rule: *a scoped query is evidence about the **scope**, not about the
+   table.* "My fixtures left nothing" and "the table is clean" are different claims, and
+   a flat reading only means something against a state in which it could have differed
+   (a `0` beside a `0` proves nothing; the same scope reading `0` while the table held
+   `109` does).
+2. **Same file** - add: *assert the **property** ("my rows are gone"), never the
+   **implementation** ("my purge ran")*, because a purge that runs and deletes nothing
+   passes an implementation assertion and fails a property assertion. That was the exact
+   bug in the seed's `LIKE '<marker>%'` against `evt-<marker>-...`.
+3. **Same file** - tighten the `providers.py` docstring. It claims the marker/`key` count
+   is pinned so *additions* are visible, but the mutation check showed the test also
+   catches a **removal** (`marker list -1` fails). The claim is accurate but understated,
+   and an understated guard is one somebody later deletes as weaker than it is.
+4. **`docs/handoff/phase5-after-sales.md`** (`f4a2ade`, later corrected at `ecf361f`) -
+   note the forward obligation: if a future edit makes the refund or claim path write
+   `payment_callbacks`, the teardown obligation arrives with it. Their fixtures write no
+   callbacks today, which is why nothing leaks; that is a current fact, not a property,
+   and a correctness argument that holds only because of a fact elsewhere is a latent
+   bug.
+5. **`scripts/residue.py`** - see 18.5 item 4: add the parent-with-missing-child check.
+   The query is written out there.
+
+Two habits worth carrying, both offered by their authors because each could see the
+other's blind spot and not their own:
+
+* **A mutation proves a test is capable of failing; a collection check only proves it
+  ran.** A suite can be complete and still be insensitive.
+* **Cross-read prose, not just tests.** Four defects this phase were statements about
+  one module living inside another module's file - an author is systematically blind to
+  the category they are standing inside, and a reviewer reading the text *to use the
+  interface* is not.
+
+### 18.8 First commands for the new conversation
 
 ```powershell
 cd C:\Users\27363\Desktop\store
