@@ -5,15 +5,15 @@
   "spec": "REQ-PAY-004 / section 44 - a duplicate callback produces exactly one business effect: one payment confirm, one inventory effect, one fulfillment, no duplicate outbox side effect; mandatory condition 2 of section 147",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/concurrency/test_payment_idempotency.py -v --no-header -p no:cacheprovider -m concurrency",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T10:50:25.846784+00:00",
-  "duration_ms": 3996,
+  "timestamp": "2026-09-23T10:55:08.738920+00:00",
+  "duration_ms": 3731,
   "exit_code": 0,
-  "summary": "11 passed in 2.31s",
+  "summary": "11 passed in 2.19s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "e917503dbe3d69ae66d099a401f7303ae1e66187\n",
-    "subject": "Final sku_id ruling: the column stays; handoff section 7 rewritten, baseline reading recorded\n",
+    "revision": "039b917649140f22c67bda07043b1c23e7dd1f74\n",
+    "subject": "Handoff: a row-count delta over a shared DB is not evidence; scoped queries are\n",
     "relevant_paths": [
       "backend/app/core",
       "backend/app/shared",
@@ -29,8 +29,10 @@
     ],
     "relevant_paths_dirty": false,
     "relevant_paths_dirty_files": [],
-    "other_paths_dirty": false,
-    "other_paths_dirty_files": []
+    "other_paths_dirty": true,
+    "other_paths_dirty_files": [
+      " M docs/handoff/phase5-after-sales.md"
+    ]
   },
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
