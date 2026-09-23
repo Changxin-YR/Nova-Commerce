@@ -517,6 +517,18 @@ def _purge(gate: Gate) -> None:
         ("DELETE FROM fulfillments WHERE order_id = :order_id", {"order_id": gate.order_id}),
         ("DELETE FROM inventory_movements WHERE sku_id IN (:sku0, :sku1)",
          {"sku0": gate.sku_ids[0], "sku1": gate.sku_ids[1]}),
+        # Callbacks are deleted by **marker**, not only by order_no. A refused delivery
+        # resolves no payment, so `order_no` is legitimately NULL on it (design 5.2 keeps
+        # that nullable precisely so an unresolvable event stays recordable) - which means an
+        # order_no-scoped delete silently misses every refusal-path row. Measured: each run
+        # of this file left ~19 rows behind, and because `payment_callbacks` carries no FK to
+        # `payments`, nothing ever removed them. The marker is unique per fixture instance
+        # (`uuid4`-derived), and every event id this file builds embeds it, so the LIKE cannot
+        # reach a neighbouring test's rows.
+        (
+            "DELETE FROM payment_callbacks WHERE provider_event_id LIKE :event_pattern",
+            {"event_pattern": f"%{gate.marker}%"},
+        ),
         ("DELETE FROM payment_callbacks WHERE order_no = :order_no",
          {"order_no": gate.order_no}),
         ("DELETE FROM payments WHERE order_id = :order_id", {"order_id": gate.order_id}),
@@ -589,6 +601,15 @@ def _purge_orphan_marker(marker: str) -> None:
                 text("SELECT COUNT(*) FROM orders WHERE merchant_id = :m"), {"m": merchant_id}
             ).scalar()
             if int(has_orders or 0) == 0:
+                # A failed attempt may also have claimed a callback row before it died. The
+                # event ids and the merchant code both embed the marker, so this is exact.
+                session.execute(
+                    text(
+                        "DELETE FROM payment_callbacks "
+                        "WHERE merchant_id = :m OR provider_event_id LIKE :event_pattern"
+                    ),
+                    {"m": merchant_id, "event_pattern": f"%{marker}%"},
+                )
                 session.execute(
                     text("DELETE FROM merchants WHERE id = :m"), {"m": merchant_id}
                 )

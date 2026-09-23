@@ -45,7 +45,7 @@ from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.order.enums import OrderStatus, PaymentStatus
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.modules.payment.enums import PaymentChannel, PaymentRecordStatus
-from app.modules.payment.models import Payment, PaymentCallback
+from app.modules.payment.models import Payment
 from app.shared.db.base import utc_now
 from app.shared.db.session import configure_database, get_session_factory
 
@@ -395,7 +395,28 @@ def _purge(shop: Shop) -> None:
         session.execute(
             delete(InventoryMovement).where(InventoryMovement.sku_id.in_(shop.sku_ids))
         )
-        session.execute(delete(PaymentCallback).where(PaymentCallback.merchant_id == shop.merchant_id))
+        # Callbacks are deleted by **event-id pattern**, not only by merchant_id. A refused
+        # delivery (forged signature, stale timestamp, unknown payment) resolves no payment,
+        # so its `order_no` and `merchant_id` are both NULL - which means a merchant-scoped
+        # delete silently misses exactly the rows an incident review would want removed.
+        # Measured: 4 rows leaked per run. Every event id this suite builds embeds the
+        # fixture marker (`http-<marker>-*`) and the mock-pay route embeds the payment_no, so
+        # both patterns are exact, and `payment_callbacks` carries no FK to `payments`
+        # (design 5.2) that would otherwise cascade.
+        session.execute(
+            text(
+                "DELETE FROM payment_callbacks "
+                "WHERE provider_event_id LIKE :evt_pattern "
+                "OR provider_event_id LIKE :mock_pattern "
+                "OR merchant_id = :merchant_id OR order_no = :order_no"
+            ),
+            {
+                "evt_pattern": f"%{shop.marker}%",
+                "mock_pattern": f"mock-{shop.payment_no}%",
+                "merchant_id": shop.merchant_id,
+                "order_no": shop.order_no,
+            },
+        )
         session.execute(delete(Payment).where(Payment.order_id == shop.order_id))
         session.execute(
             text(
