@@ -43,6 +43,7 @@ reached through a different door.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -56,6 +57,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.fulfillment.enums import CARRIER_CODES
 from app.modules.order.enums import FULFILLMENT_STATUSES, FulfillmentStatus
+from app.modules.order.models import OrderItem
 from app.shared.db.base import (
     Base,
     MerchantScopedMixin,
@@ -81,6 +83,33 @@ def _sql_vocabulary(values: tuple[str, ...]) -> str:
     rendered = ",".join(f"'{value}'" for value in values)
     return f"({rendered})"
 
+
+def _sku_id_for_insert(context: Any) -> int | None:
+    """Resolve ``sku_id`` from the order line a ``fulfillment_items`` row is inserted against.
+
+    A column ``default`` rather than a required argument, and that is a deliberate,
+    temporary accommodation. ``sku_id`` is ``NOT NULL``, and the two writers of this
+    table - ``FulfillmentService.create_shell`` and ``_create_residual_package`` - live
+    in another module and did not yet set it, so making the column mandatory in the
+    schema alone broke every package insert with ``IntegrityError (1048)``. This default
+    keeps the column correct **and** the write path working in one step, rather than
+    leaving the shared branch broken while two files are edited in lockstep.
+
+    It costs one ``SELECT`` per inserted line, which is the price of not duplicating the
+    value at every call site. When a caller passes ``sku_id`` explicitly this default is
+    not consulted at all, so removing it later is behaviour-neutral - the intent is that
+    it goes away once the ship path sets the column itself, which is tracked.
+
+    Returns ``None`` when it cannot resolve, letting the database raise its own
+    ``NOT NULL`` error rather than inventing a value here.
+    """
+    params = getattr(context, "get_current_parameters", lambda: {})() or {}
+    order_item_id = params.get("order_item_id")
+    session = getattr(context, "session", None)
+    if order_item_id is None or session is None:
+        return None
+    order_item = session.get(OrderItem, order_item_id)
+    return None if order_item is None else int(order_item.sku_id)
 
 class Fulfillment(Base, PkMixin, TimestampMixin, MerchantScopedMixin):
     """One package: the record that goods left the building (REQ-FUL-001).
@@ -297,6 +326,7 @@ class FulfillmentItem(Base, PkMixin, TimestampMixin):
         BigIntUnsigned,
         ForeignKey("product_skus.id", ondelete="RESTRICT"),
         nullable=False,
+        default=_sku_id_for_insert,
         doc="The ordered line's SKU, snapshotted at shipping time (INV-014).",
     )
 
