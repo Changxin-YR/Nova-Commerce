@@ -51,6 +51,7 @@ from datetime import UTC
 
 import pytest
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import ValidationError
@@ -113,11 +114,84 @@ AFTER_SALES_PERMISSIONS: tuple[str, ...] = (
 )
 
 
+def _resolve_permission(session: Session, roles: RoleRepository, code: str) -> Permission:
+    """The permission row for ``code``, created if it does not exist - **race-tolerantly**.
+
+    ``permissions`` is *global vocabulary* keyed by a unique ``code``, and more than one thing
+    creates these rows (the shared seed, this fixture, and any other suite's fixture). A plain
+    ``SELECT``-then-``INSERT`` is a check-then-act race: if another session commits the same code
+    between the two, the ``SELECT`` misses and the ``INSERT`` raises 1062 - which is exactly the
+    intermittency this suite showed before it was fixed.
+
+    So the insert is **attempted** and a unique violation is read as "somebody else won". This is
+    the same rule the project applies to idempotency keys (``HANDOFF.md`` section 6, and
+    ``IdempotencyRepository.insert_in_progress``): let the database make the decision atomically.
+    The attempt sits inside a ``SAVEPOINT`` because SQLAlchemy marks the session as needing a
+    rollback after an ``IntegrityError``, so without it the follow-up re-read would raise
+    ``PendingRollbackError`` instead of returning the winner's row.
+    """
+    existing = roles.get_permission_by_code(code)
+    if existing is not None:
+        return existing
+
+    resource, _, action = code.partition(":")
+    try:
+        with session.begin_nested():
+            created = roles.add_permission(
+                Permission(
+                    code=code,
+                    resource=resource,
+                    action=action,
+                    description="Phase 5 after-sales fixture",
+                )
+            )
+        return created
+    except IntegrityError:
+        # Lost the race: the winner's row is committed, so read it back.
+        won = roles.get_permission_by_code(code)
+        if won is None:  # pragma: no cover - the unique index implies it is there
+            raise
+        return won
+
+
+def _grant_if_absent(
+    session: Session, roles: RoleRepository, *, role_id: int, permission_id: int
+) -> None:
+    """Grant a permission to a role, tolerating the pair already being granted.
+
+    ``RoleRepository.grant_permission`` inserts unconditionally, so granting a pair that is
+    already there raises a duplicate-key error rather than being a no-op. Attempt-and-tolerate
+    rather than *read-then-grant*, for the same reason as above: the check-then-act version can
+    still lose the race, and a fixture that fails intermittently is worse than one that is
+    merely slower.
+    """
+    already = (
+        session.execute(
+            select(RolePermission).where(
+                RolePermission.role_id == role_id,
+                RolePermission.permission_id == permission_id,
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if already is not None:
+        return
+    try:
+        with session.begin_nested():
+            roles.grant_permission(role_id=role_id, permission_id=permission_id)
+    except IntegrityError:
+        # Somebody granted it concurrently; that is the outcome we wanted.
+        pass
+
+
 def _extend_staff_role(seeded_shop: SeededShop) -> None:
     """Grant the after-sales permissions to the shared seed's staff role.
 
     Through ``RoleRepository`` and the database, not by forging a ``Principal``: the HTTP tests
-    depend on the real auth dependency re-resolving these grants from these rows.
+    depend on the real auth dependency re-resolving these grants from these rows, which is the
+    thing worth proving - a principal whose permissions were assembled in Python would let the
+    routes pass with the database in any state at all.
     """
     factory = get_session_factory()
     with factory() as session:
@@ -135,29 +209,10 @@ def _extend_staff_role(seeded_shop: SeededShop) -> None:
             raise ValidationError("the shared seed did not create the ORDER_OPERATOR role")
 
         for permission_code in AFTER_SALES_PERMISSIONS:
-            permission = roles.get_permission_by_code(permission_code)
-            if permission is None:
-                resource, _, action = permission_code.partition(":")
-                permission = roles.add_permission(
-                    Permission(
-                        code=permission_code,
-                        resource=resource,
-                        action=action,
-                        description="Phase 5 after-sales fixture",
-                    )
-                )
-            # Idempotent: the shared seed already grants `order:read` to this role, and
-            # `grant_permission` inserts unconditionally - so a second grant of the same pair
-            # is a duplicate-key error, not a no-op. The check is a read of the table the insert
-            # goes into, which is the only way to know without assuming.
-            already = session.execute(
-                select(RolePermission).where(
-                    RolePermission.role_id == role.id,
-                    RolePermission.permission_id == permission.id,
-                )
-            ).scalars().first()
-            if already is None:
-                roles.grant_permission(role_id=role.id, permission_id=permission.id)
+            permission = _resolve_permission(session, roles, permission_code)
+            _grant_if_absent(
+                session, roles, role_id=role.id, permission_id=permission.id
+            )
         session.commit()
 
 
@@ -420,7 +475,7 @@ def _commerce_shop_instance(engine) -> Iterator[SeededShop]:
 
 
 @pytest.fixture
-def seeded_shop(commerce_shop: SeededShop) -> Iterator[AfterSalesShop]:
+def seeded_shop(_commerce_shop_instance: SeededShop) -> Iterator[AfterSalesShop]:
     """The shared seed's world, plus a genuinely paid order, via the shared seed itself.
 
     This is the shape PHASE5_DESIGN section 12 asks for: one definition of the shop and one
@@ -433,23 +488,22 @@ def seeded_shop(commerce_shop: SeededShop) -> Iterator[AfterSalesShop]:
     ``PENDING_PAYMENT -> PROCESSING`` status log, the fulfillment shell and its items, and a
     ``PROCESSED`` callback row. Nothing about the paid state is hand-written.
 
-    Two earlier workarounds are gone, and their absence is the point: this fixture used to
-    install a test-side ``FulfillmentItem(sku_id=...)`` shim and hand-seed the shell, because
-    the live ``fulfillment_items.sku_id`` was ``NOT NULL`` while the insert sites omitted it, so
-    ``paid_order`` could not complete. Both insert sites now pass ``sku_id``, so the workarounds
-    have been deleted rather than left to rot.
+    Because ``paid_order`` can only succeed if ``PaymentSuccessWorkflow`` creates its
+    fulfillment shell, this fixture asserts the shell exists. That assertion is the guard: it
+    fails loudly if the shell stops being created, instead of the suite quietly starting from a
+    state the product cannot produce.
 
     Function-scoped, not module-scoped: the seed builds idempotency keys from its marker, so a
     world shared across tests would hand one key to different payloads and the second request
     would be refused as a reuse. One world per test means one marker per test.
     """
-    _extend_staff_role(commerce_shop)
+    _extend_staff_role(_commerce_shop_instance)
 
     factory = get_session_factory()
     order = paid_order(
-        commerce_shop,
+        _commerce_shop_instance,
         lines=[
-            OrderLineInput(sku_id=commerce_shop.sku_ids[index], quantity=LINE_QUANTITY)
+            OrderLineInput(sku_id=_commerce_shop_instance.sku_ids[index], quantity=LINE_QUANTITY)
             for index in range(3)
         ],
         suffix=f"as{uuid.uuid4().hex[:8]}",
@@ -479,7 +533,7 @@ def seeded_shop(commerce_shop: SeededShop) -> Iterator[AfterSalesShop]:
         order_item_amounts = tuple(int(item.payable_amount) for item in items)
 
     yield AfterSalesShop(
-        seeded=commerce_shop,
+        seeded=_commerce_shop_instance,
         order_no=order.order_no,
         order_id=int(order.id),
         order_item_ids=order_item_ids,
