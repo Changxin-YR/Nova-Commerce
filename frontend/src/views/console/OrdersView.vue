@@ -356,12 +356,14 @@ function stamp(iso: string): string {
               <td>{{ stamp(order.created_at) }}</td>
               <td>
                 <!--
-                  `OrderSummary` carries NO line items (§6) — that is the whole point of the
-                  list/detail split — so the goods cell cannot name a product here without an N+1
-                  detail fetch per row. It shows the order number instead of pretending.
+                  §11 addendum: `OrderSummary` carries no line items (so a 20-row page does not
+                  hydrate every basket), but the server DOES supply `first_item_name` / `item_count`
+                  for exactly this column. Before the addendum this cell could not name a product
+                  without an N+1 detail fetch per row; now it reads the two backend-owned fields.
                 -->
-                <span class="o-list__goods" :title="`订单 ${order.order_no}`">
-                  <em class="nx-muted">{{ order.order_no }}</em>
+                <span class="o-list__goods" :title="order.first_item_name">
+                  {{ order.first_item_name }}
+                  <em v-if="order.item_count > 1" class="nx-muted">等 {{ order.item_count }} 件</em>
                 </span>
               </td>
               <td><StatusChip :status="order.order_status" kind="order" dot /></td>

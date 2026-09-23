@@ -134,13 +134,39 @@ export interface OrderBase {
   expires_at: string | null
 }
 
-/** List rows. Deliberately has NO `items[]`, `shipments[]` or address. */
-export type OrderSummary = OrderBase
+/**
+ * List rows. Deliberately has NO `items[]`, `shipments[]` or address.
+ *
+ * The two summary fields are the §11 addendum: a list endpoint must not hydrate every order's
+ * goods, but a list that cannot name a single product forced either an N+1 detail fetch per row or
+ * a blank column. Both are BACKEND-OWNED — computing them client-side is impossible, which is
+ * exactly why this frontend refused to invent them and reported the gap instead.
+ */
+export type OrderSummary = OrderBase & {
+  /** Total number of UNITS in the order (not the number of distinct lines). */
+  item_count: number
+  /** Display name of the first line (`product_name` + `sku_name`), truncated to 200 chars. */
+  first_item_name: string
+}
 
-/** Detail adds `items[]`, `shipments[]` and the address/full-order extras. */
+/** Detail adds `items[]`, `shipments[]`, the address snapshot and the two server-owned extras. */
 export interface OrderDetail extends OrderBase {
   /** The full address line, when the detail payload provides it. */
   full_address?: string
+  /**
+   * `null` unless `order_status` is `CANCELLED`/`CLOSED` (§11 addendum). Recorded by the cancel
+   * workflow, so the client cannot infer it — the cancel endpoint accepts the reason as its writer.
+   */
+  cancel_reason: string | null
+  /**
+   * Integer minor units, `paid_amount - refunded_amount`, bounded below by 0 (§11 addendum).
+   *
+   * SERVER-OWNED BECAUSE INV-005 IS. This value decides whether a refund control renders at all, so
+   * having the client compute it would put an accounting rule in the UI: on a payload lacking the
+   * field the expression yields `undefined`, `undefined > 0` is `false`, and every refund
+   * affordance would silently vanish without anything throwing.
+   */
+  refundable_amount: number
   items: OrderItem[]
   /** Fulfillment objects that can be shipped. This is where the ship id comes from. */
   shipments: Fulfillment[]

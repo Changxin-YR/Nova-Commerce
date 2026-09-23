@@ -167,13 +167,13 @@ function stamp(iso: string): string {
 
             <div class="orders__body">
               <!--
-                ITEMS COLUMN — deliberately NOT a per-line list.
-                The frozen list payload is `OrderSummary`, which carries NO `items[]`
-                (API_CONTRACT.md §6: the list/detail split exists so a page of orders does not drag
-                every line item across the wire). The old code rendered `order.snapshot.items`
-                here, which on a frozen payload is simply `undefined`.
-                Real line items would need one detail call PER ROW, so the list shows the
-                order-level figures and routes to the detail page, which does have `items[]`.
+                ITEMS COLUMN.
+                The frozen list payload is `OrderSummary`, which carries NO `items[]` — the split
+                exists so a page of orders does not drag every basket across the wire. The §11
+                addendum gives the list exactly what this column needs: `first_item_name` (display
+                name of the first line) and `item_count` (total units), both BACKEND-OWNED. Before
+                the addendum this cell could only have been filled by an N+1 detail fetch per row.
+                Routing to the detail payload still gives the full itemised list.
               -->
               <div class="orders__items">
                 <div class="orders__row">
@@ -182,11 +182,10 @@ function stamp(iso: string): string {
                       :to="{ name: 'order-detail', params: { orderNo: order.order_no } }"
                       class="orders__title"
                     >
-                      订单 {{ order.order_no }}
+                      {{ order.first_item_name }}
                     </RouterLink>
                     <p class="nx-muted orders__specs">
-                      收货人 {{ order.receiver_name }} · 商品金额
-                      <PriceText :amount="order.original_amount" size="sm" muted />
+                      共 {{ order.item_count }} 件 · 收货人 {{ order.receiver_name }}
                     </p>
                   </div>
 
@@ -266,12 +265,11 @@ function stamp(iso: string): string {
                 </div>
 
                 <!--
-                  NOTE: a "取消原因" line used to render here from `order.cancel_reason`.
-                  `API_CONTRACT.md` §6 does NOT define that field on `OrderSummary`/`OrderDetail`,
-                  so on a frozen payload it is `undefined` and the line could never appear. The
-                  field is removed rather than kept as decoration over a value the server never
-                  sends. If the backend adds a cancel reason later it should be added to the
-                  contract first and this block restored from it (see the migration report).
+                  NOTE: the "取消原因" line that used to render here is NOT restored, and this is a
+                  payload distinction rather than a missing contract field. The §11 addendum defines
+                  `cancel_reason` on `OrderDetail` (this list holds `OrderSummary`, which carries no
+                  such field). It is rendered on the detail page, which is the only place the server
+                  supplies it. Showing it here would mean an N+1 detail fetch per row.
                 -->
               </div>
             </div>

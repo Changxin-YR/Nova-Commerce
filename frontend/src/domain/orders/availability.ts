@@ -50,6 +50,13 @@ export interface OrderStateLike {
   paid_amount: number
   /** Integer minor units already refunded. */
   refunded_amount: number
+  /**
+   * SERVER-OWNED remaining refundable amount (`OrderDetail`, §11 addendum).
+   *
+   * Optional in the TYPE only because the bridge below still has to cope with a payload produced
+   * before the backend order module lands; every real `OrderDetail` carries it.
+   */
+  refundable_amount?: number | null
 }
 
 export type OrderAction = 'cancel' | 'confirmReceipt' | 'ship' | 'refund' | 'viewDetail'
@@ -63,16 +70,29 @@ export interface OrderActionFlags {
 }
 
 /**
- * Remaining refundable amount, in integer minor units.
+ * Remaining refundable amount, in integer minor units — **read from the server**.
  *
- * The frozen order payload carries `paid_amount` and `refunded_amount` but NOT
- * `refundable_amount`, so it is derived here in ONE place. The retired invented shape had it as a
- * server field; read off a frozen payload it would be `undefined`, and `undefined > 0` is `false`,
- * so refunds would silently vanish from the UI.
+ * `API_CONTRACT.md` §11 made `refundable_amount` server-owned, and the reason is worth stating where
+ * the value is consumed: this figure decides whether a refund CONTROL IS RENDERED AT ALL, so a
+ * client-side derivation would put an accounting rule (INV-005) in the UI. §15 forbids the client
+ * from being the authority on it.
+ *
+ * WHY THERE IS STILL A DERIVATION HERE: the order module does not exist yet (`app/modules/*`), so
+ * until it lands a real payload has no `refundable_amount`. Without the bridge, `undefined > 0` is
+ * `false` and EVERY refund affordance would silently disappear — the exact failure mode that
+ * prompted the addendum. The bridge keeps the UI correct in the meantime and is discarded the
+ * moment the server field is present; it is a transition, not a second source of truth.
  */
 export function refundableAmount(
-  order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount'>,
+  order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount'> & {
+    refundable_amount?: number | null
+  },
 ): number {
+  const fromServer = order.refundable_amount
+  if (typeof fromServer === 'number' && Number.isFinite(fromServer)) {
+    return Math.max(0, fromServer)
+  }
+  // Transitional bridge only — see the doc comment. Never used once the backend ships the field.
   return Math.max(0, order.paid_amount - order.refunded_amount)
 }
 
@@ -157,7 +177,9 @@ export function canShipOrder(
 
 /** A refund can still be issued while money remains un-refunded on a paid order. */
 export function canRefundOrder(
-  order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount' | 'payment_status'>,
+  order: Pick<OrderStateLike, 'paid_amount' | 'refunded_amount' | 'payment_status'> & {
+    refundable_amount?: number | null
+  },
 ): boolean {
   const refundableStates: PaymentStatus[] = ['PAID', 'PARTIAL_REFUNDED']
   return refundableStates.includes(order.payment_status) && refundableAmount(order) > 0

@@ -76,6 +76,10 @@ function makeOrder(overrides: Partial<OrderSummary> = {}): OrderSummary {
     created_at: '2026-09-22T23:31:07.507Z',
     paid_at: null,
     expires_at: '2026-09-22T23:46:07.507Z',
+    // §11 addendum: backend-owned summary fields, so the list can name a product without
+    // hydrating every order's basket.
+    first_item_name: 'Nova Phone 15 Pro 原色钛金属 256GB',
+    item_count: 1,
     ...overrides,
   }
 }
@@ -213,6 +217,39 @@ describe('console Orders — row actions follow the frozen state machine', () =>
     // Cancel is refused after shipping even though order_status is PROCESSING.
     expect(labels).not.toContain('取消')
     expect(wrapper.text()).toContain('不可取消')
+  })
+
+  it('names the goods from the §11 summary fields, without an N+1 detail fetch', async () => {
+    listMock.mockResolvedValue(
+      pageOf([
+        makeOrder({
+          order_status: 'PROCESSING',
+          payment_status: 'PAID',
+          first_item_name: 'Nova Phone 15 Pro 原色钛金属 256GB',
+          item_count: 3,
+        }),
+      ]),
+    )
+    const wrapper = mountView()
+    await flushPromises()
+
+    // The addendum exists so the list can name a product; asserting it here means a regression to
+    // a blank column fails the suite rather than shipping.
+    expect(wrapper.text()).toContain('Nova Phone 15 Pro 原色钛金属 256GB')
+    expect(wrapper.text()).toContain('等 3 件')
+    // The row needed NO per-row detail fetch to render its goods cell: `orderAdminApi.detail` is
+    // not even provided by the module mock above, so an N+1 lookup would throw rather than
+    // quietly succeed. One list call for the page.
+    expect(listMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits the quantity suffix for a single-unit order', async () => {
+    listMock.mockResolvedValue(pageOf([makeOrder({ first_item_name: '单件商品', item_count: 1 })]))
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('单件商品')
+    expect(wrapper.text()).not.toContain('等 1 件')
   })
 
   it('queries the fulfillment queue for outstanding packages only', async () => {

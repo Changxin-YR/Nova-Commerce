@@ -319,3 +319,38 @@ because doing views first means writing every view twice.
   envelope and the five metric NAMES, not the route. Changing this touches one function.
 - **Inventory movement shape** (`InventoryMovement`) stays module-local: §10 does not freeze it and
   it is display-only.
+
+---
+
+## CONTRACT ADDENDA CONSUMED (§11, commit ffbd14f)
+
+`API_CONTRACT.md` §11 added the three fields this migration had reported as gaps. All three are now
+consumed rather than worked around — the workarounds existed only because the fields were undefined,
+and the contract is the source of truth, so leaving them in place would have been a stale
+degradation.
+
+| Addendum | Where consumed | What it replaced |
+| --- | --- | --- |
+| `OrderSummary.item_count` + `first_item_name` | `console/OrdersView` goods column, `consumer/OrdersView` items column | A blank/"查看明细" placeholder. Both lists can now name a product with **no N+1 detail fetch** — the `orderAdminApi.detail` function is not even provided by the module mock, so a regression would throw instead of quietly succeeding. |
+| `OrderDetail.cancel_reason` | `consumer/OrderDetailView` "取消原因" line | The line was REMOVED during the migration because the field did not exist. It is restored, guarded on `order_status === 'CANCELLED'`, because this page holds an `OrderDetail`. The consumer LIST still cannot show it — it holds `OrderSummary`, a payload distinction rather than a missing field. |
+| `OrderDetail.refundable_amount` | `refundableAmount()` in `domain/orders/availability`, consumed by `canRefundOrder` and all three refund surfaces | Client-side `paid_amount - refunded_amount` arithmetic. |
+
+### `refundable_amount` is now read from the server, with a documented bridge
+
+The addendum's reasoning is enforced in code: `refundableAmount()` returns
+`order.refundable_amount` when the server supplies it, so the client is no longer the authority on a
+figure that gates whether a refund control renders (§15 / INV-005). A derivation remains **only** as
+a fallback for a payload produced before the backend order module lands — without it,
+`undefined > 0` is `false` and every refund affordance would silently disappear, which is the exact
+failure this addendum was written to prevent. It is labelled a transition, not a second source of
+truth, and the tests pin both branches: the server figure wins when the two disagree, and the bridge
+still yields a usable amount when the field is absent.
+
+### Gates after consuming the addenda
+
+| Command | Result |
+| --- | --- |
+| `npx vue-tsc --noEmit` | EXIT=0 |
+| `npx vite build` | EXIT=0 |
+| `npx vitest run` | EXIT=0, **250 passed** (was 246; +4 for the addendum branches) |
+| `npx eslint .` | EXIT=0 |

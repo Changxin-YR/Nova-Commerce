@@ -272,13 +272,19 @@ async function applyRefundForRemaining(): Promise<void> {
             </div>
 
             <!--
-              NOTE: a "取消原因" line used to render here from `order.cancel_reason`.
-              `API_CONTRACT.md` §6 does NOT define that field, so on a frozen payload it is
-              `undefined` and the line could never appear. Removed rather than kept as decoration
-              over a value the server never sends.
+              §11 addendum: `cancel_reason` is defined on `OrderDetail` and is `null` unless the
+              order is CANCELLED/CLOSED. It is recorded by the cancel workflow, so the client cannot
+              infer it — and the cancel endpoint accepts the reason as its writer. This is the page
+              that holds an `OrderDetail`, so this is where it belongs.
             -->
+            <p
+              v-if="order.cancel_reason && order.order_status === 'CANCELLED'"
+              class="nx-muted order-detail__note"
+            >
+              取消原因：{{ order.cancel_reason }}
+            </p>
             <p class="nx-muted order-detail__note">
-              金额与状态均来自服务端，收货人信息由服务端脱敏。退款上限由「实付 − 已退款」推导，后端在事务内独立校验。
+              金额与状态均来自服务端，收货人信息由服务端脱敏。可退余额由服务端下发（服务端持有该口径）。
             </p>
           </div>
         </aside>

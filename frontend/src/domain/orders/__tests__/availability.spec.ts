@@ -66,8 +66,41 @@ function fulfillment(overrides: Partial<Pick<Fulfillment, 'id' | 'carrier' | 'tr
 /** A shippable fulfillment: nothing stamped on it yet. */
 const unshipped = fulfillment()
 
-describe('refundableAmount — derived once, because the frozen payload has no such field', () => {
-  it('subtracts what was refunded from what was paid', () => {
+describe('refundableAmount — server-owned, with a documented pre-backend bridge', () => {
+  it('READS the server field when it is present', () => {
+    // `API_CONTRACT.md` §11 made this server-owned because it gates whether a refund control
+    // renders at all (§15: the client must not be the authority on an accounting rule).
+    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: 279900 })).toBe(
+      279900,
+    )
+  })
+
+  it('prefers the server figure over its own arithmetic when the two disagree', () => {
+    // The server may bound the value below 0, account for a rule the client does not know about,
+    // or hold a lock. Its number wins — that is the whole point of the addendum.
+    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: 100000 })).toBe(
+      100000,
+    )
+  })
+
+  it('never returns a negative amount, even if the server sends one', () => {
+    expect(refundableAmount({ paid_amount: 100, refunded_amount: 500, refundable_amount: -50 })).toBe(0)
+  })
+
+  it('still works BEFORE the backend ships the field, so refunds never silently vanish', () => {
+    // THE FAILURE MODE THE ADDENDUM WAS WRITTEN FOR: `undefined > 0` is false, so a missing field
+    // would hide every refund affordance without throwing anything. The bridge derives the value
+    // until the order module lands.
+    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0 })).toBe(279900)
+    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 79900 })).toBe(200000)
+    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 279900 })).toBe(0)
+    // An explicit null is treated as "absent", not as zero.
+    expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0, refundable_amount: null })).toBe(
+      279900,
+    )
+  })
+
+  it('subtracts what was refunded from what was paid (bridge)', () => {
     expect(refundableAmount({ paid_amount: 279900, refunded_amount: 0 })).toBe(279900)
     expect(refundableAmount({ paid_amount: 279900, refunded_amount: 79900 })).toBe(200000)
   })
