@@ -729,3 +729,86 @@ separate clones - not one directory.
   on and no UI way to fix that. Smallest remaining visible hole.
 - **No e2e coverage and no end-to-end evidence.** Everything is verified at the type and
   API-module-mock level only, because the twelve module backends are incomplete.
+
+---
+
+## 16. Handoff addendum — Phase 4 complete (Cart + Pricing + Order)
+
+**Phase 4 is complete and FG-10 passes on real MySQL.** Backend tree at `84f867d`;
+`pytest tests` = **700 passed**, `ruff check app tests migrations` clean,
+`alembic check` = no new operations, docker 5/5 healthy. Commits: `1a54156`
+(pricing), `ba03102` (persistence + migration), `426d9d5` (workflow/API/tests),
+through `84f867d` (FG-10 evidence).
+
+### Delivered
+
+* **`PricingService`** is the single price authority (spec §37): the six frozen
+  methods, pure and DB-free, 269 unit tests, 100% statement coverage. Pro-rata
+  allocation hands the remainder out backwards over positive weights, so a line's
+  `payable_amount` can never go negative; `build_price_snapshot` asserts INV-006 and
+  refuses a non-zero shipping charge.
+* **Four tables** — `orders`, `order_items`, `order_status_logs`,
+  `idempotency_records`; migration `a7c4e91b2d63`; 15 named CHECKs verified in
+  `information_schema`; all money columns signed BIGINT.
+* **`CreateOrderWorkflow`** — business inputs only (spec §38), one transaction,
+  stock reserved under the row lock (spec §27), the order inserted *before* the
+  reservation so every `ORDER_LOCK` movement carries `reference_id=order.id`
+  (INV-007), merchant-scoped warehouse resolution, idempotency record committed with
+  the order, INV-006 asserted in-transaction.
+* **Frozen API paths** (§96/§14): `POST /orders/preview`, `POST /orders`,
+  `GET /orders`, `GET /orders/{order_no}`, cancel, confirm-receipt,
+  `GET /orders/admin`, `GET /orders/admin/{order_no}`. Consumer reads are own-only
+  (50003, never 403); admin reads are merchant-scoped and permission-checked.
+* **FG-10 evidence**: `artifacts/evidence/integration/fg10_workflow.xml` (frozen
+  proof path) + `.json` — 170 assertions, all PASSED, exit 0, verdict PASS.
+* Docs: `ORDER_WORKFLOW.md` (lifecycle/invariants), `PHASE4_DESIGN.md` (freeze),
+  `PHASE7_ORDER_INTEGRATION_NOTES.md` (frontend deltas).
+
+### Decisions carried out of Phase 4 (do not re-open silently)
+
+1. **The cart is not a server resource.** The client sends its selection to
+   `POST /orders/preview`; there is no `/cart` API (contract §14.1).
+   `frontend/src/api/cart.ts` is dead code — Phase 7 deletes it.
+2. **`shipping_amount` is 0 in V1.** A paid policy needs an allocation decision
+   first (there is no per-item field for it, and it would break INV-006).
+3. **`coupon_id` is accepted and refused with `90004`** until Phase 6 resolves
+   coupons; promotions/coupons apply only through the internal `pricing_rules` seam.
+4. **Shipping never changes `order_status`**; one state machine writes that field.
+5. **Order create returns 200** on both create and replay.
+6. `order_items.image_url` is persisted NULL with the durable `image_object_key`;
+   read-time signing is a Phase 5/7 decision.
+7. Per-order warehouse resolution is equivalent to per-line only because
+   `load_priced_lines` refuses a multi-merchant cart; relaxing that guard requires
+   per-line resolution in the same change.
+
+### Fixed along the way (pre-existing defects)
+
+* **App factory**: `build_api_router()` now returns one fresh aggregate per app
+  instance. The old global router re-registered every module on each `create_app()`
+  (duplicate OpenAPI operationIds, a route table that grew with the test count, HTTP
+  tests erroring only in full-suite runs, and a duplicate `/api/v1/health` mount).
+* **`tests/conftest.py`'s shared `client` fixture is broken** (httpx 0.28
+  `ASGITransport` supports only async); Phase 4's order tests define their own
+  `TestClient` fixture. Fix at source in Phase 5.
+* **`alembic downgrade base` fails at the Phase 1 catalog revision** (errno 1553:
+  `ix_sku_attribute_values_attribute` is dropped while the FK still needs it).
+  Phase 4's own downgrade is clean. Minimal fix: drop the FK before the index in
+  that revision's `downgrade()`.
+* **`ruff format --check .` panics** inside ruff 0.16.8's annotation renderer on
+  whole trees (pre-existing, not a gate; `ruff check` is clean).
+* **Top-level `scripts/`** is outside `backend/pyproject.toml`'s `scripts/**`
+  per-file-ignores (the config is anchored to `backend/`); run ruff from `backend/`
+  for the project rule set, or extend that ignore entry.
+
+### Frontend deltas for Phase 7
+
+See `docs/architecture/PHASE7_ORDER_INTEGRATION_NOTES.md`. Headlines: four consumer
+order paths still use `/orders/orders/*`; `cartApi` is dead; the `api-contract.ts`
+preview/create shapes predate contract §14; the `refundable_amount` bridge must be
+deleted once a real HTTP response carries the field.
+
+### Next
+
+Phase 5 — Payment + Fulfillment + AfterSales + Refund (FG-11, FG-12). The order
+status machine, the stock ledger and the idempotency table are ready for it; the
+`PENDING_PAYMENT -> PROCESSING` edge and every `refunded_amount` writer belong there.
