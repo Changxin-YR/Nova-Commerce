@@ -171,7 +171,41 @@ def test_a_body_naming_its_own_price_or_identity_is_rejected(client, shop: Shop,
     assert response.status_code == 422, response.text
     assert field in response.text
 
+def test_creating_without_an_address_is_422_not_404(client, shop: Shop) -> None:
+    """The address is required on create, and the failure names the field.
 
+    The wire-level half of the assertion in ``tests/unit/modules/order/test_schemas.py``.
+    Before ``CreateOrderRequest`` re-required ``address_id``, this request passed
+    validation and died as ``ADDRESS_NOT_FOUND (50008)`` / **404** - telling the client
+    an address could not be found when it had never sent one. 422 with the field named is
+    the honest answer, and it arrives before any transaction opens.
+    """
+    response = client.post(
+        BASE,
+        json={
+            "items": [{"sku_id": shop.sku_ids[0], "quantity": 1}],
+            "client_request_id": shop.client_request_id("no-address"),
+        },
+        headers=_auth(_token(shop), **{"Idempotency-Key": shop.key("no-address")}),
+    )
+    assert response.status_code == 422, response.text
+    assert response.status_code != 404
+    assert "address_id" in response.text
+
+
+def test_preview_still_accepts_no_address(client, shop: Shop) -> None:
+    """... while preview must not inherit that requirement.
+
+    §14.4 makes V1 shipping free, so nothing prices off the address; preview accepts the
+    field only so that enabling a paid policy is not a wire change later.
+    """
+    response = client.post(
+        f"{BASE}/preview",
+        json={"items": [{"sku_id": shop.sku_ids[0], "quantity": 1}]},
+        headers=_auth(_token(shop)),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["payable_amount"] == shop.sku_prices[0]
 # ---------------------------------------------------------------------------
 # The round trip
 # ---------------------------------------------------------------------------

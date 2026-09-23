@@ -121,6 +121,48 @@ def test_client_request_id_is_stripped_not_merely_accepted() -> None:
     assert request.client_request_id == "abc"
 
 
+# ---------------------------------------------------------------------------
+# address_id: optional on preview, REQUIRED on create
+# ---------------------------------------------------------------------------
+def test_address_id_is_required_on_create() -> None:
+    """A create with no address must be rejected at the edge, naming the field.
+
+    Inheriting preview's optional ``address_id`` let such a request through
+    validation and fail later as ``ADDRESS_NOT_FOUND (50008)`` / 404 - an error that
+    says the *address* could not be found when in fact the request never carried one.
+    The client would go hunting for a missing address instead of a missing field.
+
+    ``mypy`` caught this as ``Argument "address_id" ... has incompatible type
+    "int | None"; expected "int"``, which is the type system noticing the same thing
+    the 404 was hiding.
+    """
+    body = _valid_preview()
+    body.pop("address_id")
+    with pytest.raises(ValidationError) as caught:
+        CreateOrderRequest.model_validate(body)
+    assert "address_id" in str(caught.value)
+
+
+def test_address_id_may_be_omitted_on_preview() -> None:
+    """... and preview must still accept its absence.
+
+    The V1 shipping policy is free (§14.4), so nothing prices off the address; the
+    field is accepted there only so that enabling a paid policy is not a wire change.
+    """
+    body = _valid_preview()
+    body.pop("address_id")
+    request = OrderPreviewRequest.model_validate(body)
+    assert request.address_id is None
+
+
+def test_a_non_positive_address_id_is_refused_on_both() -> None:
+    for model in (OrderPreviewRequest, CreateOrderRequest):
+        body = _valid_preview(**({"client_request_id": "abc"} if model is CreateOrderRequest else {}))
+        body["address_id"] = 0
+        with pytest.raises(ValidationError):
+            model.model_validate(body)
+
+
 def test_client_request_id_longer_than_the_column_is_refused() -> None:
     """64 characters is the column width; a longer value would truncate in MySQL."""
     with pytest.raises(ValidationError):
