@@ -177,7 +177,7 @@ def _resolve_or_create_warehouse(
 
 
 @pytest.fixture
-def shop(engine) -> Iterator[Shop]:
+def shop(engine, request) -> Iterator[Shop]:
     """A committed merchant / product / three SKUs / stock / buyer / address / staff user.
 
     Three SKUs with prices that do **not** divide evenly into round percentages
@@ -188,6 +188,12 @@ def shop(engine) -> Iterator[Shop]:
     factory = get_session_factory()
     marker = uuid.uuid4().hex[:8]
     created: dict[str, object] = {"created_warehouse": False}
+    # Registered BEFORE the first write, so a failure during setup still cleans the
+    # ids that exist. A try/finally around the yield below covers a failing *test*
+    # (pytest resumes the generator) but NOT a failure during *setup*: the abandoned
+    # generator never reaches its finally, and because this seed commits as it builds,
+    # the rows stay and change what later tests see. Design section 13.5.
+    request.addfinalizer(lambda: _purge(created, marker=marker))
 
     with factory() as session:
         merchant = Merchant(code=f"M{marker}"[:24], name=f"Order Test {marker}")
