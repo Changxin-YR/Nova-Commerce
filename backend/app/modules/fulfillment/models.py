@@ -248,6 +248,12 @@ class FulfillmentItem(Base, PkMixin, TimestampMixin):
         # package over-ship a line while each row individually looked valid.
         UniqueConstraint("fulfillment_id", "order_item_id", name="uq_fulfillment_items_package_line"),
         CheckConstraint("quantity > 0", name="quantity_positive"),
+        # The SKU lookup for a package line. Indexed because the console's
+        # fulfillment queue and the order's shipments view both resolve a line's SKU by
+        # id, and because the FK below otherwise has no supporting index (MySQL creates
+        # one implicitly for a FK, but naming it explicitly keeps it inspectable and
+        # keeps ``alembic check`` seeing the same object the migration creates).
+        Index("ix_fulfillment_items_sku_id", "sku_id"),
     )
 
     fulfillment_id: Mapped[int] = mapped_column(
@@ -263,6 +269,35 @@ class FulfillmentItem(Base, PkMixin, TimestampMixin):
         ForeignKey("order_items.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+    )
+
+    #: The ordered line's SKU, **snapshotted** like the two names below it.
+    #:
+    #: This column was ruled in, out, and back in during Phase 5, so the reasoning is
+    #: worth recording rather than rediscovering. It was originally specified here by
+    #: design section 5.4 and then briefly withdrawn in favour of deriving it on the
+    #: read path from ``order_item_id -> order_items.sku_id``, on the grounds that a
+    #: duplicated key is a second place for one fact to be wrong. The derivation was
+    #: sound but not free: it needs a ``sku_by_line`` map built by every caller, and it
+    #: raises ``InternalError`` when that map does not cover a line - which is exactly
+    #: what happens when a fulfillment references an order line outside the page being
+    #: read.
+    #:
+    #: The captain's final ruling is the column. The decisive argument is the one that
+    #: applies to a *snapshot* table: these rows already store ``product_name`` and
+    #: ``sku_name`` as values, and carrying a line's names but not the id they came from
+    #: is the one genuinely inconsistent combination. ``order_item_id`` remains the
+    #: authoritative link (INV-014 - nothing is rendered from the live catalogue); this
+    #: id is stored beside the names purely so a reader never needs a second query.
+    #:
+    #: ``logical FK`` to ``product_skus.id``, ``RESTRICT``: the same policy as every
+    #: other reference in this phase, and a FK that mutated this column would be
+    #: rejected by MySQL 8 (errno 3823) because the column also participates in a CHECK.
+    sku_id: Mapped[int] = mapped_column(
+        BigIntUnsigned,
+        ForeignKey("product_skus.id", ondelete="RESTRICT"),
+        nullable=False,
+        doc="The ordered line's SKU, snapshotted at shipping time (INV-014).",
     )
 
     #: Snapshot of the order line's names, so a packing slip and the customer's

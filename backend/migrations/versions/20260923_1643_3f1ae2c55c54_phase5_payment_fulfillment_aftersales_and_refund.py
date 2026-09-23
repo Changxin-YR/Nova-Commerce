@@ -492,6 +492,11 @@ def upgrade() -> None:
         "fulfillment_items",
         sa.Column("fulfillment_id", app.shared.db.types.BigIntUnsigned(), nullable=False),
         sa.Column("order_item_id", app.shared.db.types.BigIntUnsigned(), nullable=False),
+        # The ordered line's SKU, snapshotted beside the two names below it. Ruled in,
+        # briefly withdrawn in favour of deriving it from `order_items.sku_id` on the
+        # read path, then restored by the captain: a snapshot row that carries a line's
+        # names but not the id they came from is the one inconsistent combination.
+        sa.Column("sku_id", app.shared.db.types.BigIntUnsigned(), nullable=True),
         sa.Column("product_name", sa.String(length=200), nullable=False),
         sa.Column("sku_name", sa.String(length=200), nullable=False),
         sa.Column("quantity", sa.Integer(), nullable=False),
@@ -523,6 +528,15 @@ def upgrade() -> None:
             name=op.f("fk_fulfillment_items_order_item_id_order_items"),
             ondelete="RESTRICT",
         ),
+        # RESTRICT, like every other reference in this phase. A mutating referential
+        # action would be rejected by MySQL 8 (errno 3823) in any case: the column
+        # participates in a CHECK-bearing table.
+        sa.ForeignKeyConstraint(
+            ["sku_id"],
+            ["product_skus.id"],
+            name=op.f("fk_fulfillment_items_sku_id_product_skus"),
+            ondelete="RESTRICT",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_fulfillment_items")),
         # A duplicate line inside ONE package would let a single package over-ship a
         # line while each row individually looked valid. The cumulative rule across
@@ -539,6 +553,43 @@ def upgrade() -> None:
         "fulfillment_items",
         ["fulfillment_id"],
         unique=False,
+    )
+    op.create_index(
+        "ix_fulfillment_items_sku_id",
+        "fulfillment_items",
+        ["sku_id"],
+        unique=False,
+    )
+    # -----------------------------------------------------------------
+    # `fulfillment_items.sku_id`: backfill, then tighten to NOT NULL.
+    #
+    # The column is created NULLABLE above and tightened here rather than declared
+    # NOT NULL in `create_table`, and that is not a stylistic choice. MySQL runs this
+    # server in STRICT_TRANS_TABLES (verified: `SELECT @@sql_mode`), and under strict
+    # mode `ALTER TABLE ... ADD COLUMN ... NOT NULL` on a table that already holds rows
+    # **fails** rather than filling in a default. A migration that only works on an
+    # empty table is a migration that breaks the first time it meets a populated
+    # database - which is precisely the situation this revision is re-applied into,
+    # because the ship path had already written package lines.
+    #
+    # The backfill reads `order_items.sku_id`, which is the authoritative value and is
+    # guaranteed present: `order_item_id` is NOT NULL with a RESTRICT FK to
+    # `order_items`, so every existing row resolves. `order_items` is itself a snapshot
+    # table, so this does not introduce a catalogue read (INV-014).
+    # -----------------------------------------------------------------
+    op.execute(
+        """
+        UPDATE fulfillment_items fi
+          JOIN order_items oi ON oi.id = fi.order_item_id
+           SET fi.sku_id = oi.sku_id
+         WHERE fi.sku_id IS NULL
+        """
+    )
+    op.alter_column(
+        "fulfillment_items",
+        "sku_id",
+        existing_type=app.shared.db.types.BigIntUnsigned(),
+        nullable=False,
     )
     op.create_index(
         "ix_fulfillment_items_order_item_id",
@@ -855,6 +906,10 @@ def downgrade() -> None:
     op.drop_constraint(op.f("ck_order_items_refund_cap"), "order_items", type_="check")
     op.drop_constraint(op.f("ck_orders_refund_cap"), "orders", type_="check")
 
+    # The column is dropped with `fulfillment_items` below, so no explicit drop is
+    # needed - and asking for one would fail for the same reason Phase 4's index drops
+    # failed (errno 1553): the FK's supporting index is removed by DROP TABLE, not by a
+    # separate DROP INDEX.
     op.drop_table("refunds")
     op.drop_table("after_sale_items")
     op.drop_table("after_sales")
