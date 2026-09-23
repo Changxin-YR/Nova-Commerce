@@ -1032,6 +1032,31 @@ because every item cost a real hour:
 5. **Evidence is emitted from a clean tree only.** `scripts/gate_evidence.py`
    records the revision and refuses a PASS when the tested paths are dirty.
 
+### 18.4 Gate status - BOTH MANDATORY GATES PASS
+
+    FG-11  artifacts/evidence/concurrency/fg11_payment_idempotency.json
+           verdict=PASS  11 assertions  exit 0   revision recorded, relevant paths clean
+    FG-12  artifacts/evidence/integration/fg12_refund_invariants.json
+           verdict=PASS  12 assertions  exit 0   revision recorded, relevant paths clean
+
+FG-11 drives ten concurrent deliveries of one provider event on real MySQL. FG-12 runs
+the verifier's four modules - the three live-table caps, the workflow caps that have no
+database mirror, the fulfillment quantity guard, and the two-thread race for the last
+claimable amount - and it runs all four because a gate that runs a subset of its own
+tests is a gate with a silent hole.
+
+Both artifacts assert that the paths each gate depends on were **clean** at the revision
+they record, so each is a claim about an identifiable tree rather than about whatever
+was in the working directory.
+
+**Emit them only with the other writers stopped.** Section 13.6b: four concurrent
+`pytest` processes on one schema produce failures on rows a fixture has just created,
+and an emitter running through that would record interference as a defect.
+
+---
+
+#### Original plan, kept for the reasoning
+
 ### 18.4 Gate status
 
 * **FG-11 (mandatory) - green, evidence NOT yet valid.** The gate passes and was

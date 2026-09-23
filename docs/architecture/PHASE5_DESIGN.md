@@ -793,6 +793,41 @@ duplicate); and a savepoint row is **invisible to another connection** until the
 transaction commits, so a cross-connection re-read taken before that commit returns
 `None` and proves nothing.
 
+### 13.6b The shared database has no isolation between concurrent test runs
+
+This is the mechanism behind most of the day's wobbling numbers, and it was measured
+rather than suspected. Four `pytest` processes were live against the same `nova`
+schema at once, and all three observed failures were on rows a fixture had **just
+created**:
+
+* `StaleDataError: UPDATE statement on table 'users' expected to update 1 row(s); 0 matched`
+* `AssertionError: the fixture's account is missing entirely`
+* `ORDER_NOT_FOUND` from `RefundWorkflow` on an order `paid_order()` had created moments earlier
+
+The evidence that it is environmental rather than a defect: the same suite with no
+competitor gives **48 passed repeatedly**; an 8-run loop gave **8/8 green** while
+another agent was quiet and **1-2 failures per run** while they were active; and the
+failing **set moves** between runs (HTTP tests one run, workflow tests the next),
+which is the signature of a shared mutable resource, not a deterministic bug.
+
+`orders`/`order_items`' `RESTRICT` foreign keys make it worse rather than better: a
+purge racing another run's purge hits `1451 Cannot delete a parent row`, and its delete
+rolls back. The data is left consistent, but the teardown raises.
+
+Two consequences, and the second is the one that matters for evidence:
+
+* **A re-run during another agent's suite is a coin flip on somebody else's teardown.**
+  Any number quoted while others are testing is unreliable, including the captain's.
+* **An evidence emitter that runs during a teammate's test run can record pure
+  interference as failure.** Gate artifacts must be emitted with the other process
+  stopped - which is what the freeze window in 13.7 is for, and it is the reason the
+  emitters record a residue line and a revision.
+
+The durable fix is per-worker schema isolation (a distinct `MYSQL_DATABASE` per
+process) or serialised runs. Neither was implemented in this phase; both are recorded
+here as the next structural improvement, and until one lands the freeze window is the
+only protection.
+
 ### 13.7 The freeze window
 
 When the captain sends `FREEZE`, stop writing to the repository. Finish the tool call
