@@ -158,6 +158,7 @@ class Order(Base, PkMixin, TimestampMixin, MerchantScopedMixin, VersionMixin):
         # The console's "orders waiting for attention" view and the customer's
         # "my orders" list are the two hot reads; both are covered.
         Index("ix_orders_merchant_status", "merchant_id", "order_status"),
+        Index("ix_orders_status_expires_at", "order_status", "expires_at"),
         Index("ix_orders_user_created", "user_id", "created_at"),
         Index("ix_orders_merchant_created", "merchant_id", "created_at"),
     )

@@ -44,6 +44,7 @@ from app.modules.inventory.enums import MovementType, OperatorType, ReferenceTyp
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.inventory.service import InventoryService
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
+from app.modules.payment.models import Payment
 from app.shared.db.base import utc_now
 from app.shared.db.models.idempotency import IdempotencyRecord
 from app.shared.db.models.outbox import OutboxMessage
@@ -399,6 +400,7 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
             .all()
         ]
         if order_ids:
+            session.execute(delete(Payment).where(Payment.order_id.in_(order_ids)))
             session.execute(delete(OrderStatusLog).where(OrderStatusLog.order_id.in_(order_ids)))
             session.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))
             session.execute(delete(Order).where(Order.id.in_(order_ids)))

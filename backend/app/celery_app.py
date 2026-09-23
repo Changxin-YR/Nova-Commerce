@@ -5,6 +5,7 @@ from __future__ import annotations
 from celery import Celery
 
 from app.core.config import get_settings
+from app.modules.order.reconciliation import run_expired_order_cycle
 from app.shared.outbox.publisher import run_publish_cycle
 
 settings = get_settings()
@@ -20,6 +21,10 @@ celery_app.conf.update(
             "task": "nova.outbox.publish_due",
             "schedule": 5.0,
         },
+        "close-expired-orders": {
+            "task": "nova.orders.close_expired",
+            "schedule": 30.0,
+        },
     },
 )
 
@@ -33,3 +38,9 @@ def publish_outbox() -> dict[str, int]:
         "failed": outcome.failed,
         "dead": outcome.dead,
     }
+
+
+@celery_app.task(name="nova.orders.close_expired", ignore_result=True)
+def close_expired_orders() -> int:
+    """Close due unpaid orders, with MySQL as the source of truth."""
+    return run_expired_order_cycle()
