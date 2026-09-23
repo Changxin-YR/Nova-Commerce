@@ -19,13 +19,22 @@ inside the lock, not before it** - the "is this package already shipped?" guard
 under one lock, or two concurrent ship requests can both read ``UNFULFILLED``,
 both decide "ship it", and both deduct stock.
 
-## ``shipped_quantities_for_order_item`` is a sum over two tables
+## Two aggregates, and why they are named the way they are
 
-It answers the cumulative rule's question - how many units of this order line have
-already gone out **across every package of the order** - in one query, so the
-workflow cannot accidentally answer it per package. The join through
-``fulfillments`` is what makes the total order-wide rather than package-wide; a
-per-package total would pass every check while over-shipping the line.
+:meth:`FulfillmentRepository.shipped_quantities_for_order` answers the cumulative
+rule's question - how many units of each order line have already **left**, across
+every package of the order - in one query, so the caller cannot accidentally answer
+it per package. The join through ``fulfillments`` is what makes the total order-wide
+rather than package-wide; a per-package total would pass every check while
+over-shipping the line. It filters on ``SHIPPED_STATUSES``, because a shell in
+``UNFULFILLED`` carries the order's *planned* units and counting those as shipped
+made the ship endpoint refuse every legal first shipment - see its docstring for the
+full defect.
+
+:meth:`FulfillmentRepository.planned_quantities_for_order` is the same aggregate
+**without** that filter. Two methods rather than one boolean argument, because a
+flag would leave the dangerous reading as the default at some call sites and the
+whole point is that the distinction cannot be forgotten.
 """
 
 from __future__ import annotations
@@ -35,9 +44,20 @@ from datetime import datetime
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
+from app.modules.fulfillment.enums import FulfillmentStatus
 from app.modules.fulfillment.models import Fulfillment, FulfillmentItem
 
 __all__ = ["FulfillmentRepository"]
+
+#: The package statuses that mean goods have actually left. ``DELIVERED`` implies
+#: shipped (the ``delivered_after_shipped`` CHECK enforces it), so both count.
+#:
+#: This constant exists because its absence was a real defect - see
+#: :meth:`FulfillmentRepository.shipped_quantities_for_order`.
+SHIPPED_STATUSES: tuple[str, ...] = (
+    FulfillmentStatus.SHIPPED.value,
+    FulfillmentStatus.DELIVERED.value,
+)
 
 
 class FulfillmentRepository:
@@ -213,6 +233,77 @@ class FulfillmentRepository:
         Lines that appear in no package are absent from the mapping rather than
         present as zero, so a caller that forgets ``.get(..., 0)`` gets a ``KeyError``
         instead of a silently wrong total.
+
+        ## The status filter, and the defect its absence caused
+
+        Only packages that have **actually shipped** are counted. This filter is
+        load-bearing and was **missing in the first version of this method** - a real
+        defect, found by ``fulfillment-workflow`` while writing the ship path, not by
+        any test of mine:
+
+        * ``PaymentSuccessWorkflow`` step 8 creates a shell in ``UNFULFILLED`` that
+          carries the order's **planned** units - one line per order line at full
+          quantity;
+        * without a status filter this method summed those planned units and returned
+          them as *shipped*. On a fresh order, one shell with ``quantity=3`` against a
+          ``quantity=3`` order line reported ``3`` shipped when the truth is ``0``;
+        * the cumulative guard then computed ``3 + 2 > 3`` and refused a perfectly
+          legal shipment of two units - so with a full-width shell, **the first
+          shipment of any line was refused and the ship endpoint could never be used.**
+
+        The lesson worth keeping is about the *name*, not the SQL: a method called
+        ``shipped_*`` that returns planned units is worse than no method at all,
+        because a caller has no reason to doubt it. ``FulfillmentService
+        ._shipped_quantities`` carries the same filter independently, so the 70001
+        guard and the order's axis cannot disagree about how much has gone out.
+        """
+        stmt = (
+            select(
+                FulfillmentItem.order_item_id,
+                func.sum(FulfillmentItem.quantity),
+            )
+            .join(Fulfillment, Fulfillment.id == FulfillmentItem.fulfillment_id)
+            .where(
+                Fulfillment.order_id == order_id,
+                Fulfillment.fulfillment_status.in_(SHIPPED_STATUSES),
+            )
+            .group_by(FulfillmentItem.order_item_id)
+        )
+        return {int(row[0]): int(row[1]) for row in self._session.execute(stmt).all()}
+
+    def shipped_quantity_for_order_item(self, order_item_id: int) -> int:
+        """Units of one order line that have actually left, across every package.
+
+        Applies the same ``SHIPPED_STATUSES`` filter as
+        :meth:`shipped_quantities_for_order`, and for the same reason - see that
+        method's docstring for the defect the missing filter caused.
+
+        It does **not** filter by order: ``order_item_id`` is unique to one order, so
+        an ``order_id`` condition would be redundant rather than an extra safeguard.
+        """
+        stmt = (
+            select(func.coalesce(func.sum(FulfillmentItem.quantity), 0))
+            .join(Fulfillment, Fulfillment.id == FulfillmentItem.fulfillment_id)
+            .where(
+                FulfillmentItem.order_item_id == order_item_id,
+                Fulfillment.fulfillment_status.in_(SHIPPED_STATUSES),
+            )
+        )
+        return int(self._session.execute(stmt).scalar_one())
+
+    def planned_quantities_for_order(self, order_id: int) -> dict[int, int]:
+        """``{order_item_id: units allocated to packages}``, regardless of status.
+
+        The unfiltered counterpart of :meth:`shipped_quantities_for_order`, and it
+        exists so the distinction is **named** rather than being a filter every caller
+        has to remember. Read this one to ask "is every line fully allocated across the
+        order's packages?"; read the other to ask "has this line shipped?". That is
+        precisely the confusion that made the original
+        ``shipped_quantities_for_order`` a defect rather than a convenience.
+
+        On a fresh order it equals the order's own quantities, because the shell
+        carries the plan; as shipping splits lines into real packages the two methods
+        diverge, which is the behaviour worth asserting.
         """
         stmt = (
             select(
@@ -224,15 +315,6 @@ class FulfillmentRepository:
             .group_by(FulfillmentItem.order_item_id)
         )
         return {int(row[0]): int(row[1]) for row in self._session.execute(stmt).all()}
-
-    def shipped_quantity_for_order_item(self, order_item_id: int) -> int:
-        """Units of one order line across every package of its order."""
-        stmt = (
-            select(func.coalesce(func.sum(FulfillmentItem.quantity), 0))
-            .join(Fulfillment, Fulfillment.id == FulfillmentItem.fulfillment_id)
-            .where(FulfillmentItem.order_item_id == order_item_id)
-        )
-        return int(self._session.execute(stmt).scalar_one())
 
     def count_for_order(self, order_id: int) -> int:
         """Used by FG-11 to prove a replayed callback created exactly one package."""
