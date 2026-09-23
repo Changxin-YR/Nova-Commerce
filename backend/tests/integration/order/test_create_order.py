@@ -535,3 +535,129 @@ def test_a_stranger_cannot_preview_against_someone_elses_address(shop: Shop) -> 
             )
     finally:
         session.close()
+
+
+def _stranger(shop: Shop) -> object:
+    """A principal whose ``user_id`` owns nothing.
+
+    Ownership is a property of the principal, not of the row, so the stranger needs no
+    user row of their own: ``user_id`` is what the query filters on, and a principal
+    that owns nothing exercises exactly the branch under test.
+    """
+    from app.modules.identity.service import Principal
+
+    return Principal(
+        user_id=shop.consumer_id + 10_000,
+        user_type="CONSUMER",
+        merchant_id=None,
+        roles=(),
+        permissions=frozenset(),
+        data_scope=shop.consumer.data_scope,
+        session_id="stranger",
+        is_staff=False,
+    )
+
+
+def _address_failure(shop: Shop, *, address_id: int, principal, suffix: str):
+    """Run one create that must fail on the address, and return the raised error.
+
+    Returns the exception rather than asserting inside, because the point of these tests
+    is to compare two failures with each other.
+    """
+    from app.core.errors import AppError
+
+    session = get_session_factory()()
+    try:
+        with pytest.raises(AppError) as caught:
+            OrderService(session).create_order(
+                principal=principal,
+                items=[OrderLineInput(shop.sku_ids[0], 1)],
+                address_id=address_id,
+                client_request_id=shop.client_request_id(suffix),
+                idempotency_key=shop.key(suffix),
+            )
+        return caught.value
+    finally:
+        session.close()
+
+
+def test_create_refuses_a_stranger_address_with_404_and_never_403(shop: Shop) -> None:
+    """The address rule on the **create** path (§14.2, §109).
+
+    §14.2 requires ``address_id`` to belong to the caller; §109 requires the answer to be
+    a not-found rather than a 403, because a 403 tells the caller that *somebody else's*
+    address id exists and turns the endpoint into an existence oracle. A 403 here would
+    be the more "helpful" answer and the wrong one.
+
+    **The code is asserted, not just the status.** The ruling is settled: the order path
+    calls ``AddressService.get`` and lets it raise, so an address that is absent and an
+    address that belongs to somebody else both answer ``ADDRESS_NOT_FOUND (50008)`` /
+    404. That is deliberate - distinguishing them would re-create the oracle one layer
+    down, where it is harder to notice - and it is pinned here so that a future change
+    which re-splits the codes turns this test red instead of quietly widening the
+    endpoint's disclosure.
+    """
+    stranger = _stranger(shop)
+    error = _address_failure(
+        shop, address_id=shop.address_id, principal=stranger, suffix="stranger-addr"
+    )
+    assert error.status_code == 404, "an address failure must never be a 403"
+    assert error.status_code != 403
+    assert int(error.code) == 50008
+
+    # Nothing was created, and no stock was touched: the refusal happens at step 2,
+    # before the price is computed and long before the reservation.
+    session = get_session_factory()()
+    try:
+        assert order_count_for(session, user_id=shop.consumer_id) == 0
+        available, locked, _version = read_position(
+            session, sku_id=shop.sku_ids[0], warehouse_id=shop.warehouse_id
+        )
+        assert (available, locked) == (OPENING_STOCK, 0)
+    finally:
+        session.close()
+
+
+def test_create_refuses_an_address_that_does_not_exist(shop: Shop) -> None:
+    """The absent case: also 50008 / 404, and also not a 403."""
+    error = _address_failure(
+        shop, address_id=999_999_999, principal=shop.consumer, suffix="absent-addr"
+    )
+    assert error.status_code == 404
+    assert int(error.code) == 50008
+
+    session = get_session_factory()()
+    try:
+        assert order_count_for(session, user_id=shop.consumer_id) == 0
+    finally:
+        session.close()
+
+
+def test_absent_and_not_yours_addresses_are_indistinguishable(shop: Shop) -> None:
+    """§109 made executable: the two failures must be **identical in every observable**.
+
+    This is the assertion that actually protects the endpoint. Asserting "both are 404"
+    is not enough: a response that differs in its business code (or in its message) is
+    still an existence oracle for anyone who reads the JSON, and the caller is exactly the
+    party who reads the JSON. So the status, the code **and** the message are compared -
+    if any of the three ever diverges, this fails.
+
+    Note the two requests are otherwise alike: same principal for the absent case is the
+    *owner*, which is the stronger pairing - the difference the attacker would exploit is
+    "I get 50009 for an id that is mine-adjacent", and that difference must not exist.
+    """
+    not_yours = _address_failure(
+        shop, address_id=shop.address_id, principal=_stranger(shop), suffix="cmp-notyours"
+    )
+    absent = _address_failure(
+        shop, address_id=999_999_999, principal=shop.consumer, suffix="cmp-absent"
+    )
+
+    assert not_yours.status_code == absent.status_code == 404
+    assert int(not_yours.code) == int(absent.code) == 50008
+    assert not_yours.public_message == absent.public_message
+    # The context must not differ either - it is part of the payload the client sees.
+    assert not_yours.context == absent.context
+
+
+def test_create_refuses_an_address_that_does_not_exist(shop: Shop) -> None:
