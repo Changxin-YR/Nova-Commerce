@@ -145,6 +145,15 @@ export const API = {
     promotions: '/marketing/promotions',
     adminCoupons: '/marketing/admin/coupons',
     adminPromotions: '/marketing/admin/promotions',
+    /**
+     * TASK endpoints (§99, API_CONTRACT.md §4). FROZEN paths:
+     *   POST /api/v1/marketing/promotions/{id}/publish
+     *   POST /api/v1/marketing/promotions/{id}/unpublish
+     * They sit at the `/marketing/promotions` prefix, NOT the `/marketing/admin` module prefix the
+     * list route uses — same shape as the product publish/unpublish split.
+     */
+    publishPromotion: (id: string | number) => `/marketing/promotions/${id}/publish`,
+    unpublishPromotion: (id: string | number) => `/marketing/promotions/${id}/unpublish`,
   },
 
   // -- analytics ----------------------------------------------------------
@@ -168,8 +177,13 @@ export const API = {
     base: (baseId: string) => `/knowledge/admin/bases/${baseId}`,
     documents: (baseId: string) => `/knowledge/admin/bases/${baseId}/documents`,
     document: (docId: string) => `/knowledge/admin/documents/${docId}`,
-    reprocess: (docId: string) => `/knowledge/admin/documents/${docId}/reprocess`,
-    archive: (docId: string) => `/knowledge/admin/documents/${docId}/archive`,
+    /**
+     * TASK endpoints (§99, API_CONTRACT.md §4). FROZEN paths are
+     * `POST /api/v1/knowledge/documents/{id}/reprocess` and `.../archive` — note the
+     * `documents/` segment, NOT the `/knowledge/admin/documents/` module path the read routes use.
+     */
+    reprocess: (docId: string) => `/knowledge/documents/${docId}/reprocess`,
+    archive: (docId: string) => `/knowledge/documents/${docId}/archive`,
     /** Retrieval debug: rewrite -> filter -> dense -> sparse -> fusion -> rerank -> evidence. */
     retrievalDebug: '/knowledge/retrieval/debug',
     evaluation: '/knowledge/admin/evaluation',

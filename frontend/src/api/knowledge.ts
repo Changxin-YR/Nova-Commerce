@@ -49,6 +49,11 @@ export const knowledgeAdminApi = {
     return httpClient.upload<KnowledgeDoc>(API.knowledge.documents(baseId), form)
   },
 
+  /**
+   * TASK endpoints (§99). Each returns the UPDATED document, not 204 — a state transition that
+   * returns nothing leaves the client to choose between an extra refetch and an optimistic guess
+   * that drifts from the server (API_CONTRACT.md §4).
+   */
   async reprocess(docId: string): Promise<KnowledgeDoc> {
     return httpClient.post<KnowledgeDoc>(API.knowledge.reprocess(docId), {})
   },

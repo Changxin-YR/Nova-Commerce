@@ -50,6 +50,18 @@ export const marketingApi = {
 }
 
 export const marketingAdminApi = {
+  /**
+   * TASK endpoints (§99, API_CONTRACT.md §4). Publishing a promotion is a named business intent,
+   * never a `PATCH {status}`, and each returns the updated entity rather than 204.
+   */
+  async publishPromotion(id: string | number): Promise<Promotion> {
+    return httpClient.post<Promotion>(API.marketing.publishPromotion(id), {})
+  },
+
+  async unpublishPromotion(id: string | number): Promise<Promotion> {
+    return httpClient.post<Promotion>(API.marketing.unpublishPromotion(id), {})
+  },
+
   async coupons(query: PageQuery = {}): Promise<Paged<Coupon>> {
     return httpClient.get<Paged<Coupon>>(API.marketing.adminCoupons, { params: query })
   },

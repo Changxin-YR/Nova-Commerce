@@ -9,9 +9,18 @@
  *      (rewrite → filter → dense → sparse → fusion → rerank → final evidence).
  *   3. RAG evaluation metrics.
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { knowledgeAdminApi, retrievalApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
+import { buildKnowledgeDocParams } from '@/domain/listParams'
+import {
+  canArchive,
+  canReprocess,
+  docActionBlockedReason,
+  isProcessing,
+  isTerminalForOperator,
+  needsAttention,
+} from '@/domain/knowledge/availability'
 import { useNotificationStore } from '@/stores/notification'
 import { normalizeError } from '@/api/error'
 import { POLL_INTERVAL_MS } from '@/config/app'
@@ -19,6 +28,9 @@ import StateView from '@/components/ui/StateView.vue'
 import StatusChip from '@/components/ui/StatusChip.vue'
 
 const notifications = useNotificationStore()
+
+/** Filter draft lives in this page — NOT in a store (§105). */
+const filters = reactive({ keyword: '', page: 1, page_size: 20 })
 
 const {
   data: baseData,
@@ -45,15 +57,50 @@ const {
   execute: loadDocs,
   refresh: refreshDocs,
 } = useAsyncState(
-  () => (selectedBaseId.value ? knowledgeAdminApi.documents(selectedBaseId.value, { page: 1 }) : Promise.resolve(null)),
+  () =>
+    selectedBaseId.value
+      ? knowledgeAdminApi.documents(
+          selectedBaseId.value,
+          buildKnowledgeDocParams({
+            knowledgeBaseId: selectedBaseId.value,
+            keyword: filters.keyword,
+            page: filters.page,
+            page_size: filters.page_size,
+          }),
+        )
+      : Promise.resolve(null),
   { immediate: false },
 )
 
 watch(selectedBaseId, (id) => {
-  if (id) void loadDocs()
+  if (id) {
+    filters.page = 1
+    void loadDocs()
+  }
 }, { immediate: true })
 
 const documents = computed(() => docData.value?.items ?? [])
+const docMeta = computed(() => docData.value?.meta ?? null)
+
+/** Any filter change RESETS to page 1, otherwise the operator lands on an empty page 3. */
+function applyDocFilters(): void {
+  filters.page = 1
+  void loadDocs()
+}
+
+function resetDocFilters(): void {
+  filters.keyword = ''
+  filters.page = 1
+  void loadDocs()
+}
+
+function changeDocPage(delta: number): void {
+  const next = filters.page + delta
+  if (next < 1) return
+  if (docMeta.value && next > docMeta.value.total_pages) return
+  filters.page = next
+  void loadDocs()
+}
 
 /**
  * Poll while any document is PROCESSING so the Processing state (§108) resolves
@@ -102,16 +149,47 @@ function onFileChange(event: Event): void {
   input.value = ''
 }
 
-async function reprocess(docId: string): Promise<void> {
+/**
+ * Central task-action runner.
+ *
+ * §104: these buttons decide only what is OFFERED. The server re-validates and answers
+ * `DOCUMENT_STATE_INVALID` (100002) when the UI and the backend disagree about a transition — a
+ * real case when two operators work the same queue, so it is reported rather than crashing.
+ */
+async function runDocAction(action: 'reprocess' | 'archive', docId: string): Promise<void> {
+  busyDocId.value = docId
   try {
-    await knowledgeAdminApi.reprocess(docId)
-    notifications.success('已提交重新处理')
+    if (action === 'reprocess') {
+      await knowledgeAdminApi.reprocess(docId)
+      notifications.success('已提交重新处理')
+    } else {
+      await knowledgeAdminApi.archive(docId)
+      notifications.success('文档已归档')
+    }
     await loadDocs()
   } catch (e) {
     const normalized = normalizeError(e)
-    notifications.error('重新处理失败', normalized.message, normalized.code, normalized.traceId)
+    if (normalized.forbidden) {
+      notifications.error(
+        '权限不足',
+        '服务端拒绝了该操作：界面权限与服务端不一致，请刷新后重试或联系管理员。',
+        normalized.code,
+        normalized.traceId,
+      )
+      await loadDocs()
+    } else if (normalized.code === 100_002) {
+      notifications.warning('文档状态已变化', '该文档已被其他操作改变，列表已刷新，请重试。')
+      await loadDocs()
+    } else {
+      notifications.error(action === 'reprocess' ? '重新处理失败' : '归档失败', normalized.message, normalized.code, normalized.traceId)
+    }
+  } finally {
+    busyDocId.value = ''
   }
 }
+
+/** Document currently mid-mutation (disables just that row). */
+const busyDocId = ref('')
 
 // -- Retrieval debug ---------------------------------------------------------
 const debugQuery = ref('')
@@ -178,44 +256,108 @@ function scorePercent(value: number): string {
           <h3 class="nx-section-title">文档</h3>
 
           <!-- Knowledge surfaces must render Processing / Failed (§108). -->
+          <!-- filter bar ------------------------------------------------------ -->
+          <div class="nx-filterbar">
+            <label>
+              文件名
+              <input
+                v-model="filters.keyword"
+                class="nx-input"
+                placeholder="按文件名检索"
+                @keydown.enter="applyDocFilters()"
+              />
+            </label>
+            <button type="button" class="nx-btn nx-btn--primary nx-btn--sm" @click="applyDocFilters()">查询</button>
+            <button type="button" class="nx-btn nx-btn--sm" @click="resetDocFilters()">重置</button>
+          </div>
+
           <StateView :state="docStatus" :error="docError" @retry="loadDocs()">
+            <div v-if="docMeta" class="knowledge__count nx-muted">共 {{ docMeta.total }} 条</div>
+
             <table class="nx-table">
               <thead>
                 <tr>
-                  <th>文件名</th>
-                  <th>类型</th>
-                  <th>大小</th>
-                  <th>状态</th>
-                  <th>分片</th>
-                  <th>操作</th>
+                  <th style="width: 260px">文件名</th>
+                  <th style="width: 130px">类型</th>
+                  <th style="width: 80px; text-align: right">大小</th>
+                  <th style="width: 150px">状态</th>
+                  <th style="width: 70px; text-align: right">分片</th>
+                  <th style="width: 150px">操作</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="doc in documents" :key="doc.id">
                   <td class="knowledge__name">{{ doc.file_name }}</td>
                   <td>{{ doc.content_type }}</td>
-                  <td>{{ Math.max(1, Math.round(doc.size_bytes / 1024)) }} KB</td>
+                  <td style="text-align: right">{{ Math.max(1, Math.round(doc.size_bytes / 1024)) }} KB</td>
                   <td>
+                    <!--
+                      §108 extra states for a knowledge surface: PROCESSING is a live state (the page
+                      polls while any document is in it) and FAILED is the failure state, which shows
+                      the server's own `error_message` rather than a generic "failed".
+                    -->
                     <StatusChip :status="doc.status" kind="doc" />
-                    <span v-if="doc.status === 'FAILED' && doc.error_message" class="knowledge__doc-error">
+                    <span v-if="isProcessing(doc.status)" class="knowledge__doc-processing">解析中…</span>
+                    <span v-else-if="needsAttention(doc.status) && doc.error_message" class="knowledge__doc-error">
                       {{ doc.error_message }}
                     </span>
                   </td>
-                  <td>{{ doc.chunk_count }}</td>
+                  <td style="text-align: right">{{ doc.chunk_count }}</td>
                   <td>
-                    <button
-                      v-if="doc.status === 'FAILED' || doc.status === 'READY'"
-                      type="button"
-                      class="nx-btn nx-btn--ghost"
-                      @click="reprocess(doc.id)"
-                    >
-                      重新处理
-                    </button>
+                    <div class="knowledge__actions">
+                      <!--
+                        Availability comes from the tested module, never an inline status check, so
+                        the row cannot offer a transition §53 forbids (e.g. reprocessing a document
+                        that is already parsing).
+                      -->
+                      <button
+                        v-if="canReprocess(doc.status)"
+                        type="button"
+                        class="nx-btn nx-btn--text"
+                        :disabled="busyDocId === doc.id"
+                        @click="runDocAction('reprocess', doc.id)"
+                      >
+                        重新处理
+                      </button>
+                      <button
+                        v-if="canArchive(doc.status)"
+                        type="button"
+                        class="nx-btn nx-btn--text"
+                        :disabled="busyDocId === doc.id"
+                        @click="runDocAction('archive', doc.id)"
+                      >
+                        归档
+                      </button>
+                      <span
+                        v-if="isTerminalForOperator(doc.status)"
+                        class="knowledge__hint"
+                        :title="docActionBlockedReason('archive', doc.status)"
+                      >
+                        {{ doc.status === 'PROCESSING' ? '处理中' : '已归档' }}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
-            <p v-if="documents.some((d) => d.status === 'PROCESSING')" class="nx-muted knowledge__polling">
+
+            <!-- pager --------------------------------------------------------- -->
+            <div v-if="docMeta" class="knowledge__pager">
+              <button type="button" class="nx-btn nx-btn--sm" :disabled="filters.page <= 1" @click="changeDocPage(-1)">
+                上一页
+              </button>
+              <span class="nx-muted">第 {{ docMeta.page }} / {{ docMeta.total_pages }} 页</span>
+              <button
+                type="button"
+                class="nx-btn nx-btn--sm"
+                :disabled="docMeta.total_pages > 0 && filters.page >= docMeta.total_pages"
+                @click="changeDocPage(1)"
+              >
+                下一页
+              </button>
+            </div>
+
+            <p v-if="documents.some((d) => isProcessing(d.status))" class="nx-muted knowledge__polling">
               有文档正在解析，页面会自动刷新。
             </p>
           </StateView>
@@ -345,6 +487,37 @@ function scorePercent(value: number): string {
     margin-top: 4px;
     color: var(--nx-danger);
     font-size: 11.5px;
+  }
+
+  &__count {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  &__hint {
+    color: var(--nx-text-muted);
+    font-size: 11.5px;
+  }
+
+  &__doc-processing {
+    margin-left: 6px;
+    color: var(--nx-text-muted);
+    font-size: 11.5px;
+  }
+
+  &__pager {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    font-size: 12px;
   }
 
   &__polling {
