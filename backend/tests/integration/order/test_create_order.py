@@ -157,7 +157,7 @@ def test_the_stock_is_reserved_and_the_ledger_explains_it(shop: Shop) -> None:
     finally:
         session.close()
 
-    _create(shop, lines=[OrderLineInput(sku_id, 4)])
+    result = _create(shop, lines=[OrderLineInput(sku_id, 4)])
 
     session = get_session_factory()()
     try:
@@ -182,10 +182,11 @@ def test_the_stock_is_reserved_and_the_ledger_explains_it(shop: Shop) -> None:
         assert lock.operator_type == "CUSTOMER"
         assert lock.operator_id == shop.consumer_id
         assert lock.reference_type == "ORDER"
-        # INV-007/§7: the ledger names the order that locked the unit, because §7
-        # inserts the order row *before* reserving. A NULL here would leave the movement
-        # explainable only by decoding an idempotency-key string.
-        assert lock.reference_id is not None
+        assert lock.reference_id == result.order.id
+        # §7/INV-007: the movement names the **order** that locked the unit, and names it
+        # exactly - the whole reason §7 inserts the order row before the reservation. A
+        # bare ``is not None`` would pass for a movement pointing at the wrong order, so
+        # the id itself is compared.
         assert lock.idempotency_key == f"order-lock:{shop.consumer_id}:{shop.client_request_id('1')}:{sku_id}"
     finally:
         session.close()
@@ -658,6 +659,3 @@ def test_absent_and_not_yours_addresses_are_indistinguishable(shop: Shop) -> Non
     assert not_yours.public_message == absent.public_message
     # The context must not differ either - it is part of the payload the client sees.
     assert not_yours.context == absent.context
-
-
-def test_create_refuses_an_address_that_does_not_exist(shop: Shop) -> None:
