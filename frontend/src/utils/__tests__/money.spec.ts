@@ -4,6 +4,7 @@ import {
   formatMoney,
   fromMajorString,
   percentOf,
+  splitMoney,
   sumMoney,
   toMajorString,
 } from '@/utils/money'
@@ -50,6 +51,28 @@ describe('money (integer minor units)', () => {
     for (const amount of [1, 50, 199, 123456]) {
       expect(fromMajorString(formatMoney(amount, { withSymbol: false }))).toBe(amount)
     }
+  })
+
+  it('splits an amount for the styled price renderer', () => {
+    expect(splitMoney(299900)).toEqual({ sign: '', integer: '2,999', decimal: '00' })
+    expect(splitMoney(1)).toEqual({ sign: '', integer: '0', decimal: '01' })
+    expect(splitMoney(0)).toEqual({ sign: '', integer: '0', decimal: '00' })
+    expect(splitMoney(1234567)).toEqual({ sign: '', integer: '12,345', decimal: '67' })
+    expect(splitMoney(-2500)).toEqual({ sign: '−', integer: '25', decimal: '00' })
+    expect(splitMoney(299900, { grouping: false })).toEqual({
+      sign: '',
+      integer: '2999',
+      decimal: '00',
+    })
+  })
+
+  it('never loses the leading zero of the minor part when splitting', () => {
+    for (const amount of [5, 50, 105, 1005]) {
+      const parts = splitMoney(amount)
+      expect(parts.decimal).toHaveLength(2)
+    }
+    expect(splitMoney(5).decimal).toBe('05')
+    expect(splitMoney(50).decimal).toBe('50')
   })
 
   it('sums and computes percentages with integers', () => {

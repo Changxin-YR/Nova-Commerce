@@ -24,8 +24,8 @@ from alembic import context
 # Make `app` importable when alembic is invoked from the backend directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import get_settings  # noqa: E402
-from app.shared.db.base import metadata  # noqa: E402
+from app.core.config import get_settings
+from app.shared.db.base import metadata
 
 config = context.config
 
@@ -139,7 +139,8 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
-        compare_server_default=True,
+        compare_server_default=False,  # see the note in run_migrations_online()
+
         include_object=include_object,
         render_item=render_item,
         # Render the CHECK constraints that back INV-001/INV-002 so the generated
@@ -161,7 +162,15 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            compare_server_default=True,
+            # OFF deliberately. MySQL normalises `now(3)` to `CURRENT_TIMESTAMP(3)`,
+            # so a server-default comparison never converges: every future
+            # autogenerate re-emits 16 no-op ALTERs against the identity tables'
+            # created_at/updated_at columns. That churn is worse than the drift it
+            # might catch - a migration history full of meaningless ALTERs is one
+            # nobody reads, and an unread migration is how a real change slips
+            # through review. compare_type stays ON: a changed column type is a
+            # real, catchable problem.
+            compare_server_default=False,
             include_object=include_object,
             render_item=render_item,
             # MySQL DDL is not transactional; batch mode rewrites ALTERs into

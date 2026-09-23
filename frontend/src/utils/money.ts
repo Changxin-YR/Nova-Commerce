@@ -81,3 +81,32 @@ export function percentOf(part: MoneyAmount, total: MoneyAmount): number {
   if (total <= 0) return 0
   return Math.round((part / total) * 100)
 }
+
+/**
+ * The parts of an amount, for renderers that style the symbol/integer/decimal
+ * differently (the commerce convention: big integer, small symbol and cents).
+ *
+ * This is the ONE place minor units become major units. `<PriceText>` consumes it rather
+ * than dividing by 100 itself, so no business component ever writes `amount / 100` and
+ * rounding behaviour cannot drift between two implementations.
+ */
+export interface MoneyParts {
+  /** '−' for negative amounts, '' otherwise. */
+  sign: string
+  /** Grouped integer digits, e.g. "2,999". */
+  integer: string
+  /** Exactly two digits, e.g. "00". */
+  decimal: string
+}
+
+export function splitMoney(amount: MoneyAmount, options: { grouping?: boolean } = {}): MoneyParts {
+  const { grouping = true } = options
+  const asString = toMajorString(amount)
+  const [rawInteger = '0', rawDecimal = '00'] = asString.split('.')
+  const sign = rawInteger.startsWith('-') ? '−' : ''
+  const digits = rawInteger.replace('-', '')
+  const integer = grouping ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : digits
+  // Pad before slicing, so "5" becomes "05" rather than "50".
+  const decimal = rawDecimal.padStart(2, '0').slice(0, 2)
+  return { sign, integer, decimal }
+}

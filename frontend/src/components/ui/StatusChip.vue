@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /**
- * Status chip for the frozen enums (§105).
+ * Status chip for the frozen state enums (§105).
  *
- * The mapping table is exhaustive over each union, so adding a status to the frozen
- * enum breaks the typecheck here rather than silently rendering a blank chip. Unknown
- * values are shown verbatim in a neutral chip instead of being hidden — a support
- * engineer needs to see the odd value, not a silent gap.
+ * Restyled for the dense look: 2px radius, 12px type, 1px border, colour carries the
+ * meaning (green = done, orange = waiting on the user, red = failed, grey = inert).
+ *
+ * The tone tables are exhaustive over each union, so adding a status to a frozen enum
+ * breaks the typecheck HERE rather than silently rendering a blank chip. An unknown value
+ * is shown verbatim in a neutral chip — a support engineer needs to see the odd value.
  */
 import { computed } from 'vue'
 import type {
@@ -28,13 +30,18 @@ type StatusValue =
   | RiskLevel
   | string
 
-const props = defineProps<{ status: StatusValue; kind?: 'order' | 'payment' | 'fulfillment' | 'aftersale' | 'doc' | 'action' | 'risk' }>()
+const props = defineProps<{
+  status: StatusValue
+  kind?: 'order' | 'payment' | 'fulfillment' | 'aftersale' | 'doc' | 'action' | 'risk'
+  /** Prefix a dot marker (used in dense console tables). */
+  dot?: boolean
+}>()
 
-type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'primary'
+type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'brand'
 
 const ORDER_TONES: Record<OrderStatus, Tone> = {
   PENDING_PAYMENT: 'warning',
-  PROCESSING: 'primary',
+  PROCESSING: 'brand',
   COMPLETED: 'success',
   CANCELLED: 'neutral',
   CLOSED: 'neutral',
@@ -51,7 +58,7 @@ const PAYMENT_TONES: Record<PaymentStatus, Tone> = {
 const FULFILLMENT_TONES: Record<FulfillmentStatus, Tone> = {
   UNFULFILLED: 'neutral',
   PARTIAL_SHIPPED: 'info',
-  SHIPPED: 'primary',
+  SHIPPED: 'brand',
   DELIVERED: 'success',
 }
 
@@ -74,7 +81,7 @@ const ACTION_TONES: Record<PendingActionStatus, Tone> = {
   PENDING: 'warning',
   APPROVED: 'info',
   REJECTED: 'neutral',
-  EXECUTING: 'primary',
+  EXECUTING: 'brand',
   SUCCEEDED: 'success',
   FAILED: 'danger',
   EXPIRED: 'neutral',
@@ -88,6 +95,7 @@ const RISK_TONES: Record<RiskLevel, Tone> = {
   CRITICAL: 'danger',
 }
 
+/** Chinese labels for the frozen enums. The enum VALUE is the contract, not the label. */
 const LABELS: Record<string, string> = {
   PENDING_PAYMENT: '待付款',
   PROCESSING: '处理中',
@@ -103,7 +111,7 @@ const LABELS: Record<string, string> = {
   PARTIAL_SHIPPED: '部分发货',
   SHIPPED: '已发货',
   DELIVERED: '已签收',
-  NONE: '无',
+  NONE: '无售后',
   UPLOADED: '已上传',
   READY: '已就绪',
   FAILED: '失败',
@@ -131,7 +139,6 @@ function toneFor(value: string): Tone {
   if (kind === 'action') return ACTION_TONES[value as PendingActionStatus] ?? 'neutral'
   if (kind === 'risk') return RISK_TONES[value as RiskLevel] ?? 'neutral'
 
-  // No `kind` given: try every table, then fall back to neutral.
   return (
     ORDER_TONES[value as OrderStatus] ??
     PAYMENT_TONES[value as PaymentStatus] ??
@@ -146,61 +153,60 @@ const label = computed(() => LABELS[String(props.status)] ?? String(props.status
 </script>
 
 <template>
-  <span class="nx-status" :class="`nx-status--${tone}`">
-    <span class="nx-status__dot" aria-hidden="true" />
+  <span class="chip" :class="`chip--${tone}`">
+    <span v-if="dot" class="chip__dot" aria-hidden="true" />
     {{ label }}
   </span>
 </template>
 
 <style scoped lang="scss">
-.nx-status {
+.chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 9px;
-  border-radius: var(--nx-radius-pill);
+  gap: 4px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: var(--nx-radius);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 1;
   white-space: nowrap;
-  background: var(--nx-surface-sunken);
-  color: var(--nx-text-secondary);
 
   &__dot {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: currentColor;
-    opacity: 0.75;
   }
 
   &--neutral {
+    color: var(--nx-text-secondary);
     background: var(--nx-surface-sunken);
-    color: var(--nx-text-muted);
   }
 
   &--info {
-    background: var(--nx-info-soft);
     color: var(--nx-info);
+    background: var(--nx-info-soft);
   }
 
-  &--primary {
-    background: var(--nx-primary-soft);
-    color: var(--nx-primary);
+  &--brand {
+    color: var(--nx-brand);
+    background: var(--nx-brand-soft);
   }
 
   &--success {
-    background: var(--nx-success-soft);
     color: var(--nx-success);
+    background: var(--nx-success-soft);
   }
 
   &--warning {
-    background: var(--nx-warning-soft);
     color: var(--nx-warning);
+    background: var(--nx-warning-soft);
   }
 
   &--danger {
-    background: var(--nx-danger-soft);
     color: var(--nx-danger);
+    background: var(--nx-danger-soft);
   }
 }
 </style>

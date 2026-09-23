@@ -1,150 +1,360 @@
 /**
- * Design tokens + the small global primitives shared by the consumer store and the
- * merchant console.
+ * Nexora design tokens + Element Plus theme overrides.
  *
- * Token values follow the Amicro design-system palette (dark page #121212, card
- * #181818, hover #202020, muted text #767676, 24/14px surface radii) adapted to
- * Element Plus overrides rather than Tailwind, because this app is Vue 3 + Element
- * Plus with SCSS (REQ-FE-001).
+ * DESIGN DIRECTION: information-dense Chinese B2C commerce — the conventions Chinese
+ * shoppers already know. Tight type scale, 1px hairlines, ~0 radius, grey page with white
+ * content blocks, red pricing. Deliberately NOT the Western SaaS look (large radii,
+ * floating shadow cards, generous whitespace).
  *
- * Everything is a CSS custom property so a component never hard-codes a colour and
- * dark mode is a token swap rather than a second stylesheet.
+ * SCOPE / LEGAL (spec §127): only the *design language* is referenced. No third-party
+ * logo, image asset, brand name or proprietary graphic is used or reproduced anywhere in
+ * this app — the brand is Nexora, and all copy, badges and artwork are ours.
+ *
+ * HOW ELEMENT PLUS IS THEMED: Element Plus is driven by CSS custom properties
+ * (`--el-*`). Overriding them reskins every component, so no component library is swapped
+ * (§6 freezes Element Plus). Element Plus's stylesheet is imported BEFORE this file in
+ * `main.ts`, so these declarations win.
+ *
+ * Every `--el-*` override lives in section 2 below, so the theme surface is auditable in
+ * one place. The inventory is also listed in README "Theming".
  */
 
+/* ===========================================================================
+   1. Nexora brand tokens — the private layer components consume
+   =========================================================================== */
 :root {
-  --nx-primary: #2563eb;
-  --nx-primary-hover: #1d4ed8;
-  --nx-primary-soft: rgba(37, 99, 235, 0.1);
+  /* -- brand / price red ------------------------------------------------- */
+  --nx-brand: #e1251b;
+  --nx-brand-hover: #c81623;
+  --nx-brand-soft: #fdeded;
+  --nx-price: #e1251b;
+  /* Secondary CTA: the "add to cart" outline button */
+  --nx-cta-orange: #ff6700;
+  --nx-cta-orange-hover: #e85f00;
 
-  --nx-success: #16a34a;
-  --nx-success-soft: rgba(22, 163, 74, 0.12);
-  --nx-warning: #d97706;
-  --nx-warning-soft: rgba(217, 119, 6, 0.12);
-  --nx-danger: #dc2626;
-  --nx-danger-soft: rgba(220, 38, 38, 0.1);
-  --nx-info: #0ea5e9;
-  --nx-info-soft: rgba(14, 165, 233, 0.12);
+  /* -- links / status ---------------------------------------------------- */
+  --nx-link: #1d7de0;
+  --nx-link-hover: #3a92e8;
+  --nx-success: #2fa84f;
+  --nx-success-soft: #eaf7ee;
+  --nx-warning: #ff8f1f;
+  --nx-warning-soft: #fff5e6;
+  --nx-danger: #e1251b;
+  --nx-danger-soft: #fdeded;
+  --nx-info: #1d7de0;
+  --nx-info-soft: #eaf3fd;
 
-  --nx-page-bg: #f8f9fa;
+  /* -- neutrals: the dense-commerce palette ------------------------------ */
+  --nx-text: #333333;
+  --nx-text-secondary: #666666;
+  --nx-text-muted: #999999;
+  --nx-text-inverse: #ffffff;
+  --nx-border: #e8e8e8;
+  --nx-border-strong: #d9d9d9;
+  --nx-border-hover: #e1251b;
+  --nx-page-bg: #f5f5f5;
   --nx-surface: #ffffff;
-  --nx-surface-hover: #ffffff;
-  --nx-surface-stage: #f4f4f6;
-  --nx-surface-sunken: #f1f5f9;
-  --nx-text: #000000;
-  --nx-text-secondary: #4b5563;
-  --nx-text-muted: #6b7280;
-  --nx-border: #e5e7eb;
-  --nx-border-strong: #d1d5db;
+  --nx-surface-hover: #fafafa;
+  --nx-surface-sunken: #f7f7f7;
+  --nx-surface-stage: #fafafa;
+  --nx-header-bg: #ffffff;
 
-  --nx-radius-card: 24px;
-  --nx-radius-stage: 14px;
-  --nx-radius-control: 10px;
-  --nx-radius-pill: 999px;
+  /* -- geometry: near-square. The single biggest visual signal separating a
+        Chinese commerce UI from a Western SaaS one. ---------------------- */
+  --nx-radius: 2px;
+  --nx-radius-card: 2px;
+  --nx-radius-stage: 2px;
+  --nx-radius-control: 2px;
+  --nx-radius-pill: 2px;
 
-  --nx-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
-  --nx-shadow-card-hover: 0 6px 24px rgba(0, 0, 0, 0.06);
-  --nx-shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.12);
+  /* -- borders instead of shadows ---------------------------------------- */
+  --nx-shadow-card: none;
+  --nx-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --nx-shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.14);
+  --nx-shadow-card-inset: none;
 
-  --nx-header-height: 64px;
-  --nx-console-sidebar-width: 232px;
-  --nx-console-sidebar-collapsed: 64px;
+  /* -- dense type + layout scale ----------------------------------------- */
+  --nx-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --nx-font-size: 12px;
+  --nx-font-size-base: 14px;
+  --nx-line-height: 1.5;
 
-  --nx-font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --nx-header-height: 80px;
+  --nx-utilitybar-height: 30px;
+  --nx-container-width: 1190px;
+  --nx-console-sidebar-width: 200px;
+  --nx-console-sidebar-collapsed: 56px;
+  --nx-console-topbar-height: 50px;
+}
+
+/* Dark theme is a compact token swap, not a second stylesheet: the store is designed
+   light (that is the reference convention), and the accent red keeps its meaning. */
+html.dark {
+  --nx-brand: #ff4d43;
+  --nx-brand-hover: #ff6a60;
+  --nx-brand-soft: #3a1c1a;
+  --nx-price: #ff4d43;
+  --nx-link: #5aa9f0;
+
+  --nx-text: #e6e6e6;
+  --nx-text-secondary: #b3b3b3;
+  --nx-text-muted: #808080;
+  --nx-border: #333333;
+  --nx-border-strong: #444444;
+  --nx-page-bg: #1a1a1a;
+  --nx-surface: #242424;
+  --nx-surface-hover: #2c2c2c;
+  --nx-surface-sunken: #1f1f1f;
+  --nx-surface-stage: #1f1f1f;
+  --nx-header-bg: #242424;
+  --nx-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ===========================================================================
+   2. Element Plus overrides — THE COMPLETE THEME SURFACE
+   Nothing else in the app styles Element Plus internals.
+   =========================================================================== */
+:root {
+  /* -- brand colours (primary + the light/dark ramp EP derives from it) --- */
+  --el-color-primary: #e1251b;
+  --el-color-primary-light-3: #e85a52;
+  --el-color-primary-light-5: #f08c86;
+  --el-color-primary-light-7: #f8bdba;
+  --el-color-primary-light-8: #fad5d3;
+  --el-color-primary-light-9: #fdeded;
+  --el-color-primary-dark-2: #c81623;
+
+  --el-color-success: #2fa84f;
+  --el-color-success-light-9: #eaf7ee;
+  --el-color-warning: #ff8f1f;
+  --el-color-warning-light-9: #fff5e6;
+  --el-color-danger: #e1251b;
+  --el-color-error: #e1251b;
+  --el-color-danger-light-9: #fdeded;
+  --el-color-info: #999999;
+
+  /* -- text --------------------------------------------------------------- */
+  --el-text-color-primary: #333333;
+  --el-text-color-regular: #666666;
+  --el-text-color-secondary: #999999;
+  --el-text-color-placeholder: #bbbbbb;
+  --el-text-color-disabled: #cccccc;
+
+  /* -- surfaces + borders ------------------------------------------------- */
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f5f5f5;
+  --el-bg-color-overlay: #ffffff;
+  --el-border-color: #e8e8e8;
+  --el-border-color-light: #eeeeee;
+  --el-border-color-lighter: #f2f2f2;
+  --el-border-color-extra-light: #f7f7f7;
+  --el-border-color-dark: #d9d9d9;
+  --el-border-color-darker: #cccccc;
+  --el-fill-color: #f7f7f7;
+  --el-fill-color-light: #fafafa;
+  --el-fill-color-lighter: #fcfcfc;
+  --el-fill-color-blank: #ffffff;
+
+  /* -- geometry: near-square --------------------------------------------- */
+  --el-border-radius-base: 2px;
+  --el-border-radius-small: 2px;
+  --el-border-radius-round: 2px;
+
+  /* -- dense type + control heights -------------------------------------- */
+  --el-font-family: var(--nx-font-sans);
+  --el-font-size-base: 14px;
+  --el-font-size-small: 13px;
+  --el-font-size-extra-small: 12px;
+  --el-component-size: 32px;
+  --el-component-size-small: 26px;
+  --el-component-size-large: 38px;
+
+  /* -- reduced elevation: this design separates with borders --------------- */
+  --el-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --el-box-shadow-light: 0 1px 4px rgba(0, 0, 0, 0.08);
+  --el-box-shadow-lighter: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 html.dark {
-  --nx-primary: #3b82f6;
-  --nx-primary-hover: #60a5fa;
-  --nx-primary-soft: rgba(59, 130, 246, 0.16);
-
-  --nx-success: #22c55e;
-  --nx-warning: #f59e0b;
-  --nx-danger: #f87171;
-
-  --nx-page-bg: #121212;
-  --nx-surface: #181818;
-  --nx-surface-hover: #202020;
-  --nx-surface-stage: #131313;
-  --nx-surface-sunken: #141414;
-  --nx-text: #ffffff;
-  --nx-text-secondary: #ededed;
-  --nx-text-muted: #767676;
-  --nx-border: #2a2a2a;
-  --nx-border-strong: #3a3a3a;
-
-  --nx-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --nx-shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --el-text-color-primary: #e6e6e6;
+  --el-text-color-regular: #b3b3b3;
+  --el-text-color-secondary: #808080;
+  --el-text-color-placeholder: #6b6b6b;
+  --el-bg-color: #242424;
+  --el-bg-color-page: #1a1a1a;
+  --el-bg-color-overlay: #2c2c2c;
+  --el-border-color: #333333;
+  --el-border-color-light: #3a3a3a;
+  --el-border-color-lighter: #303030;
+  --el-border-color-dark: #444444;
+  --el-fill-color: #1f1f1f;
+  --el-fill-color-light: #262626;
+  --el-fill-color-lighter: #2a2a2a;
+  --el-fill-color-blank: #242424;
 }
 
+/* ===========================================================================
+   3. Base
+   =========================================================================== */
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: var(--nx-font-sans);
-  background: var(--nx-page-bg);
+  /* 12px base is the dense-commerce convention; components opt in to more. */
+  font-size: var(--nx-font-size);
+  line-height: var(--nx-line-height);
   color: var(--nx-text);
+  background: var(--nx-page-bg);
+  font-family: var(--nx-font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* -- container: the standard card geometry ---------------------------------- */
-.nx-container {
-  width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 20px;
+a {
+  color: var(--nx-link);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--nx-brand);
+  }
 }
 
-.nx-card {
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* ===========================================================================
+   4. Layout primitives
+   =========================================================================== */
+.nx-container {
+  width: var(--nx-container-width);
+  margin: 0 auto;
+
+  @media (max-width: 1200px) {
+    width: 100%;
+    padding: 0 12px;
+  }
+}
+
+/* White content block on the grey page, separated by hairlines (not shadows). */
+.nx-block {
   background: var(--nx-surface);
   border: 1px solid var(--nx-border);
-  border-radius: var(--nx-radius-card);
-  box-shadow: var(--nx-shadow-card);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 
-  &--interactive:hover {
-    background: var(--nx-surface-hover);
-    box-shadow: var(--nx-shadow-card-hover);
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--nx-border);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
   }
 
   &__body {
-    padding: 18px 20px;
-  }
-
-  &__stage {
-    margin: 12px 12px 0;
-    background: var(--nx-surface-stage);
-    border-radius: var(--nx-radius-stage);
+    padding: 12px;
   }
 }
 
-/* -- buttons: plain CSS so state components work without Element Plus --------- */
+/* Section heading with the brand-red accent bar (a commerce convention). */
+.nx-floor-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    background: var(--nx-brand);
+  }
+}
+
+.nx-muted {
+  color: var(--nx-text-muted);
+}
+
+.nx-text-secondary {
+  color: var(--nx-text-secondary);
+}
+
+.nx-price {
+  color: var(--nx-price);
+}
+
+/* Tabular numerals everywhere money or counts are compared vertically. */
+.nx-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hairline-separated label/value rows, used by every summary and amount panel. */
+.nx-rows {
+  margin: 0;
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 12px;
+  }
+
+  dt {
+    color: var(--nx-text-secondary);
+  }
+
+  dd {
+    margin: 0;
+  }
+
+  &--total {
+    margin-top: 4px;
+    padding-top: 8px !important;
+    border-top: 1px solid var(--nx-border);
+    font-size: 14px !important;
+  }
+}
+
+/* ===========================================================================
+   5. Buttons — plain CSS, so state components work without Element Plus.
+   Two-CTA convention: solid brand for the primary action, orange outline for
+   the secondary ("add to cart" beside "buy now").
+   =========================================================================== */
 .nx-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 32px;
+  gap: 4px;
+  height: 30px;
   padding: 0 14px;
   border: 1px solid var(--nx-border-strong);
-  border-radius: var(--nx-radius-control);
+  border-radius: var(--nx-radius);
   background: var(--nx-surface);
   color: var(--nx-text);
-  font-size: 13px;
-  font-weight: 500;
   font-family: inherit;
+  font-size: 12px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 
-  &:hover {
-    border-color: var(--nx-primary);
-    color: var(--nx-primary);
-  }
-
-  &:active {
-    transform: scale(0.98);
+  &:hover:not(:disabled) {
+    border-color: var(--nx-brand);
+    color: var(--nx-brand);
   }
 
   &:disabled {
@@ -152,15 +362,29 @@ body {
     cursor: not-allowed;
   }
 
+  /* Primary: solid brand red — the main conversion action. */
   &--primary {
-    background: var(--nx-primary);
-    border-color: var(--nx-primary);
+    background: var(--nx-brand);
+    border-color: var(--nx-brand);
     color: #fff;
 
-    &:hover {
-      background: var(--nx-primary-hover);
-      border-color: var(--nx-primary-hover);
+    &:hover:not(:disabled) {
+      background: var(--nx-brand-hover);
+      border-color: var(--nx-brand-hover);
       color: #fff;
+    }
+  }
+
+  /* Secondary CTA: orange outline — the "add to cart" affordance. */
+  &--outline {
+    background: var(--nx-surface);
+    border-color: var(--nx-cta-orange);
+    color: var(--nx-cta-orange);
+
+    &:hover:not(:disabled) {
+      background: #fff8f3;
+      border-color: var(--nx-cta-orange-hover);
+      color: var(--nx-cta-orange-hover);
     }
   }
 
@@ -170,86 +394,199 @@ body {
     color: #fff;
   }
 
-  &--ghost {
+  /* Flat text action for table rows. */
+  &--text {
+    height: auto;
+    padding: 0;
+    border: none;
     background: transparent;
-    border-color: transparent;
-    color: var(--nx-text-muted);
+    color: var(--nx-link);
 
-    &:hover {
-      background: var(--nx-primary-soft);
-      color: var(--nx-primary);
-      border-color: transparent;
+    &:hover:not(:disabled) {
+      background: transparent;
+      color: var(--nx-brand);
+    }
+  }
+
+  &--lg {
+    height: 38px;
+    padding: 0 24px;
+    font-size: 14px;
+  }
+
+  &--sm {
+    height: 24px;
+    padding: 0 8px;
+  }
+
+  &--block {
+    width: 100%;
+  }
+}
+
+/* ===========================================================================
+   6. Promo / status badges — dense 1px-bordered labels
+   =========================================================================== */
+.nx-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: var(--nx-radius);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+
+  &--self {
+    color: var(--nx-brand);
+    background: var(--nx-brand-soft);
+  }
+
+  &--seckill {
+    color: #fff;
+    background: var(--nx-brand);
+  }
+
+  &--discount {
+    color: var(--nx-brand);
+    background: var(--nx-surface);
+  }
+
+  &--coupon {
+    color: var(--nx-cta-orange);
+    background: var(--nx-surface);
+  }
+
+  &--new {
+    color: var(--nx-success);
+    background: var(--nx-success-soft);
+  }
+
+  &--neutral {
+    color: var(--nx-text-secondary);
+    border-color: var(--nx-border-strong);
+    background: var(--nx-surface-sunken);
+  }
+}
+
+/* ===========================================================================
+   7. Dense tables + filter bars (console side)
+   =========================================================================== */
+.nx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--nx-border);
+    vertical-align: middle;
+  }
+
+  th {
+    background: var(--nx-surface-sunken);
+    border-right: 1px solid var(--nx-border);
+    font-weight: 700;
+    color: var(--nx-text-secondary);
+    white-space: nowrap;
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+
+  tbody tr:hover {
+    background: var(--nx-surface-hover);
+  }
+}
+
+.nx-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--nx-border);
+  background: var(--nx-surface);
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--nx-text-secondary);
+  }
+
+  &__spacer {
+    margin-left: auto;
+  }
+}
+
+.nx-input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--nx-border-strong);
+  border-radius: var(--nx-radius);
+  background: var(--nx-surface);
+  color: var(--nx-text);
+  font-family: inherit;
+  font-size: 12px;
+
+  &:focus {
+    border-color: var(--nx-brand);
+    outline: none;
+  }
+}
+
+/* ===========================================================================
+   8. Tabs — flat, underline-active. Not pill-shaped: pills read as Western SaaS,
+   underline reads as commerce.
+   =========================================================================== */
+.nx-tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--nx-border);
+}
+
+.nx-tab {
+  position: relative;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--nx-text);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--nx-brand);
+  }
+
+  &--active {
+    color: var(--nx-brand);
+    font-weight: 700;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--nx-brand);
     }
   }
 }
 
-/* -- pill bar (Amicro catalog navigation pattern) ---------------------------- */
-.nx-pills {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border-radius: var(--nx-radius-pill);
-  background: var(--nx-surface-sunken);
-  border: 1px solid var(--nx-border);
-}
-
-.nx-pill {
-  padding: 6px 14px;
-  border: none;
-  border-radius: var(--nx-radius-pill);
-  background: transparent;
-  color: var(--nx-text-muted);
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease;
-
-  &:hover {
-    color: var(--nx-text);
-  }
-
-  &--active {
-    background: var(--nx-surface);
-    color: var(--nx-text);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  }
-}
-
-html.dark .nx-pill--active {
-  background: #2a2a2a;
-  color: #fff;
-}
-
-/* -- typography ------------------------------------------------------------- */
-.nx-page-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.019em;
-}
-
-.nx-section-title {
-  margin: 0 0 12px;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.nx-muted {
-  color: var(--nx-text-muted);
-  font-size: 13px;
-}
-
-.nx-money {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-/* -- accessibility ---------------------------------------------------------- */
+/* ===========================================================================
+   9. Accessibility
+   =========================================================================== */
 :focus-visible {
-  outline: 2px solid var(--nx-primary);
-  outline-offset: 2px;
+  outline: 2px solid var(--nx-brand);
+  outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -259,18 +596,4 @@ html.dark .nx-pill--active {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
-}
-
-/* -- Element Plus token bridge --------------------------------------------- */
-:root {
-  --el-color-primary: var(--nx-primary);
-  --el-border-radius-base: var(--nx-radius-control);
-}
-
-html.dark {
-  --el-bg-color: var(--nx-surface);
-  --el-bg-color-page: var(--nx-page-bg);
-  --el-text-color-primary: var(--nx-text);
-  --el-text-color-regular: var(--nx-text-secondary);
-  --el-border-color: var(--nx-border);
 }

@@ -14,6 +14,7 @@ declare module 'vue' {
     ActionApprovalCard: typeof import('./../components/agent/ActionApprovalCard.vue')['default']
     ApexChart: typeof import('./../components/charts/ApexChart.vue')['default']
     MessageBlocks: typeof import('./../components/agent/MessageBlocks.vue')['default']
+    PriceText: typeof import('./../components/ui/PriceText.vue')['default']
     ProductCard: typeof import('./../components/ui/ProductCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

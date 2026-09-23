@@ -145,33 +145,34 @@ const showLogin = computed(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 48px 24px;
+  gap: 6px;
+  padding: 40px 24px;
   text-align: center;
   color: var(--nx-text);
 
   &--compact {
-    padding: 20px 12px;
+    padding: 16px 12px;
     gap: 4px;
   }
 
   &__icon {
-    font-size: 24px;
+    font-size: 22px;
     line-height: 1;
-    opacity: 0.75;
+    color: var(--nx-text-muted);
   }
 
   &__title {
     margin: 0;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
   }
 
   &__description {
-    margin: 0;
     max-width: 46ch;
-    font-size: 13px;
-    color: var(--nx-text-muted);
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--nx-text-secondary);
   }
 
   &__trace {
@@ -192,10 +193,10 @@ const showLogin = computed(
 
   &__spinner {
     display: inline-block;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border: 2px solid var(--nx-border);
-    border-top-color: var(--nx-primary);
+    border-top-color: var(--nx-brand);
     border-radius: 50%;
     animation: nx-spin 0.7s linear infinite;
   }

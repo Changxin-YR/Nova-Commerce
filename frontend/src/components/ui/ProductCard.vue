@@ -1,76 +1,115 @@
 <script setup lang="ts">
 /**
- * Reusable consumer product card (used by Home and Search).
+ * Product card — the most repeated element in the store, so it carries the design
+ * language: hairline border, ~0 radius, two-line clamped title, dominant red price,
+ * promo badge row, and a hover state that RAISES the border and adds a soft shadow
+ * (rather than the rounded floating card of a Western SaaS layout).
  *
- * Prices are rendered through `formatMoney` so integer minor units never reach the
- * DOM as a float.
+ * Prices render through `<PriceText>` only. This component never formats money.
  */
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { formatMoney } from '@/utils/money'
+import PriceText from '@/components/ui/PriceText.vue'
 import type { ProductSummary } from '@/types/domain'
 
-defineProps<{ product: ProductSummary }>()
+const props = withDefaults(
+  defineProps<{
+    product: ProductSummary
+    /** Hide the promo badge row in very dense grids. */
+    showTags?: boolean
+  }>(),
+  { showTags: true },
+)
+
+/**
+ * Promo badges come from the product's own tags. They are OUR labels — no third-party
+ * mark or promotional wording is reproduced (spec §127).
+ */
+const PROMO_STYLES: Record<string, string> = {
+  自营: 'nx-badge--self',
+  秒杀: 'nx-badge--seckill',
+  满减: 'nx-badge--discount',
+  领券: 'nx-badge--coupon',
+  新品: 'nx-badge--new',
+}
+
+const badges = computed(() => (props.product.tags ?? []).slice(0, 3))
+function badgeClass(tag: string): string {
+  return PROMO_STYLES[tag] ?? 'nx-badge--neutral'
+}
+
+/** "已售 1.2万" reads better than a raw 5-digit number in a dense grid. */
+const salesText = computed(() => {
+  const count = props.product.sales_count
+  if (count === undefined || count === null) return ''
+  if (count >= 10000) return `已售 ${(count / 10000).toFixed(1)}万`
+  return `已售 ${count}`
+})
 </script>
 
 <template>
-  <RouterLink :to="{ name: 'product', params: { id: product.id } }" class="product-card">
-    <div class="product-card__stage">
+  <RouterLink :to="{ name: 'product', params: { id: product.id } }" class="pcard">
+    <div class="pcard__stage">
       <img
         v-if="product.cover_url"
         :src="product.cover_url"
         :alt="product.title"
-        class="product-card__image"
+        class="pcard__image"
         loading="lazy"
       />
-      <span v-else class="product-card__placeholder" aria-hidden="true">无图</span>
+      <span v-else class="pcard__placeholder" aria-hidden="true">暂无图片</span>
     </div>
 
-    <div class="product-card__body">
-      <h3 class="product-card__title">{{ product.title }}</h3>
-      <p v-if="product.brand_name" class="product-card__brand">{{ product.brand_name }}</p>
+    <div class="pcard__body">
+      <PriceText
+        :amount="product.min_price_amount"
+        :original-amount="product.original_price_amount"
+        size="md"
+        class="pcard__price"
+      />
 
-      <div class="product-card__price">
-        <span class="nx-money">{{ formatMoney(product.min_price_amount) }}</span>
-        <span v-if="product.original_price_amount" class="product-card__original">
-          {{ formatMoney(product.original_price_amount) }}
-        </span>
-      </div>
+      <h3 class="pcard__title" :title="product.title">{{ product.title }}</h3>
 
-      <p class="product-card__meta">
-        <span v-if="product.rating">评分 {{ product.rating.toFixed(1) }}</span>
-        <span v-if="product.sales_count !== undefined">已售 {{ product.sales_count }}</span>
+      <p v-if="showTags && badges.length" class="pcard__badges">
+        <span v-for="tag in badges" :key="tag" class="nx-badge" :class="badgeClass(tag)">{{ tag }}</span>
+      </p>
+
+      <p class="pcard__meta">
+        <span v-if="salesText">{{ salesText }}</span>
+        <span v-if="product.rating">好评 {{ product.rating.toFixed(1) }}</span>
       </p>
     </div>
   </RouterLink>
 </template>
 
 <style scoped lang="scss">
-.product-card {
+.pcard {
   display: block;
+  padding: 10px;
   background: var(--nx-surface);
   border: 1px solid var(--nx-border);
-  border-radius: var(--nx-radius-card);
-  box-shadow: var(--nx-shadow-card);
+  border-radius: var(--nx-radius);
   color: inherit;
-  text-decoration: none;
-  overflow: hidden;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.15s, box-shadow 0.15s;
 
   &:hover {
+    /* Hover RAISES the border and lifts slightly — the standard commerce affordance. */
+    border-color: var(--nx-border-hover);
     box-shadow: var(--nx-shadow-card-hover);
-    background: var(--nx-surface-hover);
-    transform: translateY(-2px);
+    color: inherit;
+
+    .pcard__title {
+      color: var(--nx-brand);
+    }
   }
 
   &__stage {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 172px;
-    margin: 12px 12px 0;
-    background: var(--nx-surface-stage);
-    border-radius: var(--nx-radius-stage);
+    height: 160px;
     overflow: hidden;
+    background: var(--nx-surface-stage);
   }
 
   &__image {
@@ -85,45 +124,41 @@ defineProps<{ product: ProductSummary }>()
   }
 
   &__body {
-    padding: 12px 16px 16px;
-  }
-
-  &__title {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    min-height: 38px;
-  }
-
-  &__brand {
-    margin: 4px 0 0;
-    font-size: 12px;
-    color: var(--nx-text-muted);
+    padding-top: 8px;
   }
 
   &__price {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin-top: 8px;
-    font-size: 16px;
-    color: var(--nx-danger);
+    display: block;
+    margin-bottom: 4px;
   }
 
-  &__original {
+  &__title {
+    /* Two-line clamp: the dense-grid title height must stay predictable. */
+    display: -webkit-box;
+    height: 36px;
+    margin: 0;
+    overflow: hidden;
     font-size: 12px;
-    color: var(--nx-text-muted);
-    text-decoration: line-through;
+    font-weight: 400;
+    line-height: 18px;
+    color: var(--nx-text);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    transition: color 0.15s;
+  }
+
+  &__badges {
+    display: flex;
+    gap: 4px;
+    margin: 6px 0 0;
+    overflow: hidden;
   }
 
   &__meta {
     display: flex;
+    align-items: center;
     gap: 10px;
+    min-height: 16px;
     margin: 6px 0 0;
     font-size: 12px;
     color: var(--nx-text-muted);
