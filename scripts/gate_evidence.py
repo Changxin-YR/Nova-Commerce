@@ -34,6 +34,7 @@ import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -114,7 +115,7 @@ def _parse_junit(xml_path: pathlib.Path | None) -> dict[str, object] | None:
         "exists": xml_path.is_file(),
         "parses": False,
         "testcase_count": 0,
-        "outcomes": {},
+        "outcomes": [],
         "error": None,
     }
     if not xml_path.is_file():
@@ -128,7 +129,7 @@ def _parse_junit(xml_path: pathlib.Path | None) -> dict[str, object] | None:
         result["error"] = f"JUnit report could not be parsed: {exc}"
         return result
     result["parses"] = True
-    outcomes: dict[str, str] = {}
+    outcomes: list[dict[str, str]] = []
     count = 0
     for case in tree.iter("testcase"):
         count += 1
@@ -138,7 +139,7 @@ def _parse_junit(xml_path: pathlib.Path | None) -> dict[str, object] | None:
             if child.tag in {"failure", "error", "skipped"}:
                 outcome = {"failure": "FAILED", "error": "ERROR", "skipped": "SKIPPED"}[child.tag]
                 break
-        outcomes[name] = outcome
+        outcomes.append({"name": name, "actual": outcome})
     result["testcase_count"] = count
     result["outcomes"] = outcomes
     return result
@@ -300,7 +301,7 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
     if not assertions:
         reasons.append("pytest observed zero test outcomes (nothing was executed)")
     if junit is not None:
-        junit_outcomes = junit.get("outcomes") or {}
+        junit_outcomes = junit.get("outcomes") or []
         if not junit.get("parses"):
             reasons.append(f"JUnit report unusable: {junit.get('error')}")
         if junit.get("testcase_count", 0) != len(assertions):
@@ -308,7 +309,9 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
                 f"JUnit testcase count ({junit.get('testcase_count')}) disagrees with the "
                 f"outcomes parsed from stdout ({len(assertions)})"
             )
-        elif not isinstance(junit_outcomes, dict) or len(junit_outcomes) != len(assertions):
+        elif not isinstance(junit_outcomes, list) or Counter(
+            (item["name"], item["actual"]) for item in junit_outcomes
+        ) != Counter((item["name"], item["actual"]) for item in assertions):
             reasons.append("JUnit outcomes disagree with the outcomes parsed from stdout")
     failures = [a for a in assertions if not a["pass"]]
     if failures:
@@ -361,8 +364,8 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
     )
     for reason in reasons:
         print(f"  ! {reason}")
-    for assertion in assertions:
-        print(f"  [{'PASS' if assertion['pass'] else 'FAIL'}] {assertion['name']}")
+    for assertion in failures:
+        print(f"  [FAIL] {assertion['name']}")
     return 0 if verdict == "PASS" else 1
 
 

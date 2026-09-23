@@ -342,8 +342,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     for reason in reasons:
         print(f"  ! {reason}")
-    for assertion in assertions:
-        print(f"  [{'PASS' if assertion['pass'] else 'FAIL'}] {assertion['name']}")
+    for assertion in failures:
+        print(f"  [FAIL] {assertion['name']}")
     return 0 if verdict == "PASS" else 1
 
 
