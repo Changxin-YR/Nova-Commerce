@@ -179,12 +179,15 @@ export interface AdminOrderQuery extends PageQuery {
   fulfillment_status?: string
 }
 
-export interface ShipRequest {
-  carrier: string
-  tracking_no: string
-  items?: { order_item_id: string; quantity: number }[]
-  idempotency_key: string
-}
+/*
+ * REMOVED — `ShipRequest`.
+ *
+ * The ship body is frozen in API_CONTRACT.md §5 as EXACTLY
+ * `{carrier, tracking_no, item_quantities}`, transcribed as `ShipFulfillmentRequest` in
+ * `@/types/frozen-contract`. The version that lived here took `items[]` plus a mandatory
+ * `idempotency_key` — a field the frozen endpoint does NOT accept (§110 mass-assignment guard),
+ * so using it would have produced a request the server rejects.
+ */
 
 // ---------------------------------------------------------------------------
 // payment
@@ -230,49 +233,18 @@ export interface AfterSaleQuery extends PageQuery {
   order_no?: string
 }
 
-// ---------------------------------------------------------------------------
-// analytics
-// ---------------------------------------------------------------------------
-
-export interface AnalyticsOverview {
-  /** Integer minor units. */
-  gmv_amount: number
-  order_count: number
-  paid_order_count: number
-  /** Integer minor units. */
-  refund_amount: number
-  after_sale_count: number
-  new_user_count: number
-  /** 0..1 */
-  payment_conversion_rate: number
-  /** 0..1 */
-  refund_rate: number
-}
-
-export interface SeriesPoint {
-  /** ISO date, day granularity. */
-  date: string
-  /** Integer minor units for money series. */
-  value: number
-}
-
-export interface SalesTrend {
-  points: SeriesPoint[]
-  money: boolean
-}
-
-export interface TopProduct {
-  product_id: string
-  title: string
-  sold_quantity: number
-  /** Integer minor units. */
-  sales_amount: number
-}
-
-export interface OrderFunnelStage {
-  stage: 'created' | 'paid' | 'shipped' | 'completed'
-  count: number
-}
+/*
+ * REMOVED — the invented analytics shapes (`AnalyticsOverview`, `SeriesPoint`, `SalesTrend`,
+ * `TopProduct`, `OrderFunnelStage`).
+ *
+ * API_CONTRACT.md §8 freezes ONE envelope for every analytics endpoint, carried by
+ * `AnalyticsEnvelope` in `@/types/frozen-contract`, and the five metric names in
+ * `ANALYTICS_METRICS`. The shapes deleted here were worse than merely different:
+ * `SalesTrend.money: boolean` made the unit a guess, so `refund.rate` could be rendered as
+ * currency, and `TopProduct`/`OrderFunnelStage` were separate non-envelope shapes for what the
+ * contract says is the same envelope. One envelope means one chart component and one table
+ * component render all five metrics.
+ */
 
 // ---------------------------------------------------------------------------
 // knowledge

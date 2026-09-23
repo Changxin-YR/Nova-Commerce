@@ -244,78 +244,22 @@ export interface Address {
   tag?: string
 }
 
-export interface OrderItem {
-  id: string
-  product_id: string
-  sku_id: string
-  product_title: string
-  sku_specs: Record<string, string>
-  cover_url?: string
-  quantity: number
-  /** Integer minor units, snapshotted at order creation (§ immutability). */
-  unit_price_amount: MoneyAmount
-  /** Integer minor units. */
-  subtotal_amount: MoneyAmount
-  /** Integer minor units actually refunded for this line. */
-  refunded_amount: MoneyAmount
-}
-
-/**
- * Address/price metadata frozen onto the order at creation time. The UI renders
- * this snapshot, never live catalog data.
+/*
+ * REMOVED — the invented order shapes.
+ *
+ * `OrderItem`, `OrderSnapshot`, `Shipment` and `Order` used to live here as a nested,
+ * string-id model (`order.snapshot.items`, `order.status`, `Shipment.id: string`) written
+ * before `docs/architecture/API_CONTRACT.md` existed. The contract landed and showed those
+ * shapes were WRONG, not merely unconfirmed: money is FLAT on the order, the state field is
+ * `order_status`, identifiers are numbers, and the receiver arrives already masked (§94).
+ *
+ * They are deleted rather than kept alongside the frozen types, because two shapes for one
+ * resource is precisely how a silent integration bug starts: half the app keeps compiling
+ * against the old one and the mismatch only surfaces when the real API answers.
+ *
+ * The frozen shapes are re-exported at the bottom of this file, so
+ * `import type { Order } from '@/types/domain'` still resolves to exactly ONE definition.
  */
-export interface OrderSnapshot {
-  receiver_name: string
-  receiver_phone: string
-  full_address: string
-  items: OrderItem[]
-  /** Integer minor units. */
-  items_amount: MoneyAmount
-  /** Integer minor units. */
-  discount_amount: MoneyAmount
-  /** Integer minor units. */
-  shipping_amount: MoneyAmount
-  /** Integer minor units. MUST equal items - discount + shipping. */
-  payable_amount: MoneyAmount
-  coupon_code?: string
-}
-
-export interface Shipment {
-  id: string
-  order_no: string
-  carrier: string
-  tracking_no: string
-  fulfillment_status: FulfillmentStatus
-  items: { order_item_id: string; quantity: number }[]
-  shipped_at?: string
-  delivered_at?: string
-}
-
-export interface Order {
-  id: string
-  /** Human-facing, unique, used in URLs. */
-  order_no: string
-  user_id: string
-  status: OrderStatus
-  payment_status: PaymentStatus
-  fulfillment_status: FulfillmentStatus
-  after_sale_status: AfterSaleStatus
-  snapshot: OrderSnapshot
-  shipments: Shipment[]
-  /** Integer minor units actually paid (0 until PAID). */
-  paid_amount: MoneyAmount
-  /** Integer minor units already refunded. */
-  refunded_amount: MoneyAmount
-  /** Integer minor units remaining refundable = paid - refunded (server computed). */
-  refundable_amount: MoneyAmount
-  expires_at?: string
-  paid_at?: string
-  completed_at?: string
-  cancelled_at?: string
-  cancel_reason?: string
-  created_at: string
-  updated_at?: string
-}
 
 export interface Payment {
   id: string
@@ -515,6 +459,39 @@ export interface PendingAction {
  * near-identical definition drifting out of sync.
  */
 export type { Paged, PageQuery, PageMeta } from '@/types/api'
+
+/**
+ * The frozen order / fulfillment / inventory shapes, re-exported so that every
+ * `import type { Order } from '@/types/domain'` resolves to the SINGLE definition in
+ * `@/types/frozen-contract` (a verbatim transcription of `API_CONTRACT.md`).
+ *
+ * `Order` is deliberately an alias of the DETAIL payload: the frozen contract splits
+ * `OrderSummary` (list rows, no `items[]`/`shipments[]`) from `OrderDetail` (single order).
+ * List endpoints return `Paged<OrderSummary>`; a view that needs line items holds an
+ * `OrderDetail`. Aliasing `Order` to the detail payload keeps one name for "a whole order"
+ * while the narrowed `OrderSummary` stays available for tables that only need the envelope.
+ */
+export type {
+  AdjustmentPreview,
+  AnalyticsDimension,
+  AnalyticsEnvelope,
+  AnalyticsPeriod,
+  AnalyticsPoint,
+  AnalyticsSummary,
+  AnalyticsUnit,
+  CreateAdjustmentRequest,
+  Fulfillment,
+  FulfillmentItem,
+  Inventory,
+  OrderDetail,
+  OrderItem,
+  OrderSummary,
+  ShipFulfillmentRequest,
+  StaleVersionConflict,
+} from '@/types/frozen-contract'
+
+/** A single order with its line items and shipments (the detail payload). */
+export type { OrderDetail as Order } from '@/types/frozen-contract'
 
 // ---------------------------------------------------------------------------
 // UI-level status (§108)

@@ -43,9 +43,16 @@ export const API = {
 
   // -- inventory ----------------------------------------------------------
   inventory: {
-    available: (skuId: string) => `/inventory/customer/stock/${skuId}`,
+    available: (skuId: string | number) => `/inventory/customer/stock/${skuId}`,
     adminStock: '/inventory/admin/stock',
-    adjust: (skuId: string) => `/inventory/admin/stock/${skuId}/adjust`,
+    /**
+     * TASK endpoint (§99, API_CONTRACT.md §7). FROZEN path is
+     * `POST /api/v1/inventory/adjustments` — note it is NOT sku-keyed: `warehouse_id` and
+     * `sku_id` travel in the BODY, and the body is exactly
+     * `{warehouse_id, sku_id, version, delta_available, reason}`.
+     */
+    adjustments: '/inventory/adjustments',
+    adjustmentsPreview: '/inventory/adjustments/preview',
     movements: '/inventory/admin/movements',
   },
 
@@ -142,10 +149,17 @@ export const API = {
 
   // -- analytics ----------------------------------------------------------
   analytics: {
-    overview: '/analytics/admin/overview',
-    salesTrend: '/analytics/admin/sales-trend',
-    topProducts: '/analytics/admin/top-products',
-    orderFunnel: '/analytics/admin/order-funnel',
+    /**
+     * Metric-keyed (§8). Every analytics endpoint returns the same envelope, so there is one
+     * parameterised path rather than four near-identical ones. The five frozen metric names are
+     * `sales.gmv`, `sales.order_count`, `inventory.turnover`, `product.performance`, `refund.rate`
+     * (`ANALYTICS_METRICS` in `@/types/frozen-contract`).
+     *
+     * ASSUMPTION (API_CONTRACT.md §8 froze the response envelope and the metric NAMES, not the
+     * route): a metric path segment under the existing `/analytics/admin` prefix. If the backend
+     * exposes one route per metric, only this function changes.
+     */
+    metric: (metric: string) => `/analytics/admin/metrics/${metric}`,
   },
 
   // -- knowledge / RAG (§103) ---------------------------------------------

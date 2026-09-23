@@ -17,9 +17,10 @@ import type {
   CreateOrderRequest,
   OrderPreview,
   OrderPreviewRequest,
-  ShipRequest,
 } from '@/types/api-contract'
-import type { Order, Paged, Shipment } from '@/types/domain'
+import type { PageQuery } from '@/types/api'
+import type { Order, OrderDetail, OrderSummary, Paged } from '@/types/domain'
+import type { Fulfillment, ShipFulfillmentRequest } from '@/types/frozen-contract'
 
 export const orderApi = {
   async preview(payload: OrderPreviewRequest): Promise<OrderPreview> {
@@ -34,8 +35,15 @@ export const orderApi = {
     })
   },
 
-  async list(params: { page?: number; page_size?: number; status?: string } = {}): Promise<Order[]> {
-    return httpClient.get<Order[]>(API.orders.list, { params })
+  /**
+   * The consumer order list. Returns the frozen PAGED envelope, not a bare array
+   * (API_CONTRACT.md §3): a bare array cannot carry a total, so pagination would have to be
+   * dropped or the server would have to make a breaking change.
+   *
+   * Rows are `OrderSummary` — no `items[]`, no `shipments[]` (API_CONTRACT.md §6).
+   */
+  async list(params: PageQuery & { status?: string } = {}): Promise<Paged<OrderSummary>> {
+    return httpClient.get<Paged<OrderSummary>>(API.orders.list, { params })
   },
 
   async detail(orderNo: string): Promise<Order> {
@@ -50,18 +58,20 @@ export const orderApi = {
     return httpClient.post<Order>(API.orders.confirmReceipt(orderNo), {})
   },
 
-  async shipments(orderNo: string): Promise<Shipment[]> {
-    return httpClient.get<Shipment[]>(API.fulfillment.shipments(orderNo))
+  /** The fulfillments inside one order — how a client discovers a shippable id (§5.1). */
+  async shipments(orderNo: string): Promise<Fulfillment[]> {
+    return httpClient.get<Fulfillment[]>(API.fulfillment.shipments(orderNo))
   },
 }
 
 export const orderAdminApi = {
-  async list(query: AdminOrderQuery = {}): Promise<Paged<Order>> {
-    return httpClient.get<Paged<Order>>(API.orders.adminList, { params: query })
+  /** List rows: `OrderSummary` carries no `items[]`/`shipments[]`/address (API_CONTRACT.md §6). */
+  async list(query: AdminOrderQuery = {}): Promise<Paged<OrderSummary>> {
+    return httpClient.get<Paged<OrderSummary>>(API.orders.adminList, { params: query })
   },
 
-  async detail(orderNo: string): Promise<Order> {
-    return httpClient.get<Order>(API.orders.adminDetail(orderNo))
+  async detail(orderNo: string): Promise<OrderDetail> {
+    return httpClient.get<OrderDetail>(API.orders.adminDetail(orderNo))
   },
 }
 
@@ -74,15 +84,25 @@ export const orderAdminApi = {
  * fulfillment first and passes its id in; see `canShipOrder()` in
  * `src/domain/orders/availability.ts` for why the id is mandatory.
  *
- * `ShipRequest` carries the quantity split per order item, so a partial shipment is expressed
- * as data rather than as a separate endpoint. The server enforces
- * `FULFILLMENT_QUANTITY_EXCEEDS_ORDER` (70 001) and `FULFILLMENT_ALREADY_SHIPPED` (70 003).
+ * The body is EXACTLY `{carrier, tracking_no, item_quantities}` (API_CONTRACT.md §5, §110
+ * mass-assignment guard). There is deliberately NO `idempotency_key`: the guard against a double
+ * ship is the fulfillment's own state (`FULFILLMENT_ALREADY_SHIPPED`, 70 003), so adding a key
+ * here would be an invented field the server does not accept.
+ *
+ * `carrier` is a carrier CODE (e.g. "SF"), not free text.
  */
 export const fulfillmentAdminApi = {
-  async ship(fulfillmentId: string, payload: ShipRequest): Promise<Shipment> {
-    // Idempotency key prevents a retried request from creating a second shipment.
-    return httpClient.post<Shipment>(API.fulfillment.ship(fulfillmentId), payload, {
-      idempotencyKey: payload.idempotency_key,
-    })
+  async ship(fulfillmentId: number | string, payload: ShipFulfillmentRequest): Promise<Fulfillment> {
+    return httpClient.post<Fulfillment>(API.fulfillment.ship(fulfillmentId), payload)
+  },
+
+  /**
+   * The fulfillment QUEUE (§5.2). An operator works from a queue, not by opening orders one at
+   * a time, and this is also the only surface that can discover an id to ship.
+   */
+  async list(
+    query: PageQuery & { order_no?: string; fulfillment_status?: string } = {},
+  ): Promise<Paged<Fulfillment>> {
+    return httpClient.get<Paged<Fulfillment>>(API.fulfillment.adminList, { params: query })
   },
 }

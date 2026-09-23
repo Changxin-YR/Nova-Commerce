@@ -25,6 +25,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     ForeignKey,
@@ -208,6 +209,20 @@ class InventoryMovement(Base, PkMixin, TimestampMixin):
         # INV-007 stated as a constraint: the recorded delta must equal the
         # difference between the recorded before/after values. A ledger whose
         # arithmetic does not add up is worse than no ledger.
+        #
+        # All four quantity columns are SIGNED, which is what makes plain
+        # subtraction correct here. This was NOT the first attempt: the columns
+        # were originally BIGINT UNSIGNED, and MySQL promotes a mixed
+        # signed/unsigned comparison to unsigned - so a decrement evaluated
+        # `0 - 1` in unsigned arithmetic, overflowed, and the constraint rejected
+        # an arithmetically correct row. FG-09 caught it on its first run.
+        #
+        # Casting inside the expression was tried and is worse: Alembic does not
+        # autogenerate CHECK-constraint changes on MySQL, so the "migration" was
+        # empty and the database silently kept the old rule. Fixing the column
+        # types instead puts the arithmetic on solid ground and lets
+        # `compare_type=True` carry the change through autogenerate like any
+        # other schema edit.
         CheckConstraint(
             "delta_available = after_available - before_available",
             name="delta_available_consistent",
@@ -232,10 +247,10 @@ class InventoryMovement(Base, PkMixin, TimestampMixin):
 
     delta_available: Mapped[int] = mapped_column(Integer, nullable=False)
     delta_locked: Mapped[int] = mapped_column(Integer, nullable=False)
-    before_available: Mapped[int] = mapped_column(BigIntUnsigned, nullable=False)
-    after_available: Mapped[int] = mapped_column(BigIntUnsigned, nullable=False)
-    before_locked: Mapped[int] = mapped_column(BigIntUnsigned, nullable=False)
-    after_locked: Mapped[int] = mapped_column(BigIntUnsigned, nullable=False)
+    before_available: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    after_available: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    before_locked: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    after_locked: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     reference_type: Mapped[str] = mapped_column(
         status_column(32), nullable=False, default=ReferenceType.MANUAL.value

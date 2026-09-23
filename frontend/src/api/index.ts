@@ -38,7 +38,7 @@ export { agentApi } from '@/api/agent'
 export { governanceApi } from '@/api/governance'
 export { systemApi } from '@/api/system'
 
-export type { StockRow, AdjustStockRequest, InventoryMovement } from '@/api/inventory'
+export type { InventoryMovement } from '@/api/inventory'
 export type { PendingActionQuery } from '@/api/governance'
 export type { RagEvaluationResult } from '@/api/knowledge'
 export type { AgentToolInfo } from '@/api/agent'

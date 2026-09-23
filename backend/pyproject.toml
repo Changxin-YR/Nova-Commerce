@@ -187,6 +187,16 @@ ignore = [
 # refresh token appears in no column of auth_sessions"). Going through the ORM
 # would let the model's own view hide the thing under test.
 "tests/integration/**" = ["TID251"]
+# The concurrency gate needs all four of these, each for a specific reason:
+#   TID251  - the negative control must issue raw, deliberately-unlocked SQL; a
+#             repository call would be the wrong thing to test. Reading the physical
+#             row back also has to bypass the ORM for the assertion to mean anything.
+#   BLE001  - a worker thread records any exception and the test asserts on the
+#             collected set afterwards; letting one escape would hide the others.
+#   N802    - test_naive_read_then_write_DOES_oversell shouts on purpose: it is the
+#             control that proves the positive test is not passing by luck.
+#   RUF002  - the module docstring quotes spec section 113 verbatim, in Chinese.
+"tests/concurrency/**" = ["TID251", "BLE001", "N802", "RUF002"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "app.shared.db.session.SessionLocal".msg = "Import get_session()/session_scope() instead - never reach into the global session factory."
