@@ -744,6 +744,29 @@ name errno 3819 explicitly.
 `information_schema` and asserts the **expression**, not just the name - a constraint
 re-created with the wrong clause would satisfy a name-only check.
 
+### 13.6a Two measured corrections to the twin construction (13.6)
+
+Both were measured by the verifier after 13.6 was written, and both change the recipe:
+
+* **Build the twin from an explicit column list, never `CREATE TABLE ... LIKE`.** On
+  MySQL 8.4 `LIKE` **does** copy CHECK constraints - it renames them to
+  `<table>_chk_N`, which is why an earlier probe filtered `CHECK_CONSTRAINTS` by name,
+  found nothing, and wrongly concluded the constraints were absent. It also copies
+  keys (3 of them on `payments`). A `LIKE` twin is therefore neither constraint-free
+  nor key-free, so a rejection on it has several possible causes and the control
+  measures the wrong thing. **Reading a filtered view is not reading the schema** -
+  the same error class as the rest of this phase.
+* **Attach the clause BEFORE inserting the violating row.** MySQL validates a new
+  `CHECK` against existing rows, so the other order fails on the `ALTER` itself with
+  `(3819, "Check constraint '<name>' is violated.")`. Corollary worth knowing about
+  your own schema: on a table that is legitimately mid-drift, a cap cannot be added at
+  all until the data satisfies it.
+
+Additions: `CHECK` names are unique per **schema**, not per table (`3822` on a
+duplicate); and a savepoint row is **invisible to another connection** until the outer
+transaction commits, so a cross-connection re-read taken before that commit returns
+`None` and proves nothing.
+
 ### 13.7 The freeze window
 
 When the captain sends `FREEZE`, stop writing to the repository. Finish the tool call
