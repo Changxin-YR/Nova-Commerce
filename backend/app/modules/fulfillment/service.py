@@ -462,11 +462,19 @@ class FulfillmentService:
     def sku_by_line_for_orders(self, order_ids: Sequence[int]) -> dict[int, int]:
         """``{order_item_id: sku_id}`` for the given orders, in **one** query.
 
-        ``fulfillment_items`` does not store ``sku_id`` (``models.py``: duplicating it
-        would create a second place for the same fact to be wrong), but the frozen wire
-        shape carries it (``API_CONTRACT`` section 5), so the read paths resolve it from
-        ``order_items`` - the authoritative place for it by definition, since the SKU is
-        a property of what was *ordered*, not of how it was packed.
+        ``fulfillment_items`` does not store ``sku_id``, and **none is coming**: REQ-FUL-002
+        in ``PROJECT_BASELINE.yaml`` freezes its columns as ``fulfillment_id,
+        order_item_id, quantity``, and the captain withdrew ``PHASE5_DESIGN`` section
+        5.4's ``sku_id FK RESTRICT`` so that the baseline wins. Duplicating the key would
+        also create a second place for one fact to be wrong.
+
+        The frozen wire shape nonetheless requires the field (``API_CONTRACT`` section 5),
+        so the read paths **derive** it from ``order_items`` - the authoritative place for
+        it, since the SKU is a property of what was *ordered*, not of how it was packed,
+        and ``order_items`` is itself a snapshot table, so INV-014 is untouched.
+
+        This is the permanent design rather than a workaround: do not add a column, and do
+        not add a ``getattr`` fallback that would let the derivation be bypassed.
 
         Batched across every order on the page rather than resolved per line. The
         alternative is an N+1 that stays invisible until an order ships in five
