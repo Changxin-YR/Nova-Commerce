@@ -56,8 +56,14 @@ class Gate:
     name: str
     mandatory: bool
     spec: str
-    #: pytest target, relative to ``backend/`` (a file or a directory).
+    #: pytest target(s), relative to ``backend/`` (files or directories).
+    #:
+    #: A tuple rather than a space-joined string because the plan is built as a fixed
+    #: argv with no shell, so a space inside one element would be a single bogus path.
     test_target: str
+    #: Additional targets. ``test_target`` is always included, so a gate with one
+    #: target needs only that field.
+    extra_targets: tuple[str, ...] = ()
     #: pytest marker expression, e.g. ``integration`` or ``concurrency``.
     marker: str = "integration"
     #: The paths whose dirty/clean state decides whether this run is reproducible.
@@ -192,11 +198,12 @@ def _run_git(args: list[str]) -> str:
 def _build_plan(gate: Gate) -> tuple[list[str], str]:
     """The real pytest invocation, and the readable command recorded in the artifact."""
     xml_out = gate.xml_out
+    targets = (gate.test_target, *gate.extra_targets)
     plan = [
         str(PYTHON),
         "-m",
         "pytest",
-        gate.test_target,
+        *targets,
         "-v",
         "--no-header",
         "-p",
@@ -230,6 +237,7 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
         mandatory=gate.mandatory,
         spec=gate.spec,
         test_target=args.test_target,
+        extra_targets=gate.extra_targets,
         marker=gate.marker,
         # Carried explicitly: this reconstruction is what applies --test-target, and
         # omitting a field here silently reverts it to its default. relevant_paths
@@ -252,7 +260,8 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
             stale.unlink()
 
     plan, command = _build_plan(gate)
-    target_exists = (BACKEND / gate.test_target).exists()
+    targets = (gate.test_target, *gate.extra_targets)
+    target_exists = all((BACKEND / target).exists() for target in targets)
 
     started = datetime.now(UTC)
     timed_out = False
@@ -284,7 +293,8 @@ def emit(gate: Gate, argv: list[str] | None = None) -> int:
 
     reasons: list[str] = []
     if not target_exists:
-        reasons.append(f"test target not found: {gate.test_target} (neither a file nor a directory)")
+        missing = [t for t in targets if not (BACKEND / t).exists()]
+        reasons.append(f"test target(s) not found: {missing}")
     if timed_out:
         reasons.append(f"pytest timed out after {gate.timeout_seconds}s")
     if not assertions:

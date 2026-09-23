@@ -1,0 +1,112 @@
+{
+  "gate_id": "FG-12",
+  "name": "Refund Invariants",
+  "mandatory": true,
+  "spec": "REQ-AFS-002 / section 46 - total refunded <= paid amount; item refund <= item payable amount; mandatory condition 3 of section 147",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/refund tests/concurrency/test_refund_concurrency.py -v --no-header -p no:cacheprovider -m integration",
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-23T10:31:21.720233+00:00",
+  "duration_ms": 9908,
+  "exit_code": 0,
+  "summary": "12 passed, 1 deselected in 7.49s",
+  "verdict": "PASS",
+  "fail_reasons": [],
+  "git": {
+    "revision": "e1d88cda525c4a08170f40c7b0b9031784387315\n",
+    "subject": "Contract contradictions sweep: payment_no uniqueness scope, and sku_id vs REQ-FUL-002\n",
+    "relevant_paths": [
+      "backend/app",
+      "backend/migrations",
+      "backend/tests/integration/refund",
+      "backend/tests/concurrency/test_refund_concurrency.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": true,
+    "other_paths_dirty_files": [
+      " M scripts/emit_fg12_evidence.py",
+      " M scripts/gate_evidence.py"
+    ]
+  },
+  "infrastructure": {
+    "engine": "MySQL 8.4 (real container, not mocked)",
+    "why_real": "Both caps are enforced at the database boundary as well as in the service, so the gate must show the engine refusing the bad write - a CHECK constraint cannot be proven against a mock, and an application-level check that agrees with the application proves nothing.",
+    "fresh_connection_rule": "Every post-mutation read uses a fresh connection. MySQL REPEATABLE READ fixes a connection's snapshot at its first read, so a probe that reuses one connection compares the snapshot against itself and passes as a false green (HANDOFF section 6). Each negative control also asserts that the offending mutation actually failed before asserting the row is unchanged - the two-way check that exposed the trap during Phase 4."
+  },
+  "junit_report": null,
+  "assertions": [
+    {
+      "name": "test_the_first_shipment_may_ship_the_full_ordered_quantity",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_shipping_across_two_packages_cannot_exceed_the_ordered_quantity",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_live_table_carries_the_named_cap[ck_payments_refund_cap]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_live_table_carries_the_named_cap[ck_orders_refund_cap]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_live_table_carries_the_named_cap[ck_order_items_refund_cap]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_write_over_the_cap_is_refused_by_that_named_check[ck_payments_refund_cap]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_write_over_the_cap_is_refused_by_that_named_check[ck_orders_refund_cap]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_write_over_the_cap_is_refused_by_that_named_check[ck_order_items_refund_cap]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_dropping_the_cap_lets_the_identical_write_land",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_refund_to_exactly_paid_amount_is_accepted",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_per_line_cumulative_cap_binds_while_the_order_still_has_room",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_workflow_revalidates_the_caps_against_locked_rows",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "stderr_tail": ""
+}

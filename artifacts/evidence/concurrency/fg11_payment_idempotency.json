@@ -5,15 +5,15 @@
   "spec": "REQ-PAY-004 / section 44 - a duplicate callback produces exactly one business effect: one payment confirm, one inventory effect, one fulfillment, no duplicate outbox side effect; mandatory condition 2 of section 147",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/concurrency/test_payment_idempotency.py -v --no-header -p no:cacheprovider -m concurrency",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T09:38:21.467109+00:00",
-  "duration_ms": 5795,
+  "timestamp": "2026-09-23T10:31:31.977775+00:00",
+  "duration_ms": 5564,
   "exit_code": 0,
-  "summary": "11 passed in 3.54s",
+  "summary": "11 passed in 3.42s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "dc3e9f8744db1fdef3d3732928df2b6206108579\n",
-    "subject": "﻿Docs: name the real ship path; drop two phantom ShipWorkflow references\n",
+    "revision": "e1d88cda525c4a08170f40c7b0b9031784387315\n",
+    "subject": "Contract contradictions sweep: payment_no uniqueness scope, and sku_id vs REQ-FUL-002\n",
     "relevant_paths": [
       "backend/app/core",
       "backend/app/shared",
@@ -31,21 +31,8 @@
     "relevant_paths_dirty_files": [],
     "other_paths_dirty": true,
     "other_paths_dirty_files": [
-      " M scripts/emit_fg11_evidence.py",
       " M scripts/emit_fg12_evidence.py",
-      " M scripts/gate_evidence.py",
-      "?? backend/app/modules/aftersales/api/",
-      "?? backend/app/modules/aftersales/enums.py",
-      "?? backend/app/modules/aftersales/refunds.py",
-      "?? backend/app/modules/aftersales/schemas.py",
-      "?? backend/app/modules/aftersales/serializers.py",
-      "?? backend/app/modules/aftersales/service.py",
-      "?? backend/app/modules/aftersales/views.py",
-      "?? backend/app/modules/aftersales/workflow.py",
-      "?? backend/scratch_anchor.txt",
-      "?? backend/tests/integration/aftersales/",
-      "?? backend/tests/integration/refund/",
-      "?? backend/tests/unit/modules/aftersales/"
+      " M scripts/gate_evidence.py"
     ]
   },
   "infrastructure": {

@@ -23,12 +23,19 @@ GATE = Gate(
         "REQ-AFS-002 / section 46 - total refunded <= paid amount; item refund <= item "
         "payable amount; mandatory condition 3 of section 147"
     ),
-    test_target="tests/integration/refund/test_refund_invariants.py",
+    # All four modules the verifier built for FG-12, not just the boundary controls:
+    # the live-table caps, the workflow caps that have no database mirror, the
+    # fulfillment quantity guard, and the concurrency probe. The frozen proof path
+    # names one artifact, so it should carry the whole gate rather than one module of
+    # it - a gate that runs a subset of its own tests is a gate with a silent hole.
+    test_target="tests/integration/refund",
+    extra_targets=("tests/concurrency/test_refund_concurrency.py",),
     marker="integration",
     relevant_paths=(
         "backend/app",
         "backend/migrations",
         "backend/tests/integration/refund",
+        "backend/tests/concurrency/test_refund_concurrency.py",
     ),
     json_out=ROOT / "artifacts" / "evidence" / "integration" / "fg12_refund_invariants.json",
     infrastructure={
