@@ -266,38 +266,44 @@ def test_a_consumer_cannot_read_the_queue(session, commerce: Commerce) -> None:
 def test_the_guards_shipped_total_counts_only_shipped_packages(session, commerce: Commerce) -> None:
     """What the 70001 guard reads must count **shipped** units, never the shell's plan.
 
-    This began as a characterisation test pinning a defect: the repository's
-    ``shipped_quantities_for_order`` summed every package with no status filter, so on a
-    fresh order it returned the ``UNFULFILLED`` shell's *planned* units as though they
-    had gone out. The cumulative guard, reading that number, computed ``3 + 2 > 3`` and
-    refused the order's **first legal shipment** with 70001 - so the ship endpoint could
-    never be used, while every service-level test stayed green.
+    This began as a characterisation test pinning a defect: ``shipped_quantities_for_order``
+    summed every package with no status filter, so on a fresh order it returned the
+    ``UNFULFILLED`` shell's *planned* units as though they had gone out. The cumulative
+    guard, reading that number, computed ``3 + 2 > 3`` and refused the order's **first
+    legal shipment** with 70001 - so the ship endpoint could never be used, while every
+    service-level test stayed green.
 
-    ``FulfillmentService`` carries its own filtered total (``_shipped_quantities``) as
-    the workaround, retired only once the repository's filter is committed. This test
-    therefore asserts the invariant - the guard must see goods, not plans - and proves it
-    through behaviour as well as through the number: the first legal shipment of a
-    3-unit line must **succeed**, which is only possible if the shell's 3 planned units
-    were not counted as shipped.
+    ``FulfillmentService`` carried its own filtered total as a workaround until the
+    filter moved into the query where the rule belongs. This test is what made that
+    retirement safe rather than merely tidy, and it is what stops the filter being
+    removed again: it asserts the repository's own aggregate, then proves the
+    consequence through behaviour - the first legal shipment of a 3-unit line must
+    **succeed**, which is only possible if the shell's 3 planned units were not counted
+    as shipped.
 
-    It is the phase's most likely silent double-count (a shell and the shipments it later
-    becomes coexist on one order), and the reason the workaround must not be retired
-    without the repository filter in place.
+    The distinction is the phase's most likely silent double-count: a shell and the
+    shipments it later becomes coexist on one order.
     """
     shell = _shell(session, commerce)
-    service = FulfillmentService(session)
+    repository = FulfillmentService(session)._fulfillments
 
-    assert service._shipped_quantities(order_of(session, commerce)) == {}, (
-        "nothing has actually shipped yet - counting the unshipped shell would make the "
-        "70001 guard refuse the order's first legal shipment"
+    assert repository.shipped_quantities_for_order(commerce.order_id) == {}, (
+        "nothing has actually shipped yet - a total that counts the unshipped shell "
+        "would make the 70001 guard refuse the order's first legal shipment"
+    )
+    assert repository.planned_quantities_for_order(commerce.order_id) == {commerce.order_item_id: 3}, (
+        "the shell carries the plan, which is a different number from the shipped total"
     )
 
     # The order's first legal shipment must succeed, not raise 70001.
     _ship(session, commerce, shell.id, quantity=2)
     session.expire_all()
 
-    assert service._shipped_quantities(order_of(session, commerce)) == {commerce.order_item_id: 2}, (
-        "the total follows the goods, not the plan"
+    assert repository.shipped_quantities_for_order(commerce.order_id) == {commerce.order_item_id: 2}, (
+        "the shipped total follows the goods"
+    )
+    assert repository.planned_quantities_for_order(commerce.order_id) == {commerce.order_item_id: 3}, (
+        "the plan is unchanged by shipping part of it"
     )
     assert order_of(session, commerce).fulfillment_status == (FulfillmentStatus.PARTIAL_SHIPPED.value)
 
@@ -313,7 +319,7 @@ def test_the_shipped_total_is_reused_by_the_axis_and_the_guard(session, commerce
 
     service = FulfillmentService(session)
     order = order_of(session, commerce)
-    shipped = service._shipped_quantities(order)
+    shipped = service._fulfillments.shipped_quantities_for_order(order.id)
     axis = service._recompute_order_axis(order)
 
     assert shipped == {commerce.order_item_id: 2}

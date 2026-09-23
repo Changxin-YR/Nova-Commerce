@@ -26,8 +26,9 @@ it is the only writer of the order's axis. Two rules shape this method:
 * **The total is order-wide, never package-wide.** A per-package check passes while
   an order over-ships a line: three packages of one unit each, against a line whose
   quantity is two, looks valid package by package and ships three. The cumulative
-  total is computed by ``_shipped_quantities``, which counts only packages that have
-  actually shipped (an ``UNFULFILLED`` shell holds *planned* units, not shipped
+  total comes from ``FulfillmentRepository.shipped_quantities_for_order``, which
+  counts only packages that have actually shipped (an ``UNFULFILLED`` shell holds
+  *planned* units, not shipped ones, so a fresh shell is never counted as a shipment)
 
 ## ``order_status`` is never written here
 
@@ -377,7 +378,7 @@ class FulfillmentService:
             )
 
         ordered = {item.id: item.quantity for item in order.items}
-        order_wide_shipped = self._shipped_quantities(order)
+        order_wide_shipped = self._fulfillments.shipped_quantities_for_order(order.id)
         self._assert_quantities_within_bounds(
             requested=requested,
             package_lines=package_lines,
@@ -441,12 +442,23 @@ class FulfillmentService:
             )
 
         # -- step 6: the axis, from all packages --------------------------
+        #
+        # Order matters twice here. The package's ``SHIPPED`` write must be flushed
+        # BEFORE the axis is recomputed, because the shipped total is now a SQL
+        # aggregate filtered on ``fulfillment_status IN ('SHIPPED','DELIVERED')``: it can
+        # only see rows the database has, and this write is still pending in the session.
+        # Flushing afterwards instead made the aggregate return ``{}`` for a package that
+        # had just shipped, so a successful partial shipment left the order reading
+        # ``UNFULFILLED``. (The earlier in-memory implementation summed ``package.items``
+        # and so was immune - which is exactly why moving the total into the query
+        # introduced this, and why the integration tests caught it.)
         fulfillment.fulfillment_status = FulfillmentStatus.SHIPPED.value
+        self._session.flush()
+
         order.fulfillment_status = self._recompute_order_axis(order)
         self._session.flush()
         return fulfillment
 
-    # -- reads -----------------------------------------------------------
     def sku_by_line_for_orders(self, order_ids: Sequence[int]) -> dict[int, int]:
         """``{order_item_id: sku_id}`` for the given orders, in **one** query.
 
@@ -610,49 +622,24 @@ class FulfillmentService:
             )
         return fulfillment, order
 
-    def _shipped_quantities(self, order: Order) -> dict[int, int]:
-        """``{order_item_id: units actually shipped}`` across all the order's packages.
-
-        **Only packages that have shipped count.** This is the one place the
-        ``UNFULFILLED`` shell must be excluded, and getting it wrong is not a subtle
-        rounding issue - it breaks shipping outright:
-
-        * an ``UNFULFILLED`` shell carries the order's *planned* units (one line per
-          order line at full quantity, written by ``create_shell``);
-        * ``FulfillmentRepository.shipped_quantities_for_order`` sums
-          ``fulfillment_items.quantity`` joined through ``fulfillments`` with **no
-          status filter**, so on a fresh order it returns the *plan*, not the shipped
-          total. Measured on real MySQL: one shell with ``qty=3`` against a
-          ``quantity=3`` order line reports ``3`` shipped when the truth is ``0``.
-        * the cumulative guard then computes ``3 + 2 > 3`` and refuses a perfectly
-          legal shipment of 2 units. With a full-width shell, the first shipment of any
-          line is refused, so the endpoint could never be used.
-
-        So the status filter lives here, in the caller, where the difference between
-        "planned" and "shipped" is the actual rule being enforced (design section 5.4:
-        the sum of **shipped** quantities across all fulfillments). The repository
-        method is reported to its owner as a latent defect: its name promises shipped
-        units and its body returns planned ones.
-
-        ``_recompute_order_axis`` shares this computation rather than repeating it, so
-        the guard and the axis cannot disagree about how much has gone out - two
-        implementations of that question is exactly how an order reads ``SHIPPED``
-        while its last shipment was refused.
-
-        One query, one iteration over already-loaded packages (``items`` is
-        ``lazy="selectin"``, so no N+1).
-        """
-        shipped: dict[int, int] = {}
-        for package in self._fulfillments.list_for_order(order.id):
-            if package.fulfillment_status not in (
-                FulfillmentStatus.SHIPPED.value,
-                FulfillmentStatus.DELIVERED.value,
-            ):
-                continue
-            for item in package.items:
-                shipped[item.order_item_id] = shipped.get(item.order_item_id, 0) + item.quantity
-        return shipped
-
+    # ``_shipped_quantities`` stood here until ``104ef26`` committed the repository's
+    # status filter, and the comment is kept rather than the method because the history
+    # is the guard rail.
+    #
+    # It existed for one reason: ``shipped_quantities_for_order`` summed every package
+    # with **no** status filter, so on a fresh order it returned the ``UNFULFILLED``
+    # shell's *planned* units as though they had shipped (measured: one shell of qty=3
+    # against a ``quantity=3`` line reported 3 shipped when the truth was 0), and the
+    # cumulative guard then refused the order's **first legal shipment** with 70001 -
+    # the endpoint was unusable while every service-level test stayed green.
+    #
+    # The filter now lives in the query where the rule belongs, so this module reads the
+    # repository instead of maintaining a second implementation of "how much has gone
+    # out"; two of those is exactly how an order reads ``SHIPPED`` while its last
+    # shipment was refused. The guard and ``_recompute_order_axis`` share the one query,
+    # so they still cannot disagree, and
+    # ``tests/integration/fulfillment/test_reads_and_serialisation.py`` fails if the
+    # filter is ever removed - which is what makes this retirement safe rather than tidy.
     def _assert_quantities_within_bounds(
         self,
         *,
@@ -795,6 +782,6 @@ class FulfillmentService:
         ordered = {item.id: item.quantity for item in order.items}
         return compute_fulfillment_status(
             ordered=ordered,
-            shipped=self._shipped_quantities(order),
+            shipped=self._fulfillments.shipped_quantities_for_order(order.id),
             current=order.fulfillment_status,
         )
