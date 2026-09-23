@@ -5,15 +5,15 @@
   "spec": "REQ-PAY-004 / section 44 - a duplicate callback produces exactly one business effect: one payment confirm, one inventory effect, one fulfillment, no duplicate outbox side effect; mandatory condition 2 of section 147",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/concurrency/test_payment_idempotency.py -v --no-header -p no:cacheprovider -m concurrency",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T10:58:33.539453+00:00",
-  "duration_ms": 4039,
+  "timestamp": "2026-09-23T11:15:12.386197+00:00",
+  "duration_ms": 5277,
   "exit_code": 0,
-  "summary": "11 passed in 2.37s",
+  "summary": "11 passed in 3.06s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "12cead80ba44ab3ce36609cac8a54ce46d15f13e\n",
-    "subject": "﻿Residue tool: report and sweep orphaned fixture callbacks\n",
+    "revision": "0e2b0ec64f90cccea3aa6e57a702124d7abfacb7\n",
+    "subject": "﻿Fix a vacuous proof: the nested probe was never collected\n",
     "relevant_paths": [
       "backend/app/core",
       "backend/app/shared",
@@ -29,8 +29,11 @@
     ],
     "relevant_paths_dirty": false,
     "relevant_paths_dirty_files": [],
-    "other_paths_dirty": false,
-    "other_paths_dirty_files": []
+    "other_paths_dirty": true,
+    "other_paths_dirty_files": [
+      " M backend/tests/integration/aftersales/conftest.py",
+      " M backend/tests/integration/commerce/residue.py"
+    ]
   },
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
