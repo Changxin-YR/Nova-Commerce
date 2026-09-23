@@ -382,15 +382,30 @@ class RefundRepository:
         (design section 6.2 step 5). A ``PENDING`` row left for a worker would tell
         the customer money is coming when nothing will send it.
 
-        ``refund_no`` may be supplied when the caller has already stamped it (the usual
-        case, because the number embeds the id from this flush). When it is omitted, a
-        32-character ``uuid4`` hex is used as a temporary unique value and the caller
-        stamps the real identifier via :meth:`stamp_refund_no`. That is deliberately
-        the same placeholder trick ``CreateOrderWorkflow._insert_order`` uses for
-        ``order_no``: the identifier embeds an auto-increment id, so the id has to
-        exist first, and a *random* placeholder rather than a sequential one keeps two
-        concurrent transactions from colliding on the placeholder itself. The value is
-        replaced before the commit, so no client ever observes it.
+        ``refund_no`` may be supplied when the caller has already stamped it. When it is
+        omitted, a 32-character ``uuid4`` hex is used as a temporary unique value and
+        :meth:`stamp_refund_no` can replace it - the same placeholder trick
+        ``CreateOrderWorkflow._insert_order`` uses for ``order_no``: the identifier embeds
+        an auto-increment id, so the id has to exist first, and a *random* placeholder
+        rather than a sequential one keeps two concurrent transactions from colliding on
+        the placeholder itself.
+
+        ## What the live refund path actually does (do not assume the placeholder)
+
+        ``RefundWorkflow`` does **not** use either mechanism: it calls this method with no
+        ``refund_no`` and then assigns the frozen ``NVR<YYYYMMDD><id:06d>`` directly at
+        ``workflow.py:669`` via ``refund_no_for(refund_id=refund.id, created_at=now)``, so
+        the id-embedding lives in exactly one place. Consequences worth knowing rather than
+        discovering:
+
+        * the placeholder is written and then overwritten within the same transaction, so
+          nothing is ever selected by its temporary value - but it does mean this method
+          cannot be called *outside* a caller that stamps afterwards, because the column
+          would keep the random value;
+        * ``stamp_refund_no`` currently has **no caller on the refund path**, so it is dead
+          code today. It is kept because it is the documented counterpart to this
+          parameter, and this docstring previously claimed the workflow used it - reported
+          by after-sales-workflow, who checked rather than assumed.
         """
         from uuid import uuid4
 
