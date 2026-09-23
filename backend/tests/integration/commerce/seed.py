@@ -57,6 +57,7 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import delete, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -400,18 +401,46 @@ def shop(engine, request) -> Iterator[Shop]:
             )
         )
         created["role_id"] = role.id
+        # permissions is GLOBAL vocabulary keyed by uq_permissions_code, so a
+        # SELECT-then-INSERT on it is a check-then-act race: another session can commit
+        # the same row between the two statements and the loser gets a duplicate-key
+        # error. Attempt the insert and treat the duplicate as "lost the race" instead -
+        # the same pattern IdempotencyRepository.insert_in_progress documents.
+        #
+        # egin_nested() is load-bearing, not decoration: SQLAlchemy marks the session
+        # as needing a rollback after an IntegrityError, so without a SAVEPOINT the
+        # follow-up re-read raises PendingRollbackError rather than returning the
+        # winner's committed row.
         permission = roles.get_permission_by_code(PermissionCode.ORDER_READ.value)
         if permission is None:
-            permission = roles.add_permission(
-                Permission(
-                    code=PermissionCode.ORDER_READ.value,
-                    resource="order",
-                    action="read",
-                    description="Phase 5 shared seed",
-                )
-            )
-            created["permission_id"] = permission.id
-        roles.grant_permission(role_id=role.id, permission_id=permission.id)
+            try:
+                with session.begin_nested():
+                    permission = roles.add_permission(
+                        Permission(
+                            code=PermissionCode.ORDER_READ.value,
+                            resource="order",
+                            action="read",
+                            description="Phase 5 shared seed",
+                        )
+                    )
+            except IntegrityError:
+                # Somebody else created it first; adopt their row.
+                permission = roles.get_permission_by_code(PermissionCode.ORDER_READ.value)
+            else:
+                # Only claim ownership of a row this fixture actually inserted, so
+                # teardown never deletes global vocabulary another test relies on.
+                created["permission_id"] = permission.id
+        assert permission is not None, "the order:read permission could not be resolved"
+        # grant_permission inserts unconditionally and the pair is UNIQUE
+        # (uq_role_permissions_role_permission), so granting a pair that already
+        # exists is a duplicate-key error rather than a no-op. Same savepoint reasoning
+        # as the permission insert above.
+        try:
+            with session.begin_nested():
+                roles.grant_permission(role_id=role.id, permission_id=permission.id)
+        except IntegrityError:
+            # Already granted - which is the desired end state, so adopt it.
+            pass
         roles.assign_role(user_id=staff.id, role_id=role.id)
 
         address = UserAddress(
