@@ -1,4 +1,4 @@
-﻿"""The shared Phase 5 commerce seed - the one merchant/product/stock/buyer every test imports.
+"""The shared Phase 5 commerce seed - the one merchant/product/stock/buyer every test imports.
 
     Shop, shop, paid_order, make_order, settle_order, purge_shop, + read-back helpers
 
@@ -230,7 +230,7 @@ def _resolve_or_create_warehouse(session: Session, *, merchant_id: int) -> tuple
 
 
 @pytest.fixture
-def shop(engine) -> Iterator[Shop]:
+def shop(engine, request) -> Iterator[Shop]:
     """A committed merchant / product / three SKUs / stock / buyer / address / staff user.
 
     Three SKUs at 1999 / 2999 / 999 - see :data:`SKU_PRICES` for why those are not
@@ -238,11 +238,38 @@ def shop(engine) -> Iterator[Shop]:
     seeding a balance without the movement that explains it makes the row
     unexplainable by its own ledger (INV-007) and `verify_ledger` correctly flags it:
     the fixture has to be honest, not merely convenient.
+
+    ## Why this uses ``addfinalizer`` and not ``try/finally`` around ``yield``
+
+    This fixture **commits** rows as it builds them (the workflows under test own their
+    transactions and commit, so a rolled-back outer transaction would be invisible to
+    them). That makes cleanup correctness rather than tidiness: any row left behind
+    changes what later tests see.
+
+    A ``try/finally`` around the ``yield`` is enough when the *test* fails - pytest
+    resumes the generator, so the ``finally`` runs. It is **not** enough when the failure
+    happens *during setup*: the generator is abandoned before it ever yields, so
+    ``finally`` never executes and the already-committed rows stay in the database. That
+    is the defect design section 13.5 records - residue that manufactures failures which
+    do not exist - and it is the case this fixture could not previously survive.
+
+    ``request.addfinalizer`` is registered **first**, before the seed writes anything, so
+    cleanup runs on every exit path: setup failure, test failure, skip, or success.
+    ``purge_shop`` is idempotent and marker-scoped, so being called on a half-built shop
+    is safe, and the ``finally`` below is kept as a belt-and-braces path for the normal
+    case.
+
+    ``created`` is passed **by reference** and filled in as the seed proceeds: a failure
+    half-way means the finalizer sees only the ids that actually exist, which is exactly
+    the scoping rule - it can never delete a row this test did not create.
     """
     factory = get_session_factory()
     marker = uuid.uuid4().hex[:8]
     created: dict[str, object] = {"created_warehouse": False}
     shop_obj: Shop | None = None
+
+    # Registered before any write, so a setup failure below cannot leak committed rows.
+    request.addfinalizer(lambda: purge_shop(created, marker=marker))
 
     with factory() as session:
         merchant = Merchant(code=f"M{marker}"[:24], name=f"Phase5 Test {marker}")
@@ -418,6 +445,9 @@ def shop(engine) -> Iterator[Shop]:
     try:
         yield shop_obj
     finally:
+        # Normally already handled by the finalizer; kept so the happy path does not
+        # depend on finalizer ordering, and so a reader sees the cleanup where the
+        # ``yield`` is.
         purge_shop(created, marker=marker)
 
 
@@ -607,6 +637,9 @@ def purge_shop(created: dict[str, object], *, marker: str) -> None:
     factory = get_session_factory()
     merchant_id = created.get("merchant_id")
     marker_like = f"{marker}%"
+    # Idempotent by construction: every statement is scoped to ids or marker prefixes
+    # that this test created, so a second call (finalizer plus finally) is a no-op.
+    # Nothing here deletes by a blanket pattern or truncates a table.
     sku_ids = tuple(created.get("sku_ids") or ())  # type: ignore[arg-type]
 
     with factory() as session:

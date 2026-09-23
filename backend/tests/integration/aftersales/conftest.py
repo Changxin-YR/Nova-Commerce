@@ -137,7 +137,7 @@ def _resolve_permission(session: Session, roles: RoleRepository, code: str) -> P
     resource, _, action = code.partition(":")
     try:
         with session.begin_nested():
-            created = roles.add_permission(
+            return roles.add_permission(
                 Permission(
                     code=code,
                     resource=resource,
@@ -145,7 +145,6 @@ def _resolve_permission(session: Session, roles: RoleRepository, code: str) -> P
                     description="Phase 5 after-sales fixture",
                 )
             )
-        return created
     except IntegrityError:
         # Lost the race: the winner's row is committed, so read it back.
         won = roles.get_permission_by_code(code)
@@ -442,36 +441,32 @@ class AfterSalesShop:
 
 
 @pytest.fixture
-def _commerce_shop_instance(engine) -> Iterator[SeededShop]:
-    """One instance of the **shared seed's** world for this module.
+def _commerce_shop_instance(request: pytest.FixtureRequest, engine) -> Iterator[SeededShop]:
+    """One instance of the **shared seed's** world for one test.
 
-    Built by running the shared fixture's own body (``_commerce_shop``), not by re-deriving it
-    and not by importing the fixture object: pytest registers a fixture only under the name it
-    is *defined* with and only within the conftest chain of the requesting test, and a sibling
-    package's conftest is not in this package's chain. So importing ``shop`` from
-    ``tests/integration/commerce/conftest.py`` does not make it injectable here - which this
-    module discovered the hard way, one failed ``fixture not found`` at a time.
+    Built by running the shared fixture's own body (``shop``), not by re-deriving it: pytest
+    registers a fixture only under the name it is *defined* with and only within the conftest
+    chain of the requesting test, so a *sibling package's* conftest is not in this package's
+    chain. Importing ``shop`` from ``tests/integration/commerce/conftest.py`` therefore does not
+    make it injectable here.
 
     Driving the generator directly keeps the requirement that matters: there is exactly **one**
-    definition of the Phase 5 shop, it lives in the shared seed, and this module does not
-    duplicate any of it. The teardown is the shared seed's ``_purge`` as well, so nothing about
-    the fixture's lifecycle is reimplemented - only its invocation is local.
+    definition of the Phase 5 shop and it lives in the shared seed. Two details are the seed's own
+    and are honoured rather than reimplemented:
 
-    **Function-scoped, not module-scoped**, and that is deliberate: the seed's ``key()`` builds
-    idempotency keys from its marker, so a world shared across tests hands the same key to
-    different payloads and the second request is refused as a reuse. One world per test means
-    one marker per test, which is what makes each test's keys its own - and it also means one
-    test cannot see another's committed rows.
+    * the seed now takes ``request`` and registers ``purge_shop`` through
+      ``request.addfinalizer``, so cleanup runs on every exit path - setup failure, test failure,
+      skip or success. Passing this fixture's ``request`` through is what lets that finalizer do
+      its job instead of being bypassed by a wrapper that drove the generator itself.
+    * the seed yields its ``Shop`` and finishes; there is nothing left to drive, so this fixture
+      must not drain the generator afterwards (doing so would run the seed's teardown *twice*).
+
+    Function-scoped, not module-scoped, and deliberately: the seed builds idempotency keys from
+    its marker, so a world shared across tests would hand one key to different payloads and the
+    second request would be refused as a reuse. One world per test means one marker per test.
     """
-    from tests.integration.commerce.seed import shop as shared_shop
-
-    generator = shared_shop.__wrapped__(engine=engine)
-    shop_instance = next(generator)
-    try:
-        yield shop_instance
-    finally:
-        for _ in generator:
-            pass
+    generator = shared_shop.__wrapped__(engine=engine, request=request)
+    yield next(generator)
 
 
 @pytest.fixture

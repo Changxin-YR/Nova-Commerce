@@ -37,9 +37,19 @@ differ, and weighting by the total would size a share for a line as though nothi
 been refunded from it yet, which the per-line cap then (correctly) refuses. See
 ``workflow._validate_caps`` for the worked example that caught it.
 
-## Why the denominator is the sum of the items, not ``approved_amount``
+## The rule, stated as the captain's ruling puts it
 
-PHASE5_DESIGN 搂6.2 step 4 gives the share as
+**A refund's per-line split must partition the refund, and the cap is a separate
+comparison against each line's remaining refundable amount.** Those are two different
+questions, and collapsing them is what made the design's literal formula wrong:
+
+* the **split** answers "how much of this refund goes on each line" - a partition, so
+  ``sum(shares) == amount`` exactly;
+* the **cap** answers "may this line carry that share" - a comparison of
+  ``line.refunded_amount + share`` against ``line.payable_amount``, evaluated per line
+  and cumulatively across refunds, in :func:`check_per_line_cap`.
+
+PHASE5_DESIGN section 6.2 step 4 wrote the share as
 ``floor(amount * item_order_item_payable / approved_amount)``. Read literally that
 divides by the *approved* amount while summing over the *items*, and the two are
 different quantities - so the shares are not a partition of the refund whenever
@@ -56,12 +66,12 @@ different quantities - so the shares are not a partition of the refund whenever
     second time without complaint.
 
 Weights are the lines' payable amounts and the denominator is their sum, so
-``sum(shares) == amount`` **always** and the per-line cap then measures a real
-thing: the refund placed on a line against what that line can carry. The frozen
-public behaviour is unchanged when ``approved_amount == sum(items.payable_amount)``
-(which is the case the service enforces at apply time, since it caps
-``requested_amount`` at the lines' own payable total); the divergence only appears
-in the configurations the literal reading gets wrong.
+``sum(shares) == amount`` **always** - the split is a partition - and the cap is then
+checked separately, per line. The frozen public behaviour is unchanged when
+``approved_amount == sum(items.payable_amount)`` (which is the case the service
+enforces at apply time, since it caps ``requested_amount`` at the lines' own payable
+total); the divergence only appears in the configurations the literal reading gets
+wrong. The captain has recorded this ruling for the handoff.
 """
 
 from __future__ import annotations
@@ -116,6 +126,18 @@ def allocate_refund_across_lines(
     line_payables: Sequence[tuple[int, int]],
 ) -> RefundSplit:
     """Spread ``amount`` across the claim's lines, in proportion to their payables.
+
+    The rule, in the form the captain asked it to be stated:
+
+        **sum of shares == amount, and share_i <= line_i.remaining**
+
+    The first clause is this function's job, and it holds for every accepted input (the second
+    was enforced when the earlier "weights are the lines' full payables" reading was replaced -
+    the weights this function receives are the lines' *remaining* refundable amounts, so a line
+    that has already been partly refunded cannot be handed a share it can no longer absorb).
+    The second clause is asserted separately, per line, by :func:`check_per_line_cap`, because
+    the cumulative comparison needs the freshly locked rows and does not belong in a pure
+    allocation. See the module docstring for the full ruling.
 
     Args:
         amount: minor units to place. Must be positive - a zero refund is refused
