@@ -139,6 +139,22 @@ class Order(Base, PkMixin, TimestampMixin, MerchantScopedMixin, VersionMixin):
             f"after_sale_status IN {_sql_vocabulary(AFTER_SALE_STATUSES)}",
             name="after_sale_status_valid",
         ),
+        # Phase 5 (PHASE5_DESIGN section 8), FG-12 cap 1 on the order. Both operands
+        # are written only by Phase 5, by two different code paths - the payment
+        # callback sets `paid_amount`, the refund workflow adds to `refunded_amount` -
+        # so this row-level CHECK is what makes "refunded more than was ever
+        # collected" impossible at the database boundary rather than merely
+        # unhandled in Python. FG-12 proves it with a direct UPDATE through a fresh
+        # connection (errno 3819), not through the service.
+        #
+        # The ordering it implies is correct rather than restrictive: between create
+        # and settlement `paid_amount` is 0, so a refund on an unpaid order is refused
+        # outright - and there is no money to give back.
+        #
+        # Both operands are signed BIGINT, which is what makes the plain comparison
+        # correct: MySQL promotes a mixed signed/unsigned comparison to UNSIGNED and
+        # would reject arithmetically valid rows (HANDOFF section 6).
+        CheckConstraint("refunded_amount <= paid_amount", name="refund_cap"),
         # The console's "orders waiting for attention" view and the customer's
         # "my orders" list are the two hot reads; both are covered.
         Index("ix_orders_merchant_status", "merchant_id", "order_status"),
@@ -336,6 +352,19 @@ class OrderItem(Base, PkMixin, TimestampMixin):
             f"after_sale_status IN {_sql_vocabulary(AFTER_SALE_STATUSES)}",
             name="after_sale_status_valid",
         ),
+        # Phase 5 (PHASE5_DESIGN section 8), FG-12 cap 2 at the *row* level: no single
+        # line may be refunded beyond what it contributed to the order total.
+        #
+        # The cap the design calls "cap 2" in the workflow is the **cumulative** one -
+        # `sum(refunds placed on this line) + this share <= payable_amount` - which
+        # spans rows and therefore cannot be a CHECK; `RefundWorkflow` enforces it
+        # against freshly locked rows. This constraint is the per-row half: it makes a
+        # single write that overshoots a line impossible even if the workflow's
+        # arithmetic is wrong, which is what "the application check is not the
+        # boundary" (section 8) means in practice.
+        #
+        # Signed operands on both sides, for the mixed-comparison reason above.
+        CheckConstraint("refunded_amount <= payable_amount", name="refund_cap"),
     )
 
     order_id: Mapped[int] = mapped_column(
