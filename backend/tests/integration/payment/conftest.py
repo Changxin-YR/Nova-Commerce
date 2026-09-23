@@ -47,6 +47,7 @@ from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.modules.payment.enums import PaymentChannel, PaymentRecordStatus
 from app.modules.payment.models import Payment
 from app.shared.db.base import utc_now
+from app.shared.db.models.outbox import OutboxMessage
 from app.shared.db.session import configure_database, get_session_factory
 
 #: The dev password for every fixture account, argon2-hashed like a real one.
@@ -451,6 +452,11 @@ def _purge(shop: Shop) -> None:
         session.execute(delete(Role).where(Role.merchant_id == shop.merchant_id))
         session.execute(delete(User).where(User.id.in_([shop.consumer_id, shop.staff_id])))
         session.execute(delete(Warehouse).where(Warehouse.id == shop.warehouse_id))
+        # Phase 6 appends an `outbox_messages` row per settlement; RESTRICT FK, so it
+        # goes before the merchant (the Phase 6 teardown obligation).
+        session.execute(
+            delete(OutboxMessage).where(OutboxMessage.merchant_id == shop.merchant_id)
+        )
         session.execute(delete(Merchant).where(Merchant.id == shop.merchant_id))
         session.commit()
 

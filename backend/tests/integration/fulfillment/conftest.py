@@ -52,6 +52,7 @@ from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.order.enums import FulfillmentStatus, OrderStatus, PaymentStatus
 from app.modules.order.models import Order, OrderItem
 from app.shared.db.base import utc_now
+from app.shared.db.models.outbox import OutboxMessage
 from app.shared.db.session import configure_database, get_session_factory
 
 #: Opening stock, large enough that a test never accidentally exhausts it.
@@ -413,5 +414,10 @@ def _purge(factory, created: dict[str, object]) -> None:
         user_ids = [uid for uid in (buyer_id, staff_id) if uid is not None]
         if user_ids:
             session.execute(delete(User).where(User.id.in_(user_ids)))
+        # Phase 6: an order created here also appends an `outbox_messages` row, whose
+        # RESTRICT FK onto merchants must be unwound first.
+        session.execute(
+            delete(OutboxMessage).where(OutboxMessage.merchant_id == int(merchant_id))
+        )
         session.execute(delete(Merchant).where(Merchant.id == int(merchant_id)))
         session.commit()

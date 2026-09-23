@@ -46,6 +46,7 @@ from app.modules.inventory.service import InventoryService
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.shared.db.base import utc_now
 from app.shared.db.models.idempotency import IdempotencyRecord
+from app.shared.db.models.outbox import OutboxMessage
 from app.shared.db.session import configure_database, get_session_factory
 
 #: The dev password for every fixture account. Argon2-hashed like a real one.
@@ -446,6 +447,12 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
             session.execute(
                 text("DELETE FROM warehouses WHERE id = :id"), {"id": created["warehouse_id"]}
             )
+        # Phase 6 appends an `outbox_messages` row per order. Its `merchant_id` FK is
+        # RESTRICT, so it has to be unwound before the merchant - otherwise this delete
+        # fails with errno 1451 and stops the teardown half-way.
+        session.execute(
+            delete(OutboxMessage).where(OutboxMessage.merchant_id == created["merchant_id"])
+        )
         session.execute(
             text("DELETE FROM merchants WHERE id = :id"), {"id": created["merchant_id"]}
         )

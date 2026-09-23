@@ -76,6 +76,7 @@ from app.modules.payment.service import PaymentService
 from app.modules.payment.workflow import CallbackRequest, PaymentSuccessWorkflow
 from app.shared.db.base import utc_now
 from app.shared.db.session import configure_database, get_session_factory
+from app.shared.outbox import OutboxEventType
 
 pytestmark = [pytest.mark.concurrency, pytest.mark.integration]
 
@@ -546,6 +547,11 @@ def _purge(gate: Gate) -> None:
         ("DELETE FROM users WHERE id = :user_id", {"user_id": gate.user_id}),
         ("DELETE FROM warehouses WHERE id = :warehouse_id",
          {"warehouse_id": gate.warehouse_id}),
+        # Phase 6 appends an `outbox_messages` row in PaymentSuccessWorkflow step 10,
+        # and its `merchant_id` FK is RESTRICT: unwound before the merchant or this
+        # teardown dies with errno 1451.
+        ("DELETE FROM outbox_messages WHERE merchant_id = :merchant_id",
+         {"merchant_id": gate.merchant_id}),
         ("DELETE FROM merchants WHERE id = :merchant_id",
          {"merchant_id": gate.merchant_id}),
     )
@@ -609,6 +615,10 @@ def _purge_orphan_marker(marker: str) -> None:
                         "WHERE merchant_id = :m OR provider_event_id LIKE :event_pattern"
                     ),
                     {"m": merchant_id, "event_pattern": f"%{marker}%"},
+                )
+                session.execute(
+                    text("DELETE FROM outbox_messages WHERE merchant_id = :m"),
+                    {"m": merchant_id},
                 )
                 session.execute(
                     text("DELETE FROM merchants WHERE id = :m"), {"m": merchant_id}
@@ -913,12 +923,25 @@ def test_the_same_event_delivered_ten_times_settles_exactly_once(gate: Gate, eng
     )
 
     # ---- clause 8: no duplicate outbox effect -------------------------------
-    # Phase 5 has no outbox table (Phase 6 owns it), so the only observable form of
-    # REQ-PAY-004's fourth clause today is that there is exactly **one** callback row
-    # in PROCESSED and exactly one settlement. Both are asserted above. This assertion
-    # states the invariant in the terms the future emitter will use, so that adding the
-    # table cannot quietly change what "once" means.
-    assert int(callbacks[1]) == 1, "a duplicate callback produced a second settlement"
+    # Phase 6 landed the outbox table, so REQ-PAY-004's fourth clause is now observable
+    # **directly** instead of by proxy. Ten deliveries of ONE event must leave exactly
+    # one `payment.settled` row. The callback count above still says "one settlement
+    # happened"; this says the settlement announced itself exactly once. Both are
+    # needed: a count over the wrong table satisfies the first and is silent on the
+    # second, which is the difference between "once" and "once *and only once*".
+    outbox = _fresh_row(
+        engine,
+        "SELECT COUNT(*) FROM outbox_messages "
+        "WHERE merchant_id = :merchant_id AND event_type = :event_type",
+        {
+            "merchant_id": gate.merchant_id,
+            "event_type": OutboxEventType.PAYMENT_SETTLED.value,
+        },
+    )
+    assert int(outbox[0]) == 1, (
+        f"a duplicate callback produced {outbox[0]} payment.settled outbox rows; "
+        "REQ-PAY-004 clause 4 requires exactly one"
+    )
 
 
 def test_a_distinct_event_for_an_already_settled_payment_applies_no_second_effect(

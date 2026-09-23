@@ -50,6 +50,7 @@ from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.modules.payment.models import Payment, PaymentCallback
 from app.shared.db.models.idempotency import IdempotencyRecord
+from app.shared.db.models.outbox import OutboxMessage
 
 __all__ = ["MARKER_PATTERNS", "ResidueReport", "purge_test_residue", "report_residue"]
 
@@ -260,6 +261,12 @@ def report_residue(session: Session) -> ResidueReport:
     )
     report.counts["fulfillments"] = count(Fulfillment, Fulfillment.order_id.in_(orders))
     report.counts["payments"] = count(Payment, Payment.id.in_(payments))
+    # Phase 6: every order/payment/refund workflow appends an event row. Counted so a
+    # leak is visible (the whole point of this tool), and later swept before the
+    # merchant is removed - `outbox_messages.merchant_id` is a RESTRICT FK.
+    report.counts["outbox_messages"] = count(
+        OutboxMessage, OutboxMessage.merchant_id.in_(merchant_ids)
+    )
     # Attribute the event-shaped callbacks exactly once. Those a marker reaches are
     # residue and are swept; the rest are reported separately (see below) and never
     # touched, because this tool cannot prove they are test output.
@@ -331,6 +338,17 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
     skus = ids["skus"]
     warehouses = ids["warehouses"]
     patterns = _marker_like_patterns(report)
+
+    # `outbox_messages` first, before anything it could outlive and before the
+    # merchants below: its `merchant_id` FK is RESTRICT, so leaving it in place makes
+    # the final `DELETE FROM merchants` fail with errno 1451 - which, because MySQL DDL
+    # and DML here are not transactional across the whole purge, leaves the run
+    # half-cleaned. The row has no FK to the order/payment/refund it describes, so the
+    # merchant id is the only attribution that reaches it.
+    if merchant_ids:
+        session.execute(
+            delete(OutboxMessage).where(OutboxMessage.merchant_id.in_(merchant_ids))
+        )
 
     # --- children before parents -------------------------------------------
     session.execute(delete(Refund).where(Refund.after_sale_id.in_(claims)))

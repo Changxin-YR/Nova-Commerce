@@ -85,6 +85,7 @@ from app.modules.payment.service import PaymentService
 from app.modules.payment.workflow import CallbackExecution, CallbackRequest, PaymentSuccessWorkflow
 from app.shared.db.base import utc_now
 from app.shared.db.models.idempotency import IdempotencyRecord
+from app.shared.db.models.outbox import OutboxMessage
 from app.shared.db.session import get_session_factory
 
 __all__ = [
@@ -754,11 +755,23 @@ def purge_shop(created: dict[str, object], *, marker: str) -> None:
             )
             session.execute(delete(Fulfillment).where(Fulfillment.order_id.in_(order_ids)))
         # `payment_callbacks` has no FK to `payments` (a delivery for an unknown
-        # payment_no must still be recordable), so it is matched by the marker's own
-        # event ids rather than by cascade.
+        # payment_no must still be recordable), so it cannot be reached by cascade.
+        # Two statements, and BOTH are needed - a marker-only sweep is the trap the
+        # "assert the property, never the implementation" lesson names: it looks like a
+        # cleanup and misses exactly the rows a caller invented.
+        #   * by marker - the seed's own ids are `evt-<marker>-...`;
+        #   * by merchant - a test that passes its own `event_id` (a bare token) writes a
+        #     row the marker cannot reach, and it then outlives teardown forever. Measured
+        #     as 26 rows accumulating, one per run, surfacing in `scripts/residue.py` as
+        #     "orphaned fixture callbacks (order gone)". The merchant column is populated
+        #     whenever the callback resolved, which is every callback these suites create.
         session.execute(
             delete(PaymentCallback).where(PaymentCallback.provider_event_id.like(marker_like))
         )
+        if merchant_id is not None:
+            session.execute(
+                delete(PaymentCallback).where(PaymentCallback.merchant_id == merchant_id)
+            )
         if payment_ids:
             session.execute(delete(Refund).where(Refund.payment_id.in_(payment_ids)))
             session.execute(delete(Payment).where(Payment.id.in_(payment_ids)))
@@ -784,6 +797,19 @@ def purge_shop(created: dict[str, object], *, marker: str) -> None:
             session.execute(delete(ProductImage).where(ProductImage.id == created["image_id"]))
         if created.get("product_id"):
             session.execute(delete(Product).where(Product.id == created["product_id"]))
+
+        # -- outbox events -----------------------------------------------
+        # Every Phase 6 workflow appends an event row, and `outbox_messages.merchant_id`
+        # is a RESTRICT foreign key onto `merchants` - so it must be removed before the
+        # merchant it belongs to. Left in place it makes the final `DELETE FROM merchants`
+        # fail with errno 1451 and stops the teardown half-way, which is precisely the
+        # class of leak this function exists to prevent. Scoped by merchant id: the row
+        # carries no FK to the order/payment/refund it describes, so that is the only
+        # attribution that reaches it.
+        if merchant_id is not None:
+            session.execute(
+                delete(OutboxMessage).where(OutboxMessage.merchant_id == merchant_id)
+            )
 
         # -- identity ----------------------------------------------------
         if created.get("consumer_id"):
