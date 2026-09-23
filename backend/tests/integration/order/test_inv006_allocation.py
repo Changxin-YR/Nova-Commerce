@@ -94,6 +94,19 @@ def test_a_percent_promotion_allocates_exactly_and_the_remainder_lands_last(shop
     """§41: pro-rata by original amount, remainder absorbed by the **last** eligible
     line. The remainder rule is what makes INV-006 hold exactly rather than to within a
     cent - integer division always leaves something over and somebody has to take it.
+
+    §6's refined statement is "the remainder is handed out one minor unit at a time,
+    walking backwards from the last line and skipping zero-weight lines, and every
+    allocation is bounded by its own line's amount". For an ordinary cart - every line
+    positive, and the last line able to absorb a remainder of at most n-1 units - that is
+    exactly "the last line takes it", which is what is asserted below. The two rules only
+    diverge when the last line cannot absorb the remainder without exceeding its own
+    weight, and that cannot happen through the order path: a weight is
+    ``unit_price x quantity`` with both factors required to be positive, so no line here
+    is ever zero-weight.
+
+    The expected shares are recomputed from the SKU prices and the basis points, and the
+    remainder is *placed by the rule* rather than read back from the result.
     """
     rules = PricingRules(
         promotion=PromotionRule(
@@ -125,6 +138,14 @@ def test_a_percent_promotion_allocates_exactly_and_the_remainder_lands_last(shop
     assert items[-1].promotion_discount_amount == shares[-1] + remainder
     for index in range(len(items) - 1):
         assert items[index].promotion_discount_amount == shares[index]
+
+    # §6's two bounds: never negative, and never more than the line is worth. The second
+    # is what stops an allocation from driving `payable_amount` below zero - which
+    # `ck_order_items_amounts_non_negative` would reject at flush time, turning a pricing
+    # bug into a 500 rather than a wrong number.
+    for item in items:
+        assert 0 <= item.promotion_discount_amount <= item.original_amount
+        assert item.payable_amount >= 0
 
     # And the invariant itself, from the committed rows.
     assert sum(item.payable_amount for item in items) == order.payable_amount

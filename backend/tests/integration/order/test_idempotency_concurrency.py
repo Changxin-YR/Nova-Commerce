@@ -40,6 +40,7 @@ from app.core.errors import (
     IdempotencyInProgressError,
     IdempotencyPayloadMismatchError,
 )
+from app.core.logging import get_logger
 from app.modules.inventory.enums import MovementType
 from app.modules.order.service import OrderService
 from app.modules.order.workflow import OrderLineInput
@@ -54,6 +55,8 @@ from .conftest import (
 )
 
 pytestmark = [pytest.mark.concurrency, pytest.mark.integration]
+
+logger = get_logger(__name__)
 
 #: Enough contention to interleave without turning the suite into a load test.
 CONCURRENT_CALLERS = 8
@@ -102,8 +105,13 @@ def test_concurrent_creates_with_one_key_make_exactly_one_order(shop: Shop) -> N
     with ThreadPoolExecutor(max_workers=CONCURRENT_CALLERS) as pool:
         outcomes = list(pool.map(lambda _index: _attempt(shop, key, barrier), range(CONCURRENT_CALLERS)))
 
+    # The distribution is logged rather than asserted: all three losing outcomes are
+    # legitimate, and pinning one would make the suite flaky on a slower machine. What
+    # is asserted is the invariant set below.
+    logger.info("idempotency race resolved", outcomes=dict(Counter(outcomes)))
     tally = Counter(outcomes)
     assert tally["raw_integrity_error"] == 0, f"a raw IntegrityError escaped: {tally}"
+    assert set(tally) <= {"created", "replayed", "in_progress_1012"}, tally
     # Exactly one caller created it; every other caller either replayed it or was told
     # to retry. Never a second create.
     assert tally["created"] == 1, f"expected exactly one create, got {tally}"

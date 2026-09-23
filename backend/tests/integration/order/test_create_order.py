@@ -182,6 +182,10 @@ def test_the_stock_is_reserved_and_the_ledger_explains_it(shop: Shop) -> None:
         assert lock.operator_type == "CUSTOMER"
         assert lock.operator_id == shop.consumer_id
         assert lock.reference_type == "ORDER"
+        # INV-007/§7: the ledger names the order that locked the unit, because §7
+        # inserts the order row *before* reserving. A NULL here would leave the movement
+        # explainable only by decoding an idempotency-key string.
+        assert lock.reference_id is not None
         assert lock.idempotency_key == f"order-lock:{shop.consumer_id}:{shop.client_request_id('1')}:{sku_id}"
     finally:
         session.close()
