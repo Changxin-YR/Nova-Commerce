@@ -57,6 +57,12 @@ checked; re-emit from `be30bec` or later if it is re-run.
 - **Teardown must not scope by `order_no`.** A refused delivery resolves no payment, so
   `order_no`/`merchant_id` are NULL on exactly those rows - and `payment_callbacks` has no FK to
   `payments` (§5.2), so they leak permanently. Delete by event-id pattern.
+- **A row-count delta across a shared database is not evidence.** I reported leaks as `1 -> 13`
+  and `8 -> 15`, and those numbers were contaminated by teammates' concurrent suites. What
+  survived was a **pattern-scoped set query** (`WHERE provider_event_id LIKE 'http-%' OR LIKE
+  'evt-fg11-%' OR LIKE 'mock-%'` -> 0), which nothing else running can shift. Measure with
+  scoped queries, not deltas - the same reason the gate's assertions are keyed by event id
+  rather than counting the table.
 
 ## 5. Interfaces others depend on
 
