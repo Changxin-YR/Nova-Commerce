@@ -431,6 +431,22 @@ The §27 rule from Phase 3 generalises: **decide inside the lock, not before it.
 For orders that means the price and the stock check both belong inside the
 transaction that writes the order.
 
+### Carried into Phase 5 - a deletion with an owner
+
+The frontend currently computes `refundable_amount` as `paid_amount - refunded_amount`
+when the server field is absent. That bridge exists because the order module has not
+landed yet, and without it every refund affordance silently disappears
+(`undefined > 0` is `false`).
+
+It is a **transition, not a second source of truth**, and it is deliberately noisy: it
+warns in dev, is marked `@deprecated`, and tests pin both branches.
+
+**Phase 5 is not done until that bridge and its test branch are deleted**, at the same
+time `OrderDetail.refundable_amount` starts being returned. The backend implementer
+owns the deletion. A TODO without a named owner is a permanent comment, and this one
+would quietly make the client the authority on an INV-005 figure - which is exactly
+what section 15 forbids.
+
 ### Gates to target
 - **FG-10** workflow tests, including the order-snapshot test (materialise an order,
   mutate the product, assert the order is byte-for-byte unchanged)
