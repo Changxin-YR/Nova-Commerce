@@ -33,6 +33,7 @@ from app.modules.aftersales.service import AfterSaleService
 from app.modules.inventory.enums import MovementType
 from app.modules.order.enums import AfterSaleStatus, PaymentStatus
 from tests.integration.aftersales.conftest import (
+    LINE_QUANTITY,
     available_stock,
     load_claim,
     movements_for,
@@ -244,8 +245,18 @@ def test_cap_one_is_a_backstop_because_cap_two_implies_it(seeded_shop, session_f
     #    the real workflow, so the *observed* code is recorded rather than the expected one.
     all_lines = (0, 1, 2)
     with session_factory() as session:
+        # Read from the fixture's constant rather than repeating its value: LINE_QUANTITY is the
+        # fixture's load-bearing number (three units per line is what makes a *second* claim on the
+        # same line expressible, and therefore the cumulative per-line cap testable at all). Writing
+        # `(3, 3, 3)` here would mean changing the constant leaves this test asking for more units
+        # than a line has, failing as an eligibility refusal inside the refund path - the last place
+        # anybody would look for the cause.
         claim = seeded_shop.file_claim(
-            session, amount=paid, item_indexes=all_lines, quantities=(3, 3, 3), suffix="one"
+            session,
+            amount=paid,
+            item_indexes=all_lines,
+            quantities=(LINE_QUANTITY,) * len(all_lines),
+            suffix="one",
         )
         claim_no = claim.after_sale_no
         seeded_shop.approve(session, claim, amount=paid)
