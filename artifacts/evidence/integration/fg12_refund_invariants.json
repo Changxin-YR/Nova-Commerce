@@ -5,15 +5,15 @@
   "spec": "REQ-AFS-002 / section 46 - total refunded <= paid amount; item refund <= item payable amount; mandatory condition 3 of section 147",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/refund tests/concurrency/test_refund_concurrency.py -v --no-header -p no:cacheprovider -m integration or concurrency",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T10:55:12.729756+00:00",
-  "duration_ms": 6327,
+  "timestamp": "2026-09-23T10:58:37.891663+00:00",
+  "duration_ms": 6876,
   "exit_code": 0,
-  "summary": "13 passed in 4.78s",
+  "summary": "13 passed in 5.19s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "039b917649140f22c67bda07043b1c23e7dd1f74\n",
-    "subject": "Handoff: a row-count delta over a shared DB is not evidence; scoped queries are\n",
+    "revision": "12cead80ba44ab3ce36609cac8a54ce46d15f13e\n",
+    "subject": "﻿Residue tool: report and sweep orphaned fixture callbacks\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -23,10 +23,8 @@
     ],
     "relevant_paths_dirty": false,
     "relevant_paths_dirty_files": [],
-    "other_paths_dirty": true,
-    "other_paths_dirty_files": [
-      " M docs/handoff/phase5-after-sales.md"
-    ]
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
   },
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
