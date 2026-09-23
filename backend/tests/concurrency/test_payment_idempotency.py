@@ -49,6 +49,7 @@ import uuid
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import event, select, text
@@ -395,7 +396,7 @@ def _seed_once(marker: str) -> Gate:
             address_snapshot={"full_address": "GuangdongShenzhenNanshanFG-11 Road 1"},
             item_count=sum(LINE_QUANTITIES),
             first_item_name="FG-11 Product FG-11 SKU 1",
-            expires_at=now,
+            expires_at=now + timedelta(minutes=30),
             created_at=now,
             updated_at=now,
         )
@@ -448,7 +449,7 @@ def _seed_once(marker: str) -> Gate:
             request_hash="a" * 64,
             paid_amount=0,
             refunded_amount=0,
-            expires_at=now,
+            expires_at=now + timedelta(minutes=30),
             created_at=now,
             updated_at=now,
         )
