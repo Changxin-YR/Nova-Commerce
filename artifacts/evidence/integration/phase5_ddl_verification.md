@@ -1,4 +1,4 @@
-﻿# Phase 5 DDL verification record (task t1 / T2, data-layer)
+# Phase 5 DDL verification record (task t1 / T2, data-layer)
 
 Owner: `data-layer`. Revision under test: `3f1ae2c55c54`
 (`backend/migrations/versions/20260923_1643_3f1ae2c55c54_phase5_payment_fulfillment_aftersales_and_refund.py`).
@@ -319,8 +319,26 @@ constructions silently do **not** work on MySQL 8.4 - both were checked by readi
 `TABLE_CONSTRAINTS` back off the twin, which came back with an empty list of
 `refund_cap` constraints:
 
-* `CREATE TABLE ... LIKE` - does **not** copy CHECK constraints;
-* `CREATE TABLE ... AS SELECT` - does **not** copy them either.
+* `CREATE TABLE ... AS SELECT` - copies **no** constraints at all. Re-measured on this
+  server: `CREATE TABLE _ascheck AS SELECT * FROM payments WHERE 1=0` leaves **0** rows in
+  `TABLE_CONSTRAINTS`. This is the construction the probe below deliberately avoids, and
+  the claim holds for it without qualification.
+* `CREATE TABLE ... LIKE` - **copies the CHECK constraints, but renames them.** This
+  sentence previously said `LIKE` â€œdoes not copyâ€ them, and that was wrong; the verifier
+  reproduced the true behaviour: a `LIKE` twin of `orders` carries **7** CHECKs and of
+  `payments` **5**, named `_likecheck_chk_1.._N`, with the cap present as
+  `_likecheck_chk_6 :: (refunded_amount <= paid_amount)`. The clauses survive; the *names*
+  do not. That is why a filter on `constraint_name LIKE '%refund_cap%'` returns nothing off
+  a twin and the earlier reading concluded "empty list = not copied".
+
+  The correction matters twice over. First, the rule to record is **never infer the schema
+  from a filtered constraint list** - the same mistake the verifier made in the opposite
+  direction, briefly believing the caps were missing from the *live* tables for the same
+  reason. Second, a `LIKE` twin is **not key-free**: it copies 3 UNIQUE/FK keys on
+  `payments` and 2 on `orders`, so a rejection on one has several possible causes and proves
+  less than the probe below. That probe is built with `AS SELECT` plus the clause read out
+  of `information_schema`, which is strictly the stronger construction - so the negative
+  controls' conclusions stand; only the stated reason for avoiding `LIKE` was wrong.
 
 A probe built on either would have inserted cleanly and announced "the cap was NOT
 enforced" - a false alarm about a constraint that is perfectly present on the real
