@@ -6,14 +6,12 @@ that the ORM row is correct: a serializer that drops a field, renames
 ``fulfillment_status`` or forgets ``items[]`` is an integration defect that no service
 test would catch.
 
-The ``sku_id`` case is worth watching. ``fulfillment_items`` does not store it -
-REQ-FUL-002 freezes its columns as ``fulfillment_id, order_item_id, quantity`` - while
-the frozen wire shape requires it, so the serializer DERIVES it through the order line.
-That is the settled design rather than a pending schema change: the captain withdrew
-``PHASE5_DESIGN`` section 5.4's ``sku_id FK RESTRICT`` and ruled the baseline wins, and
-there is deliberately no fallback path. The test below keeps the derivation honest by
-asserting the derived value equals the line's real SKU, so a mapping wired to the wrong
-key fails here instead of shipping a wrong id to the console.
+The ``sku_id`` case is worth watching. ``fulfillment_items`` carries ``sku_id`` as a
+stored snapshot column - the captain's final ruling, recorded in ``models.py`` - so the
+serializer reads it straight off the row. An earlier revision derived it from a
+page-wide map the caller built, which is why these tests once had to construct one. The
+assertion below keeps the column honest: the stored id must equal the order line's SKU,
+so a wrong value fails here rather than reaching the console.
 """
 
 from __future__ import annotations
