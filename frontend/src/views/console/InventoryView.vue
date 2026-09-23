@@ -94,7 +94,7 @@ async function submitAdjust(): Promise<void> {
     </div>
 
     <StateView :state="status" :error="error" @retry="execute()">
-      <table class="inventory__table">
+      <table class="nx-table">
         <thead>
           <tr>
             <th>SKU</th>
@@ -189,37 +189,6 @@ async function submitAdjust(): Promise<void> {
     font-size: 13px;
   }
 
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--nx-surface);
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
-    overflow: hidden;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--nx-border);
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    p {
-      margin: 2px 0 0;
-      font-size: 11.5px;
-    }
-  }
 
   &__sellable {
     font-weight: 600;

@@ -12,7 +12,7 @@ import { computed, reactive, ref } from 'vue'
 import { afterSaleAdminApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney, fromMajorString, toMajorString } from '@/utils/money'
+import { fromMajorString, toMajorString } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
@@ -88,10 +88,10 @@ async function submit(): Promise<void> {
           return
         }
         await afterSaleAdminApi.approve(record.after_sale_no, { approved_amount: amount })
-        notifications.success('已核准', `核准金额 ${formatMoney(amount)}`)
+        notifications.success('已核准', `核准金额 ${amount} 分`)
       } else {
         if (amount > refundable.value) {
-          notifications.warning('退款金额超过可退上限', `最多 ${formatMoney(refundable.value)}`)
+          notifications.warning('退款金额超过可退上限', `最多 ${refundable.value} 分`)
           return
         }
         await afterSaleAdminApi.refund(record.after_sale_no, {
@@ -139,7 +139,7 @@ async function submit(): Promise<void> {
       :title="status === 'empty' ? '没有待处理的售后单' : undefined"
       @retry="execute()"
     >
-      <table class="c-as__table">
+      <table class="nx-table">
         <thead>
           <tr>
             <th>售后单</th>
@@ -158,9 +158,9 @@ async function submit(): Promise<void> {
             <td><code>{{ record.order_no }}</code></td>
             <td>{{ record.type === 'REFUND_ONLY' ? '仅退款' : '退货退款' }}</td>
             <td><StatusChip :status="record.status" kind="aftersale" /></td>
-            <td class="nx-money">{{ formatMoney(record.requested_amount) }}</td>
-            <td class="nx-money">{{ formatMoney(record.approved_amount) }}</td>
-            <td class="nx-money">{{ formatMoney(record.refunded_amount) }}</td>
+            <td><PriceText :amount="record.requested_amount" size="sm" :grouping="false" /></td>
+            <td><PriceText :amount="record.approved_amount" size="sm" :grouping="false" /></td>
+            <td><PriceText :amount="record.refunded_amount" size="sm" :grouping="false" /></td>
             <td class="c-as__actions">
               <template v-if="record.status === 'PROCESSING'">
                 <button type="button" class="nx-btn nx-btn--ghost" @click="open(record, 'approve')">核准</button>
@@ -202,14 +202,14 @@ async function submit(): Promise<void> {
           </h3>
 
           <p class="nx-muted">
-            申请 {{ formatMoney(active.requested_amount) }} · 核准
-            {{ formatMoney(active.approved_amount) }} · 已退 {{ formatMoney(active.refunded_amount) }}
+            申请 <PriceText :amount="active.requested_amount" size="sm" /> · 核准
+            <PriceText :amount="active.approved_amount" size="sm" /> · 已退 <PriceText :amount="active.refunded_amount" size="sm" />
           </p>
 
           <label v-if="form.mode !== 'reject'" class="c-as__field">
             <span>
               金额（元）
-              <template v-if="form.mode === 'refund'"> · 可退上限 {{ formatMoney(refundable) }}</template>
+              <template v-if="form.mode === 'refund'"> · 可退上限 <PriceText :amount="refundable" size="sm" muted /></template>
             </span>
             <input v-model="form.amountYuan" inputmode="decimal" />
           </label>
@@ -254,33 +254,6 @@ async function submit(): Promise<void> {
     font-size: 13px;
   }
 
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--nx-surface);
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
-    overflow: hidden;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--nx-border);
-      white-space: nowrap;
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-  }
 
   &__actions {
     display: flex;

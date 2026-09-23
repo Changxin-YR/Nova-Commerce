@@ -16,7 +16,6 @@ import { agentApi, governanceApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useAiThreadStore } from '@/stores/aiThread'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import { AGENT_TABS, type AgentName } from '@/config/app'
 import StateView from '@/components/ui/StateView.vue'
@@ -322,7 +321,7 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
       :title="runsStatus === 'empty' ? '暂无运行记录' : undefined"
       @retry="loadRuns()"
     >
-      <table class="ai__runs">
+      <table class="nx-table">
         <thead>
           <tr>
             <th>Run ID</th>
@@ -341,7 +340,10 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
             <td><StatusChip :status="run.status" kind="action" /></td>
             <td class="ai__runs-query">{{ run.query }}</td>
             <td>{{ run.tokens_used ?? '—' }}</td>
-            <td>{{ run.cost_amount !== undefined ? formatMoney(run.cost_amount) : '—' }}</td>
+            <td>
+            <PriceText v-if="run.cost_amount !== undefined" :amount="run.cost_amount" size="sm" muted :grouping="false" />
+            <span v-else>—</span>
+          </td>
             <td>{{ new Date(run.started_at).toLocaleString() }}</td>
           </tr>
         </tbody>
@@ -624,32 +626,6 @@ async function decideFromList(actionId: string, approved: boolean, payloadHash: 
     margin-top: 10px;
   }
 
-  &__runs {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--nx-surface);
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
-    overflow: hidden;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--nx-border);
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-  }
 
   &__runs-query {
     max-width: 320px;

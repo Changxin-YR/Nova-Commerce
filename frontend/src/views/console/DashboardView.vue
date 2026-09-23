@@ -10,7 +10,6 @@ import { computed } from 'vue'
 import { analyticsApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { sanitizeChartSpec } from '@/charts/sanitizeChartSpec'
-import { formatMoney } from '@/utils/money'
 import StateView from '@/components/ui/StateView.vue'
 import ApexChart from '@/components/charts/ApexChart.vue'
 import type { ChartSpec } from '@/types/charts'
@@ -32,9 +31,9 @@ const metrics = computed(() => {
   const data = overview.value
   if (!data) return []
   return [
-    { label: 'GMV', value: formatMoney(data.gmv_amount), hint: '已支付口径' },
+    { label: 'GMV', amount: data.gmv_amount, hint: '已支付口径' },
     { label: '订单数', value: `${data.order_count}`, hint: `已支付 ${data.paid_order_count}` },
-    { label: '退款金额', value: formatMoney(data.refund_amount), hint: `售后单 ${data.after_sale_count}` },
+    { label: '退款金额', amount: data.refund_amount, hint: `售后单 ${data.after_sale_count}` },
     { label: '支付转化率', value: `${Math.round(data.payment_conversion_rate * 100)}%`, hint: '下单 → 支付' },
     { label: '退款率', value: `${Math.round(data.refund_rate * 100)}%`, hint: '退款 / GMV' },
     { label: '新增用户', value: `${data.new_user_count}`, hint: '本期新增' },

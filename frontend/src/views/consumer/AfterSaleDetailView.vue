@@ -5,7 +5,6 @@ import { RouterLink, useRoute } from 'vue-router'
 import { afterSaleApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import StateView from '@/components/ui/StateView.vue'
 import StatusChip from '@/components/ui/StatusChip.vue'
@@ -64,9 +63,9 @@ async function cancel(): Promise<void> {
               <div><dt>类型</dt><dd>{{ record.type === 'REFUND_ONLY' ? '仅退款' : '退货退款' }}</dd></div>
               <div><dt>原因</dt><dd>{{ record.reason }}</dd></div>
               <div v-if="record.description"><dt>说明</dt><dd>{{ record.description }}</dd></div>
-              <div><dt>申请金额</dt><dd class="nx-money">{{ formatMoney(record.requested_amount) }}</dd></div>
-              <div><dt>核准金额</dt><dd class="nx-money">{{ formatMoney(record.approved_amount) }}</dd></div>
-              <div><dt>已退金额</dt><dd class="nx-money">{{ formatMoney(record.refunded_amount) }}</dd></div>
+              <div><dt>申请金额</dt><dd><PriceText :amount="record.requested_amount" size="sm" muted /></dd></div>
+              <div><dt>核准金额</dt><dd><PriceText :amount="record.approved_amount" size="sm" muted /></dd></div>
+              <div><dt>已退金额</dt><dd><PriceText :amount="record.refunded_amount" size="sm" muted /></dd></div>
               <div v-if="record.reject_reason"><dt>驳回原因</dt><dd>{{ record.reject_reason }}</dd></div>
             </dl>
           </div>
@@ -78,7 +77,7 @@ async function cancel(): Promise<void> {
             <ul v-if="record.refunds.length" class="as-detail__refunds">
               <li v-for="refund in record.refunds" :key="refund.id">
                 <div>
-                  <strong class="nx-money">{{ formatMoney(refund.amount) }}</strong>
+                  <strong><PriceText :amount="refund.amount" size="md" /></strong>
                   <StatusChip :status="refund.status" />
                 </div>
                 <p class="nx-muted">

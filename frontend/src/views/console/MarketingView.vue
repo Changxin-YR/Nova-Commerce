@@ -10,7 +10,7 @@ import { computed, reactive, ref } from 'vue'
 import { marketingAdminApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney, fromMajorString, toMajorString } from '@/utils/money'
+import { fromMajorString, toMajorString } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import StateView from '@/components/ui/StateView.vue'
 import StatusChip from '@/components/ui/StatusChip.vue'
@@ -140,7 +140,7 @@ const sampleDiscount = toMajorString(1000)
         :title="couponStatus === 'empty' ? '还没有优惠券' : undefined"
         @retry="loadCoupons()"
       >
-        <table class="marketing__table">
+        <table class="nx-table">
           <thead>
             <tr>
               <th>券码</th>
@@ -156,8 +156,8 @@ const sampleDiscount = toMajorString(1000)
               <td><code>{{ coupon.code }}</code></td>
               <td>{{ coupon.name }}</td>
               <td><StatusChip :status="coupon.status" /></td>
-              <td class="nx-money">{{ formatMoney(coupon.discount_amount) }}</td>
-              <td class="nx-money">{{ formatMoney(coupon.threshold_amount) }}</td>
+              <td><PriceText :amount="coupon.discount_amount" size="sm" :grouping="false" /></td>
+              <td><PriceText :amount="coupon.threshold_amount" size="sm" :grouping="false" /></td>
               <td class="marketing__dates">
                 {{ new Date(coupon.valid_from).toLocaleDateString() }} –
                 {{ new Date(coupon.valid_to).toLocaleDateString() }}
@@ -175,7 +175,7 @@ const sampleDiscount = toMajorString(1000)
       :title="promotionStatus === 'empty' ? '还没有促销活动' : undefined"
       @retry="loadPromotions()"
     >
-      <table class="marketing__table">
+      <table class="nx-table">
         <thead>
           <tr>
             <th>名称</th>
@@ -247,32 +247,6 @@ const sampleDiscount = toMajorString(1000)
     }
   }
 
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--nx-surface);
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
-    overflow: hidden;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--nx-border);
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-  }
 
   &__dates {
     color: var(--nx-text-muted);

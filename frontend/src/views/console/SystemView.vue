@@ -81,7 +81,7 @@ const overallTone = computed(() => {
         </div>
       </div>
 
-      <table class="system__table">
+      <table class="nx-table">
         <thead>
           <tr>
             <th>依赖</th>
@@ -158,32 +158,6 @@ const overallTone = computed(() => {
     font-size: 15px;
   }
 
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--nx-surface);
-    border: 1px solid var(--nx-border);
-    border-radius: var(--nx-radius-stage);
-    overflow: hidden;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--nx-border);
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-  }
 
   &__criticality {
     padding: 1px 8px;

@@ -11,7 +11,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { afterSaleApi, orderApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useNotificationStore } from '@/stores/notification'
-import { formatMoney, fromMajorString, toMajorString } from '@/utils/money'
+import { fromMajorString, toMajorString } from '@/utils/money'
 import { normalizeError } from '@/api/error'
 import { newTraceId } from '@/utils/trace'
 import StateView from '@/components/ui/StateView.vue'
@@ -95,7 +95,7 @@ async function submit(): Promise<void> {
   }
   if (amount > refundable.value) {
     // Friendly pre-check only; the server still enforces the cap.
-    notifications.warning('退款金额超过可退余额', `最多可退 ${formatMoney(refundable.value)}`)
+    notifications.warning('退款金额超过可退余额', `最多可退 ${refundable.value} 分`)
     return
   }
 
@@ -147,8 +147,8 @@ async function submit(): Promise<void> {
         </div>
 
         <p v-if="targetOrder" class="nx-muted aftersales__hint">
-          可退余额 {{ formatMoney(refundable) }}（实付 {{ formatMoney(targetOrder.paid_amount) }} − 已退
-          {{ formatMoney(targetOrder.refunded_amount) }}）
+          可退余额 <PriceText :amount="refundable" size="sm" />（实付 <PriceText :amount="targetOrder.paid_amount" size="sm" muted /> − 已退
+          <PriceText :amount="targetOrder.refunded_amount" size="sm" muted />）
         </p>
         <p v-else-if="orderNoInput" class="aftersales__hint aftersales__hint--warn">
           未查询到该订单，请检查订单号。
@@ -221,9 +221,9 @@ async function submit(): Promise<void> {
             <p class="aftersales__reason">原因：{{ record.reason }}</p>
 
             <dl class="aftersales__amounts">
-              <div><dt>申请金额</dt><dd class="nx-money">{{ formatMoney(record.requested_amount) }}</dd></div>
-              <div><dt>核准金额</dt><dd class="nx-money">{{ formatMoney(record.approved_amount) }}</dd></div>
-              <div><dt>已退金额</dt><dd class="nx-money">{{ formatMoney(record.refunded_amount) }}</dd></div>
+              <div><dt>申请金额</dt><dd><PriceText :amount="record.requested_amount" size="sm" muted /></dd></div>
+              <div><dt>核准金额</dt><dd><PriceText :amount="record.approved_amount" size="sm" muted /></dd></div>
+              <div><dt>已退金额</dt><dd><PriceText :amount="record.refunded_amount" size="sm" muted /></dd></div>
             </dl>
 
             <p v-if="record.reject_reason" class="aftersales__reject">驳回原因：{{ record.reject_reason }}</p>

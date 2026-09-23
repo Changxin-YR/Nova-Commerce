@@ -179,7 +179,7 @@ function scorePercent(value: number): string {
 
           <!-- Knowledge surfaces must render Processing / Failed (§108). -->
           <StateView :state="docStatus" :error="docError" @retry="loadDocs()">
-            <table class="knowledge__table">
+            <table class="nx-table">
               <thead>
                 <tr>
                   <th>文件名</th>
@@ -277,7 +277,7 @@ function scorePercent(value: number): string {
     <section class="nx-card knowledge__eval">
       <div class="nx-card__body">
         <h3 class="nx-section-title">RAG 评测</h3>
-        <table v-if="(evalData ?? []).length" class="knowledge__table">
+        <table v-if="(evalData ?? []).length" class="nx-table">
           <thead>
             <tr>
               <th>数据集</th>
@@ -335,25 +335,6 @@ function scorePercent(value: number): string {
     font-size: 13px;
   }
 
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--nx-border);
-      vertical-align: top;
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-  }
 
   &__name {
     font-weight: 600;

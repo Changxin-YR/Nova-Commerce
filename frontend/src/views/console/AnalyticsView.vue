@@ -10,7 +10,6 @@ import { computed } from 'vue'
 import { analyticsApi } from '@/api'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { sanitizeChartSpec } from '@/charts/sanitizeChartSpec'
-import { formatMoney } from '@/utils/money'
 import StateView from '@/components/ui/StateView.vue'
 import ApexChart from '@/components/charts/ApexChart.vue'
 import type { ChartSpec } from '@/types/charts'
@@ -120,7 +119,7 @@ const totalSales = computed(() =>
     <div class="analytics__total nx-card">
       <div class="nx-card__body">
         <p class="nx-muted">TOP 商品销售额合计</p>
-        <p class="analytics__total-value nx-money">{{ formatMoney(totalSales) }}</p>
+        <p class="analytics__total-value"><PriceText :amount="totalSales" size="xl" /></p>
       </div>
     </div>
 
@@ -157,7 +156,7 @@ const totalSales = computed(() =>
       <div class="nx-card__body">
         <h3 class="nx-section-title">热销商品明细</h3>
         <template v-if="topTableSpec?.rows">
-          <table class="analytics__table">
+          <table class="nx-table">
             <thead>
               <tr>
                 <th v-for="column in topTableSpec.columns ?? []" :key="column.key" :style="{ textAlign: column.align ?? 'left' }">
@@ -205,27 +204,6 @@ const totalSales = computed(() =>
     gap: 16px;
   }
 
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12.5px;
-
-    th,
-    td {
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--nx-border);
-    }
-
-    th {
-      background: var(--nx-surface-sunken);
-      font-weight: 600;
-      color: var(--nx-text-secondary);
-    }
-
-    td {
-      font-variant-numeric: tabular-nums;
-    }
-  }
 
   &__footnote {
     margin: 10px 0 0;
