@@ -4,7 +4,7 @@
 > project up with **zero prior context**. Everything needed to continue is here
 > or is linked from here.
 >
-> Handoff written: 2026-09-23 08:40 · **Updated 13:00** · Repo `main` at `ffbd14f`
+> Handoff written: 2026-09-23 08:40 · **Updated 13:14** · Repo `main` at `24cde07`
 
 ---
 
@@ -167,7 +167,7 @@ pytest                153 passed  (119 unit + 28 identity integration + 6 concur
 ruff check            All checks passed
 alembic autogenerate  true no-op (migrations have converged)
 docker compose        5/5 healthy
-frontend              vue-tsc 0 · vite build 0 · vitest 246 · eslint 0
+frontend              vue-tsc 0 · vite build 0 · vitest 276 · eslint 0
 FG-09                 PASS (artifact + 6/6 assertions, real MySQL)
 ```
 
@@ -560,3 +560,32 @@ would be contradicted in Phase 10/13.
 **Where the next agent starts:** `docs/architecture/API_CONTRACT.md`, then §7 above
 (Phase 4 — Cart + Pricing + Order), then the §6 list of MySQL/Alembic traps so they
 are not paid for twice.
+
+
+---
+
+## 13. Handoff addendum — 13:14 (Phase 8 complete)
+
+All ten console views are converted to the dense pattern, each with a pure tested
+availability module behind its row actions — 276 frontend tests, four gates green.
+Commits `ec415bf`, `03aa108`; contract addenda at `24cde07`.
+
+**Two flaws the conversion exposed, both the same shape as everything else this
+session found — a frozen RULE with an unfrozen INTERFACE:**
+
+1. Knowledge `reprocess`/`archive` were built against `/knowledge/admin/documents/...`
+   instead of the frozen `/knowledge/documents/<built-in function id>/reprocess|archive`.
+2. **Marketing had no promotion publish/unpublish at all**, despite §4 freezing both.
+   Nothing in the tree could have caught this: the endpoints simply were not there.
+   A missing endpoint is invisible to a type checker, a linter and a test suite.
+
+Both are now in `endpoints.ts`. Promotion/coupon **creation** and **system role
+management** were reported rather than invented, and are now frozen in contract §12.
+
+The §12.3 lesson generalises and is worth carrying into Phase 4: **a page that cannot
+be built from the frozen contract is evidence the contract is incomplete, not evidence
+the page is unnecessary.** Five gaps were found this way; none was found by review.
+
+Phase 4 notes: promotion lifecycle (DRAFT/ACTIVE/ENDED) and the `AgentRun` /
+`PendingAction` shapes are still assumptions, marked in code and in
+`frontend/REDESIGN_STATUS.md`. Freezing them is Phase 6 and Phase 10/13 work.
