@@ -5,9 +5,9 @@
 No carrier validation, no cumulative-quantity arithmetic, no ``fulfillment_status``
 decision lives here. Whether a requested quantity exceeds what the order line
 still has coming (``FULFILLMENT_QUANTITY_EXCEEDS_ORDER``, 70001) is decided by
-``ShipWorkflow`` **while the package is locked**; whether a carrier code is known
+``FulfillmentService.ship`` **while the package is locked**; whether a carrier code
 is decided at the schema edge; whether the order's axis should become
-``SHIPPED``/``PARTIAL_SHIPPED`` is decided by the workflow from **all** packages.
+``SHIPPED``/``PARTIAL_SHIPPED`` is decided by that same method from **all** packages.
 This module answers "what is in the database" and "write this row".
 
 ## The one lock in this module

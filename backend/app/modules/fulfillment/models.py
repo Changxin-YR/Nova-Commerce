@@ -18,11 +18,12 @@ per ``order_item_id`` across all fulfillments of an order must never exceed that
 line's** ``quantity`` (``FULFILLMENT_QUANTITY_EXCEEDS_ORDER``, 70001). It spans
 rows and spans tables - the total is a sum over ``fulfillment_items`` joined
 through ``fulfillments`` and compared against ``order_items.quantity`` - so no
-single-row MySQL ``CHECK`` can express it. It is enforced in ``ShipWorkflow`` while
-the relevant rows are locked, exactly as INV-006 is enforced in
-``CreateOrderWorkflow``. A **per-package** check would be the defect the rule
-exists to catch: every row would look valid while the order shipped 3 units of a
-line whose quantity is 2.
+single-row MySQL ``CHECK`` can express it. It is enforced in
+``FulfillmentService.ship`` while the relevant rows are locked, exactly as INV-006 is
+enforced in ``CreateOrderWorkflow``. There is no separate ``ShipWorkflow`` class, and
+``FulfillmentService.ship`` is the only place this rule is applied. A **per-package**
+check would be the defect the rule exists to catch: every row would look valid while
+the order shipped 3 units of a line whose quantity is 2.
 
 ## ``fulfillment_items.quantity`` is the *package line*, not a shipped counter
 
@@ -118,7 +119,7 @@ class Fulfillment(Base, PkMixin, TimestampMixin, MerchantScopedMixin):
         # this, a status write alone could claim goods left while the customer's
         # tracking view has neither carrier nor tracking number - a "ghost
         # shipment", which is worse than an unshipped one because it is invisible
-        # in the fulfillment queue (`ShipWorkflow` stamps all three in one write,
+        # in the fulfillment queue (`FulfillmentService.ship` stamps all three in one write,
         # section 6.3 step 3, so this is satisfied by construction).
         CheckConstraint(
             "fulfillment_status NOT IN ('SHIPPED','DELIVERED') "
