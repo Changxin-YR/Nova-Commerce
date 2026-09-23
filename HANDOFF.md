@@ -812,3 +812,27 @@ deleted once a real HTTP response carries the field.
 Phase 5 — Payment + Fulfillment + AfterSales + Refund (FG-11, FG-12). The order
 status machine, the stock ledger and the idempotency table are ready for it; the
 `PENDING_PAYMENT -> PROCESSING` edge and every `refunded_amount` writer belong there.
+
+### Independent verification of Phase 4 (verifier task t4)
+
+A second execution of the committed tests reproduced FG-10 independently: same
+verdict, **170/170 PASS**, exit 0, JUnit testcase count agreeing with the stdout
+parse (only the run timestamp differs from the captain's run). Three probes with
+their own assertions, not the authors':
+
+* **INV-014**: an order created through the real `OrderService`, the catalogue then
+  mutated out-of-band by raw SQL (product name, SKU name, price) with the mutation
+  confirmed to have landed before the order was re-read - every snapshot column and
+  header field byte-identical, and the ORM view did not leak the new price.
+* **INV-006**: raw SQL over rows the workflow actually committed -
+  `payable_amount == SUM(item.payable_amount)` **and**
+  `payable_amount == SUM(original_amount - allocated_discount_amount)` per order,
+  with a non-empty result set so the assertion cannot pass vacuously.
+* **Idempotency race**: 8 threads released together on one `Idempotency-Key` -
+  exactly one `orders` row, one `idempotency_records` row, and all eight callers
+  returned the **same** `order_no` (one creator, seven replays). The unique index,
+  not application logic, is what serialised them.
+
+The shared dev database was left clean afterwards: 0 rows in all four Phase 4
+tables and no leftover scratch schemas.
+
