@@ -10,18 +10,18 @@ Four gates, all run on this exact tree (literal output):
 | Command | Output | Exit |
 | --- | --- | --- |
 | `npx vue-tsc --noEmit` | *(no output)* | 0 |
-| `npx vite build` | `✓ 2386 modules transformed` `✓ built in 1.74s` | 0 |
-| `npx vitest run` | `Test Files 21 passed (21)` / `Tests 292 passed (292)` | 0 |
+| `npx vite build` | `✓ 2386 modules transformed` `✓ built in 1.69s` | 0 |
+| `npx vitest run` | `Test Files 21 passed (21)` / `Tests 295 passed (295)` | 0 |
 | `npx eslint .` | *(no output)* | 0 |
 
 `git status --porcelain` → empty.
 
 **Done:** all 22 routes, the whole `API_CONTRACT.md` migration (types → availability → views), the
-§11 addenda, all 10 console pages on the dense 京麦 pattern, the §12.1 coupon preview→create flow, and
-`agentApi.cancelRun` (§4's frozen task endpoint) is now wired.
+§11 addenda, all 10 console pages on the dense 京麦 pattern, the §12.1 coupon preview→create flow,
+**§13.1/§13.2 promotion creation**, and `agentApi.cancelRun` (§4's frozen task endpoint).
 
-**Not done:** the §13 shapes are transcribed into `frozen-contract.ts` but **not yet consumed** by any
-view — promotion creation and role/permission editing are the two flows that need them (§3).
+**Not done:** **role/permission editing is BLOCKED** — see §3.2, it needs a discovery endpoint the
+contract does not freeze. Everything else in §13 is built or has its shapes ready.
 
 ## 2. The five console pages
 
@@ -29,30 +29,48 @@ view — promotion creation and role/permission editing are the two flows that n
 | --- | --- | --- | --- |
 | `console/AfterSalesView.vue` | DONE | list (keyword + status + paging), approve, reject, refund; claim vs money columns | `afterSaleAdminApi.detail` (no detail page); `reject_reason`, `description`, `evidence_urls`, `items[]` never displayed |
 | `console/KnowledgeView.vue` | DONE | bases, documents (keyword + paging), upload, **reprocess**, **archive**, retrieval debug, evaluation, PROCESSING auto-poll | `knowledgeAdminApi.createBase` (no UI to create a knowledge base); no document detail view |
-| `console/MarketingView.vue` | DONE | coupon list, **coupon preview → create**, promotion list, **publish/unpublish** | **promotion CREATE** (blocked — §3.1); `marketingApi.myCoupons` / `claim` (no consumer coupon-center page) |
-| `console/SystemView.vue` | DONE | health `ready`/`live`, dependency table w/ criticality, audit list (filter + paging) | **role/permission editing** (blocked — §3.2); the `system.rolePermissions` / `system.userRoles` endpoints exist in `endpoints.ts` but have **no API function and no UI** |
+| `console/MarketingView.vue` | DONE | coupon list, **coupon preview → create**, promotion list, **publish/unpublish**, **promotion preview → create** (§13.1/§13.2) | `marketingApi.myCoupons` / `claim` (no consumer coupon-center page); no edit/delete for an existing promotion |
+| `console/SystemView.vue` | DONE | health `ready`/`live`, dependency table w/ criticality, audit list (filter + paging) | **role/permission editing** (BLOCKED — §3.2: no frozen role/user LIST route); the `system.rolePermissions` / `system.userRoles` endpoints exist in `endpoints.ts` but have **no API function and no UI** |
 | `console/AiWorkspaceView.vue` | DONE | agent runs list, **run cancel / cancel-pending-approval** (was a frozen endpoint with no caller), tools, pending actions approve/reject, SSE streaming (5 tabs) | `agentApi.run` (single run detail), `agentApi.threads`, `agentApi.chat` (streaming is used instead) |
 
 The 5 views that were "pre-redesign markup" at the start of t4 all render filter bar → hairline
 `.nx-table` → pager, with `StateView` covering all five §108 states, and every row action gated by a
 pure tested availability module rather than an inline status check.
 
-## 3. What §13 unblocked, and the migration it still needs
+## 3. What §13 unblocked, and the one thing it did not
 
 `API_CONTRACT.md` §13 froze the six shapes §12 had left undefined. **All six are now transcribed into
 `src/types/frozen-contract.ts` and re-exported from `src/types/domain.ts`** — additively, so nothing
 broke. Consuming them is the remaining work:
 
-1. **Promotion creation** — the rule shape is now concrete: `promotion_type`
-   (`DIRECT_DISCOUNT` | `PERCENT_DISCOUNT` | `FULL_REDUCTION`) discriminates `rule_config`, rates are
-   **basis points** (never floats), and `scope` is explicit (`all_products: true` rather than inferred
-   from empty arrays). Build the form against `PromotionRuleConfig` and the preview→create flow against
-   `PromotionPreview.preview_token` — the coupon flow in `MarketingView.vue` is the working template,
-   including the compile-time token requirement.
-2. **Role / permission editing** — `Role` / `User` / `RolePermission` are frozen, including
-   `is_grantable`. The write is `PUT /system/roles/{id}/permissions` with the **complete explicit set**
-   plus `reason` (`UpdateRolePermissionsRequest`). §13.4 attaches four server-side obligations a
-   checkbox UI cannot express, so the client must render a **review step**, never a casual toggle.
+1. **Promotion creation — DONE** (commit `dfe527c`). `promotion_type` discriminates `rule_config`, so
+   the form renders per-type rule fields and sends the matching variant; rates are basis points;
+   `scope` is explicit; `preview_token` is required in the type. The duplicate local `Promotion` in
+   `src/api/marketing.ts` was **deleted in the same commit**, so there is one shape again.
+2. **Role / permission editing — STILL BLOCKED, and this is a contract gap, not a frontend TODO.**
+
+   **Verified by command** (this is the pull-quote; do not take it on trust — re-run it):
+
+   ```
+   Select-String -Path C:\Users\27363\Desktop\store\docs\architecture\API_CONTRACT.md `
+                 -Pattern 'roles','users'
+   -> L92  | Update a role's permissions | PUT /api/v1/system/roles/{id}/permissions | Role |
+      L93  | Assign a role to a user    | POST /api/v1/system/users/{user_id}/roles  | User |
+   ```
+
+   Two endpoints, **both writes**, and **no LIST route for roles or users** anywhere in the document.
+
+   That matters because `Role.id` is the INPUT to the write: with no way to enumerate roles, the client
+   cannot discover an id to update. **This is exactly the discovery gap §5.2 closed for
+   fulfillments** — `POST /fulfillments/{id}/ship` needed an id, nothing said how to learn one, and
+   `GET /fulfillments/admin` was frozen in response. The role editor needs the same treatment
+   (`GET /system/roles`, plus `GET /system/users` for assignment).
+
+   Per the captain's ruling for this flow (do not push with assumed shapes), inventing a list route is
+   not an option, so the editor is **unbuilt rather than half-guessed**. Everything else it needs is
+   ready: `Role` / `User` / `RolePermission` are transcribed, and `UpdateRolePermissionsRequest` carries
+   the complete explicit set plus `reason`. §13.4's four server-side obligations mean the UI must be a
+   **review flow, never a toggle grid** — the coupon/promotion preview→confirm pattern is the template.
 
 **MIGRATION HAZARD, read before touching marketing:** `src/api/marketing.ts` still carries a LOCAL,
 invented `Promotion` (`type`, `rule: Record<string, unknown>`, `start_at`/`end_at`). §13 supersedes it.
@@ -110,18 +128,17 @@ fallback spec cases — do not leave a silent second source of truth for money i
 
 ## 6. Next steps (in priority order)
 
-1. **Promotion creation**, consuming §13.1/§13.2 (`PromotionRuleConfig` discriminated by
-   `promotion_type`, `PromotionPreview.preview_token`). Also **replace the local `Promotion`** in
-   `src/api/marketing.ts` in the same commit — see the migration hazard in §3.
-2. **Role / permission editing**, consuming §13.4. The request is frozen
-   (`UpdateRolePermissionsRequest`: complete set + reason); the four server-side obligations mean the UI
-   must be a review flow, not a toggle grid.
-3. **Wire the remaining frozen-but-unused surface** if it is wanted: `inventoryAdminApi.movements`,
-   `catalogApi.categories` / `brands`, `catalogAdminApi.upsertSku`, `knowledgeAdminApi.createBase`,
-   `governanceApi.pendingAction`, `agentApi.run` / `threads`. *(Measured by script audit of `src/api`
-   exports against all `src/views` + `src/components` + `src/stores` references; re-run it after any
-   wiring — it is the cheapest way to find a frozen endpoint with no caller, which is how
-   `agentApi.cancelRun` was found.)*
+1. **Role / permission editing — needs a discovery endpoint first.** Ask for `GET /system/roles`
+   (and `GET /system/users` for assignment) to be frozen, on the §5.2 precedent. Everything else is
+   ready; see §3.2.
+2. **Wire `knowledgeAdminApi.createBase`.** The Knowledge page can list bases, upload documents,
+   reprocess and archive — but cannot CREATE a base, so on a fresh deployment the page has nothing to
+   operate on and no way to fix it from the UI. Smallest remaining user-visible hole.
+3. **Wire the rest of the frozen-but-unused surface** if wanted: `inventoryAdminApi.movements`,
+   `catalogApi.categories` / `brands`, `catalogAdminApi.upsertSku`, `governanceApi.pendingAction`,
+   `agentApi.run` / `threads`. *(Measured by script audit of `src/api` exports against all `src/views` +
+   `src/components` + `src/stores` references; re-run it after any wiring — it is the cheapest way to
+   find a frozen endpoint with no caller, which is how `agentApi.cancelRun` was found.)*
 4. **Retire the `.nx-card` / `.nx-pill` compatibility aliases** once nothing references them
    (73 + 17 occurrences across 15 files at last count) — cosmetic, not a defect.
 5. **Delete the home-floor preview block** (`tags: ['预览数据']`) in `HomeView.vue` once the catalog
