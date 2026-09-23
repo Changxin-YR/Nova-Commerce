@@ -699,6 +699,28 @@ A stale `.pyc` and a stale editor buffer are the two plausible causes. If the fi
 disk disagrees with `git ls-files` in the same repo, that is a working-tree divergence
 and is worth escalating loudly rather than explaining away as a cache.
 
+### 13.2b The file hash, added after four stale reports against ONE module
+
+A commit sha is a claim about the whole tree; when a report names one file, the cheaper
+question is whether both parties are looking at the same bytes. Four reports were filed
+against the after-sales conftest across one session - a `1241`, an `F401`/`F821`, 25
+setup errors, and two missing helpers - and every one failed to reproduce at HEAD. The
+exchange that ended it in a single round was:
+
+    git rev-parse --short HEAD
+    Get-FileHash <the file> -Algorithm MD5
+
+Both parties reported **`7DD5B0A3CEEB4B738A87CF7BAFF964B6`**, which settled it without
+argument: same file, therefore a stale reading, therefore nothing to fix. A hash does
+something a commit sha cannot - it distinguishes *different revision* from *different
+file*, and it makes "I cannot reproduce it" a fact rather than a disagreement about
+diligence.
+
+**So the reporting order is: commit, then file hash, then - only if the hashes match -
+the traceback.** And if you cannot reproduce your own finding at HEAD, say so and drop
+it rather than escalating it with a caveat: a caveated stale report still costs the
+owner the same turn.
+
 ### 13.3 Re-run at HEAD before escalating
 
 Before telling another owner their file is broken: re-run your repro at HEAD. If it
