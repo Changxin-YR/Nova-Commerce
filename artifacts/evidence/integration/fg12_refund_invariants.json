@@ -5,15 +5,15 @@
   "spec": "REQ-AFS-002 / section 46 - total refunded <= paid amount; item refund <= item payable amount; mandatory condition 3 of section 147",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/refund tests/concurrency/test_refund_concurrency.py -v --no-header -p no:cacheprovider -m integration",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T10:31:21.720233+00:00",
-  "duration_ms": 9908,
+  "timestamp": "2026-09-23T10:33:59.948299+00:00",
+  "duration_ms": 7538,
   "exit_code": 0,
-  "summary": "12 passed, 1 deselected in 7.49s",
+  "summary": "12 passed, 1 deselected in 5.69s",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "e1d88cda525c4a08170f40c7b0b9031784387315\n",
-    "subject": "Contract contradictions sweep: payment_no uniqueness scope, and sku_id vs REQ-FUL-002\n",
+    "revision": "5f1574c03dc752c7c18312363e3def68b5c33c82\n",
+    "subject": "Phase 5 (verifier): final refund-gate adjustments at freeze\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -22,11 +22,8 @@
     ],
     "relevant_paths_dirty": false,
     "relevant_paths_dirty_files": [],
-    "other_paths_dirty": true,
-    "other_paths_dirty_files": [
-      " M scripts/emit_fg12_evidence.py",
-      " M scripts/gate_evidence.py"
-    ]
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
   },
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
