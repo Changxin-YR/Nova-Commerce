@@ -217,6 +217,24 @@ PROBE_ORDER_PREFIX = "FG12-"
 PROBE_PAYMENT_PREFIX = "FGTWELVE"
 
 
+def _one_row(session: Session, sql: str, params: dict, what: str):
+    """Run a lookup that must return exactly one row, failing with a *named* message.
+
+    `.scalar_one()` raises ``NoResultFound: No row was found when one was required`` with no
+    indication of which lookup failed or why - which the captain hit while investigating this file,
+    and which reads as a defect in the thing under test rather than in the probe's own premise. The
+    message below names the row that was missing, so the failure is diagnosable at a glance and the
+    cause (an empty table, a fixture that did not run) is not mistaken for a cap defect.
+    """
+    row = session.execute(text(sql), params).first()
+    assert row is not None, (
+        f"the probe could not find the row it needs: {what}. This is a probe-premise failure, not "
+        "a constraint result - the probe builds its own rows precisely so it never depends on "
+        "another test or a previous run leaving one behind."
+    )
+    return row
+
+
 def _insert_probe_row(session: Session, table: str, legal: int, shop: Shop) -> tuple[int, str]:
     """Insert one throwaway row whose ``refunded_amount`` sits exactly at the cap.
 
@@ -296,10 +314,12 @@ def _insert_probe_row(session: Session, table: str, legal: int, shop: Shop) -> t
         # broken probe rather than a cap result.
         probe_sku = int(shop.sku_ids[1])
         product_id = int(
-            session.execute(
-                text("SELECT product_id FROM product_skus WHERE id = :sid"),
+            _one_row(
+                session,
+                "SELECT product_id FROM product_skus WHERE id = :sid",
                 {"sid": probe_sku},
-            ).scalar_one()
+                f"the seed SKU {probe_sku} the shared shop fixture just created",
+            )[0]
         )
         session.execute(
             text(
@@ -317,7 +337,13 @@ def _insert_probe_row(session: Session, table: str, legal: int, shop: Shop) -> t
                 "legal": legal,
             },
         )
-    return int(session.execute(text(f"SELECT MAX(id) FROM {table}")).scalar_one()), marker
+    inserted = _one_row(
+        session,
+        f"SELECT MAX(id) FROM {table}",
+        {},
+        f"the probe row this call just inserted into {table}",
+    )
+    return int(inserted[0]), marker
 
 
 @pytest.mark.parametrize(("table", "constraint", "cap_col"), CAPS, ids=[cap[1] for cap in CAPS])

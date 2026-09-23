@@ -132,12 +132,20 @@ def test_a_refund_to_exactly_paid_amount_is_accepted(seeded_shop: AfterSalesShop
     try:
         lines = _lines(session, seeded_shop.order_id)
         items_total = sum(payable for payable, _ in lines.values())
-        order_payable = int(
-            session.execute(
-                text("SELECT payable_amount FROM orders WHERE id = :oid"),
-                {"oid": seeded_shop.order_id},
-            ).scalar_one()
+        # Read through `first()` and assert, rather than `.scalar_one()`: a bare `NoResultFound`
+        # from inside SQLAlchemy names neither the lookup nor the reason, and reads as a defect in
+        # the thing under test rather than in the probe's premise. The assertion says what is
+        # missing. (The shipped path could also use the fixture's own figures, but reading the
+        # committed row is the point - it is what the identity assertion is about.)
+        order_row = session.execute(
+            text("SELECT payable_amount FROM orders WHERE id = :oid"),
+            {"oid": seeded_shop.order_id},
+        ).first()
+        assert order_row is not None, (
+            "the probe could not find the seed's order row: the paid order this fixture created "
+            "for the shop is gone, which is a probe-premise failure rather than a cap result"
         )
+        order_payable = int(order_row[0])
     finally:
         session.close()
 
