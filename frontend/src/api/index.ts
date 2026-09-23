@@ -50,4 +50,4 @@ export type {
   DependencyStatus,
   HealthReport,
 } from '@/api/system'
-export type { CouponPayload, Promotion } from '@/api/marketing'
+export type { CouponPayload, CouponPreviewResult, CouponCreatePayload, Promotion } from '@/api/marketing'

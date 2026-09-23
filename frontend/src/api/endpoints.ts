@@ -154,6 +154,32 @@ export const API = {
      */
     publishPromotion: (id: string | number) => `/marketing/promotions/${id}/publish`,
     unpublishPromotion: (id: string | number) => `/marketing/promotions/${id}/unpublish`,
+    /**
+     * §12.1 addendum. Creation is TWO calls because §47 requires preview-before-create and
+     * `PROMOTION_PREVIEW_REQUIRED` (90003) is a business code the server enforces: the preview
+     * returns a `preview_token`, and the create call must carry the SAME token back so the server can
+     * prove the operator approved the thing that is being written.
+     *
+     * The create paths are `/marketing/promotions` and `/marketing/coupons` — NOT the
+     * `/marketing/admin/...` prefix the LIST routes use (same split as the product task endpoints).
+     */
+    promotionsPreview: '/marketing/promotions/preview',
+    promotionsCreate: '/marketing/promotions',
+    couponsPreview: '/marketing/coupons/preview',
+    couponsCreate: '/marketing/coupons',
+  },
+
+  // -- system management (§12.2) ------------------------------------------
+  system: {
+    /**
+     * §12.2. Deliberately NOT a generic `PUT /system/roles/{id}`: that would make "downgrade a
+     * CRITICAL write tool to READ" one checkbox away, which §65 forbids. The body carries the
+     * COMPLETE explicit permission set (a delta invites a caller to omit a permission it did not know
+     * about and silently revoke it).
+     */
+    rolePermissions: (roleId: string | number) => `/system/roles/${roleId}/permissions`,
+    /** Role assignment is an authorization change, so it is explicit and audited (§133). */
+    userRoles: (userId: string | number) => `/system/users/${userId}/roles`,
   },
 
   // -- analytics ----------------------------------------------------------

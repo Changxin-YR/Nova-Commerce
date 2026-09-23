@@ -21,7 +21,8 @@
  * answers `PROMOTION_CONFLICT` (90001) / `COUPON_ALREADY_LOCKED` (90008).
  */
 import { computed, reactive, ref } from 'vue'
-import { marketingAdminApi } from '@/api'
+import { marketingAdminApi, type CouponPreviewResult } from '@/api'
+
 import { useAsyncState } from '@/composables/useAsyncState'
 import {
   canPublishPromotion,
@@ -68,6 +69,15 @@ function switchTab(next: 'coupons' | 'promotions'): void {
 const formOpen = ref(false)
 /** `preview` is NOT the same as "ready to submit" — an explicit confirm step follows it. */
 const step = ref<'form' | 'preview'>('form')
+
+/**
+ * The SERVER's preview response, including `preview_token`.
+ *
+ * The token is the mechanism §12.1 describes: the create call must echo the token the preview
+ * returned, so the server can prove the operator approved the exact thing being written. Holding it
+ * here (rather than re-deriving it) is what makes the two steps one flow instead of two requests.
+ */
+const serverPreview = ref<CouponPreviewResult | null>(null)
 const busy = ref(false)
 const form = reactive({
   code: '',
@@ -110,29 +120,55 @@ function openForm(): void {
   step.value = 'form'
 }
 
-/** Step 1: never writes. It only reveals the payload for review. */
-function preview(): void {
-  if (draftProblem.value) {
-    notifications.warning('请先修正表单', draftProblem.value)
+/**
+ * Step 1 of 2: calls `POST /marketing/coupons/preview` (§12.1). It NEVER writes — the endpoint
+ * exists so the operator reviews what the server will accept before anything is committed, and
+ * `PROMOTION_PREVIEW_REQUIRED` (90003) is the server-side enforcement of that (§47).
+ */
+async function preview(): Promise<void> {
+  const payload = draftPayload.value
+  if (!payload || draftProblem.value) {
+    notifications.warning('请先修正表单', draftProblem.value ?? '表单不完整')
     return
   }
-  step.value = 'preview'
+  busy.value = true
+  try {
+    serverPreview.value = await marketingAdminApi.previewCoupon(payload)
+    step.value = 'preview'
+  } catch (e) {
+    const normalized = normalizeError(e)
+    // 90003 means the server wants a preview first: that is this flow, so it should not happen —
+    // report it rather than silently retrying, because it signals the two sides disagree.
+    notifications.error('预览失败', normalized.message, normalized.code, normalized.traceId)
+  } finally {
+    busy.value = false
+  }
 }
 
 function backToForm(): void {
   step.value = 'form'
+  // Editing invalidates the approval: the token covers the values the operator SAW, so keeping it
+  // across an edit is exactly the drift §12.1 exists to prevent.
+  serverPreview.value = null
 }
 
 /** Step 2: the ONLY place a write happens, from the payload the operator just saw. */
 async function confirmCreate(): Promise<void> {
   const payload = draftPayload.value
-  if (!payload) return
+  const token = serverPreview.value?.preview_token
+  // No token means no approval yet, so there is nothing legitimate to write.
+  if (!payload || !token) {
+    notifications.warning('请先预览', '创建需要预览返回的 token，确保写入内容与审核内容一致')
+    step.value = 'form'
+    return
+  }
   busy.value = true
   try {
-    await marketingAdminApi.createCoupon(payload)
+    await marketingAdminApi.createCoupon({ ...payload, preview_token: token })
     notifications.success('优惠券已创建')
     formOpen.value = false
     step.value = 'form'
+    serverPreview.value = null
     form.code = ''
     form.name = ''
     form.discountYuan = ''
@@ -261,15 +297,24 @@ const sampleDiscount = toMajorString(1000)
               </p>
               <p v-if="draftProblem" class="marketing__problem">{{ draftProblem }}</p>
               <div class="marketing__actions">
-                <button type="button" class="nx-btn nx-btn--primary nx-btn--sm" @click="preview()">
-                  预览
+                <button type="button" class="nx-btn nx-btn--primary nx-btn--sm" :disabled="busy" @click="preview()">
+                  {{ busy ? '预览中…' : '预览' }}
                 </button>
               </div>
             </template>
 
             <!-- STEP 2: the review step. Creation cannot happen without it (§47). -->
             <template v-else>
-              <p class="nx-muted marketing__hint">以下是将要提交的内容，确认前不会写入。</p>
+              <p class="nx-muted marketing__hint">
+                以下为服务端预览结果（含 preview_token），确认前不会写入。
+              </p>
+              <!--
+                The server's own findings. A preview that could not disagree with the form would not be
+                worth a round trip, so warnings are rendered rather than swallowed.
+              -->
+              <ul v-if="serverPreview?.warnings?.length" class="marketing__warnings">
+                <li v-for="(warning, index) in serverPreview.warnings" :key="index">{{ warning }}</li>
+              </ul>
               <dl v-if="draftPayload" class="marketing__preview">
                 <div><dt>券码</dt><dd><code>{{ draftPayload.code }}</code></dd></div>
                 <div><dt>名称</dt><dd>{{ draftPayload.name }}</dd></div>
@@ -285,7 +330,12 @@ const sampleDiscount = toMajorString(1000)
                 <div><dt>失效</dt><dd>{{ stamp(draftPayload.valid_to) }}</dd></div>
               </dl>
               <div class="marketing__actions">
-                <button type="button" class="nx-btn nx-btn--primary nx-btn--sm" :disabled="busy" @click="confirmCreate()">
+                <button
+                  type="button"
+                  class="nx-btn nx-btn--primary nx-btn--sm"
+                  :disabled="busy || !serverPreview"
+                  @click="confirmCreate()"
+                >
                   确认提交
                 </button>
                 <button type="button" class="nx-btn nx-btn--sm" :disabled="busy" @click="backToForm()">
@@ -452,6 +502,13 @@ const sampleDiscount = toMajorString(1000)
       display: block;
       margin: 10px;
     }
+  }
+
+  &__warnings {
+    margin: 0 0 10px;
+    padding-left: 18px;
+    color: var(--nx-price);
+    font-size: 12px;
   }
 
   &__problem {
