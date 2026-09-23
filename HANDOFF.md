@@ -342,6 +342,13 @@ again.
   If you later hand-write its body, `op`/`sa` are gone and you get a `NameError` at
   apply time. Re-add them.
 
+- **MySQL REPEATABLE READ fixes a connection's snapshot at its first read.** A probe
+  that reuses one connection across an out-of-band mutation can never observe the
+  change, so an INV-014-style diff compares the snapshot against itself and passes as
+  a **false green**. Use a fresh connection for every post-mutation read, and assert
+  the mutation actually landed before asserting the historical row is unchanged - the
+  two-way check is what exposed this during Phase 4's independent verification.
+
 ### Python / SQLAlchemy
 - **`include_object` / `TypeDecorator` signatures are fixed by the frameworks.**
   Unused parameters get `# noqa: ARG001` **on the parameter line** — ruff reports
@@ -836,7 +843,11 @@ their own assertions, not the authors':
 * **Idempotency race**: 8 threads released together on one `Idempotency-Key` -
   exactly one `orders` row, one `idempotency_records` row, and all eight callers
   returned the **same** `order_no` (one creator, seven replays). The unique index,
-  not application logic, is what serialised them.
+  not application logic, is what serialised them. **Honest caveat:** the companion
+  distinct-key negative control ("N unguarded creates produce N orders") did NOT
+  complete - it counted 0 matching orders and the cause was not isolated in the
+  time available. The shared-key claim above does not depend on it: it is direct
+  observation of 1 order / 1 record / 8 identical order numbers.
 
 The shared dev database was left clean afterwards: 0 rows in all four Phase 4
 tables and no leftover scratch schemas.
