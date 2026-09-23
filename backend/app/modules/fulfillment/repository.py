@@ -253,9 +253,20 @@ class FulfillmentRepository:
 
         The lesson worth keeping is about the *name*, not the SQL: a method called
         ``shipped_*`` that returns planned units is worse than no method at all,
-        because a caller has no reason to doubt it. ``FulfillmentService
-        ._shipped_quantities`` carries the same filter independently, so the 70001
-        guard and the order's axis cannot disagree about how much has gone out.
+        because a caller has no reason to doubt it.
+
+        This method is now the **single** implementation of that rule: the 70001 guard and
+        ``FulfillmentService._recompute_order_axis`` both read it, so the two cannot
+        disagree about how much has gone out. The service-side workaround that existed
+        while this filter was missing (``_shipped_quantities``) has been deleted, on the
+        captain's ruling, and a second filtered total should not be reintroduced here -
+        one rule, one query. (An earlier version of this docstring claimed that workaround
+        still existed and ran the same filter independently; it did not, and describing
+        code that is not there is its own kind of defect.)
+
+        ``planned_quantities_for_order`` remains the deliberately unfiltered counterpart,
+        so the distinction is carried by two method *names* rather than by one method's
+        missing filter.
         """
         stmt = (
             select(
