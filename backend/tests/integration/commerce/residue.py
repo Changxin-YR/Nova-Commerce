@@ -69,7 +69,21 @@ MARKER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 #: Event-id shapes the fixtures generate: ``evt-<marker>-<suffix>`` from the shared
-#: seed, ``FG11...`` from the gate. Anchored so a real provider's event id cannot match.
+#: seed, ``FG11...`` from the gate.
+#:
+#: An earlier version of this comment claimed these were "anchored so a real provider's
+#: event id cannot match". That was **false for ``evt-%``**, which matches any event id
+#: beginning ``evt-`` - including a real provider's or a naming convention this project
+#: does not own. ``FG11%``/``fg11%`` genuinely are anchored to fixture namespaces; the
+#: bare prefix is not. The comment was worse than no comment, because it gave a reader
+#: confidence in exactly the direction that mattered. Reported by payment-workflow, who
+#: measured it rather than taking the description.
+#:
+#: The prefix is kept as the *discovery* filter - it is how rows the fixtures plausibly
+#: produced are found at all - but nothing is deleted on it alone: every sweep below is
+#: additionally scoped to ids the report already attributed to a marker, or to an order
+#: that no longer exists. Two conditions, so a provider's real delivery cannot be removed
+#: by shape alone.
 _EVENT_ID_PATTERNS = ("evt-%", "FG11%", "fg11%")
 
 
@@ -331,11 +345,15 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
     )
     session.execute(delete(Fulfillment).where(Fulfillment.order_id.in_(orders)))
     session.execute(delete(Payment).where(Payment.id.in_(payments)))
-    session.execute(
-        delete(PaymentCallback).where(
-            or_(*[PaymentCallback.provider_event_id.like(p) for p in _EVENT_ID_PATTERNS])
+    # Deleted by the **marker-derived** patterns, not by `_EVENT_ID_PATTERNS`, so the set
+    # swept is exactly the set the report attributed - by construction rather than by
+    # coincidence. The broad prefix is discovery only; deletion requires attribution.
+    if patterns:
+        session.execute(
+            delete(PaymentCallback).where(
+                or_(*[PaymentCallback.provider_event_id.like(p) for p in patterns])
+            )
         )
-    )
     session.execute(delete(OrderStatusLog).where(OrderStatusLog.order_id.in_(orders)))
     session.execute(delete(OrderItem).where(OrderItem.order_id.in_(orders)))
     session.execute(delete(Order).where(Order.id.in_(orders)))
