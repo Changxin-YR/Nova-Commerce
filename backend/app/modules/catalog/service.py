@@ -42,7 +42,7 @@ class CatalogService:
             Product.deleted_at.is_(None),
         )
         if lock:
-            query = query.with_for_update()
+            query = query.with_for_update().execution_options(populate_existing=True)
         product = self.session.execute(query).scalar_one_or_none()
         if product is None:
             raise ProductNotFoundError("product not found")

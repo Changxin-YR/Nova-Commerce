@@ -78,6 +78,24 @@ async function transition(id: number, action: 'publish' | 'unpublish'): Promise<
   }
 }
 
+async function uploadPrimary(id: number, event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  busyId.value = id
+  try {
+    await catalogAdminApi.uploadImage(id, file, 'PRIMARY')
+    notifications.success('商品主图已上传')
+    await execute()
+  } catch (e) {
+    const normalized = normalizeError(e)
+    notifications.error('上传失败', normalized.message, normalized.code, normalized.traceId)
+  } finally {
+    input.value = ''
+    busyId.value = null
+  }
+}
+
 function changePage(delta: number): void {
   const next = page.value + delta
   if (next < 1) return
@@ -127,7 +145,7 @@ function changePage(delta: number): void {
               <th style="width: 100px; text-align: right">销量</th>
               <th style="width: 100px">状态</th>
               <th style="width: 120px">商品 ID</th>
-              <th style="width: 140px">操作</th>
+              <th style="width: 220px">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -167,6 +185,16 @@ function changePage(delta: number): void {
               <td><code class="p-list__id">{{ product.id }}</code></td>
               <td>
                 <div class="p-list__actions">
+                  <label class="nx-btn nx-btn--text p-list__upload">
+                    上传主图
+                    <input
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.gif,.webp,.avif"
+                      :aria-label="`上传 ${product.title} 主图`"
+                      :disabled="busyId === product.id"
+                      @change="uploadPrimary(product.id, $event)"
+                    />
+                  </label>
                   <button
                     type="button"
                     class="nx-btn nx-btn--text"
@@ -259,6 +287,25 @@ function changePage(delta: number): void {
   &__actions {
     display: flex;
     gap: 8px;
+  }
+
+  &__upload {
+    position: relative;
+    cursor: pointer;
+
+    &:focus-within {
+      outline: 2px solid var(--nx-primary);
+      outline-offset: 2px;
+    }
+
+    input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
   }
 
   &__pager {

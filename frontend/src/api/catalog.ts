@@ -14,6 +14,14 @@ import type {
 } from '@/types/api-contract'
 import type { Brand, Category, Paged, Product, ProductSummary, Sku } from '@/types/domain'
 
+interface UploadedProductImage {
+  id: number
+  url: string | null
+  alt: string | null
+  role: 'PRIMARY' | 'GALLERY' | 'DETAIL'
+  sort_order: number
+}
+
 export const catalogApi = {
   async searchProducts(query: ProductQuery = {}): Promise<Paged<ProductSummary>> {
     return httpClient.get<Paged<ProductSummary>>(API.catalog.products, { params: query })
@@ -60,5 +68,12 @@ export const catalogAdminApi = {
 
   async addSku(productId: string | number, payload: SkuPayload): Promise<Sku> {
     return httpClient.post<Sku>(API.catalog.skus(productId), payload)
+  },
+
+  async uploadImage(productId: number, file: File, role: 'PRIMARY' | 'GALLERY' | 'DETAIL'): Promise<UploadedProductImage> {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('role', role)
+    return httpClient.upload<UploadedProductImage>(API.catalog.uploadImage(productId), form)
   },
 }

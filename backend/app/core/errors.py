@@ -493,6 +493,7 @@ CategoryNotFoundError = _error("Category not found", ErrorCode.CATEGORY_NOT_FOUN
 BrandNotFoundError = _error("Brand not found", ErrorCode.BRAND_NOT_FOUND, http_status=404)
 ProductAlreadyPublishedError = _error("Product is already published", ErrorCode.PRODUCT_ALREADY_PUBLISHED, http_status=409)
 ProductStateInvalidError = _error("Product state does not allow this action", ErrorCode.PRODUCT_STATE_INVALID, http_status=409)
+ImageUploadRejectedError = _error("Product image was rejected", ErrorCode.IMAGE_UPLOAD_REJECTED, http_status=400)
 
 # -- inventory --------------------------------------------------------------
 InsufficientStockError = _error(

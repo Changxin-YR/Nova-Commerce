@@ -39,6 +39,7 @@ export const API = {
     publish: (id: string | number) => `/products/${id}/publish`,
     unpublish: (id: string | number) => `/products/${id}/unpublish`,
     skus: (productId: string | number) => `/catalog/admin/products/${productId}/skus`,
+    uploadImage: (productId: string | number) => `/catalog/admin/products/${productId}/images`,
   },
 
   // -- inventory ----------------------------------------------------------

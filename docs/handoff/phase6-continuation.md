@@ -9,17 +9,16 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
   for the current local lead over `origin/main`. No commits from this
   continuation have been pushed.
-- Backend: `python -m pytest tests -q` passed **1164 tests** after the Analytics
-  increment. One upstream
+- Backend: `python -m pytest tests -q` passed **1165 tests** after the
+  product-image increment, including real MySQL and MinIO. One upstream
   Starlette/AnyIO deprecation warning remains.
   `ruff check --no-cache backend/app backend/tests backend/migrations` passed.
 - Schema: Alembic head is `f0d29969cfb5`; `alembic check` found no drift.
   The coupon amount columns were read back as BIGINT, and all coupon checks,
   indexes, and foreign keys were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
-- Frontend: **300 Vitest cases**, typecheck, lint, and production build pass.
-  Analytics renders all five declared metric units. Refresh FG-03/20/21 after
-  the source commit.
+- Frontend: **301 Vitest cases**, typecheck, lint, and production build pass.
+  Refresh FG-03/20/21 after the source commit.
 - `FINAL_GATE.md` currently shows **10 PASS, 16 MISSING**, overall
   **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
   index, not a claim that the whole product is complete.
@@ -88,7 +87,7 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
     ownership and allowed state transitions. A new MySQL HTTP test covers
     creation, publication, storefront visibility, duplicate SKU rejection,
     unauthorized callers and cross-merchant access. Stock still enters through
-    inventory operations; product image upload remains to be implemented.
+    inventory operations.
 13. Phase 6 Analytics now serves the five frozen metric names from committed
     orders, order-item snapshots, inventory movements, and successful refunds.
     Every response uses the shared metric/unit/period/series/summary/dimensions
@@ -96,6 +95,12 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
     five metrics and renders money and rates with their declared units. MySQL
     tests use a real settled order and a real refund workflow; metric definitions
     and zero-denominator behavior are in `docs/architecture/ANALYTICS_METRICS.md`.
+14. Merchant staff can upload a validated product image to real MinIO. The
+    product-image row saves the returned checksum, MIME type, size and object
+    key; setting a primary image demotes the previous one in the same MySQL
+    transaction. The storefront returns a signed image URL. A real MySQL/MinIO
+    HTTP test checks bytes, metadata, permissions and storefront visibility.
+    A frontend control uploads the chosen file and refreshes the product list.
 
 ## Remaining work, in execution order
 
@@ -135,6 +140,6 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 
 ## Next code entry point
 
-Next implement product image upload and a browser checkout case, then the
-remaining backend modules and gates. Refresh source-watched
+Next implement a browser checkout case, then the remaining backend modules and
+gates. Refresh source-watched
 gate artifacts after each source increment and regenerate `FINAL_GATE.md`.

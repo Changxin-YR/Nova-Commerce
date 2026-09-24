@@ -69,8 +69,6 @@ CLASSES_NOT_YET_DEFINED = frozenset(
     {
         "OK",  # 0: success, never raised
         "METHOD_NOT_ALLOWED",
-        # catalog edges
-        "IMAGE_UPLOAD_REJECTED",
         # inventory edges
         "INVENTORY_ADJUSTMENT_INVALID",
         "INVENTORY_MOVEMENT_DUPLICATE",
