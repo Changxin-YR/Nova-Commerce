@@ -6,9 +6,9 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 
 ## Verified repository state
 
-- Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
-  for the current local lead over `origin/main`. No commits from this
-  continuation have been pushed.
+- Worktree: `main`; the continuation was pushed to `origin/main` over SSH.
+  Use `git log -1 --oneline` and `git status -sb` to check the current revision
+  and sync state.
 - Backend: `python -m pytest tests -q` passed **1165 tests** after the
   product-image increment, including real MySQL and MinIO. One upstream
   Starlette/AnyIO deprecation warning remains.
@@ -138,9 +138,9 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    FG-14–15, FG-17–18, FG-22 and FG-26. Phase 7–16 features and flagship E2E
    are not complete. `mypy app` reports 85 errors in 20 files; no
    type-clean claim has been made.
-6. **Remote sync**: all continuation commits remain local. Push only after the
-   intended branch/review path is settled. Re-run affected evidence after each
-   watched source change and regenerate `FINAL_GATE.md` at the end.
+6. **Remote sync**: the continuation is on GitHub `main`. Re-run affected
+   evidence after each watched source change and regenerate `FINAL_GATE.md` at
+   the end.
 7. **Live route audit**: `create_app().openapi()["paths"]` now lists 65 paths,
    including auth, addresses, catalog, merchant product writes, and Analytics.
    Knowledge, agent, governance, and audit API routers remain
