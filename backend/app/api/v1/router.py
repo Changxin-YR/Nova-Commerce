@@ -83,6 +83,12 @@ def build_api_router() -> APIRouter:
             # tests in this repo probe by ANSWER rather than by registration.
             api_router.include_router(router, prefix=prefix, tags=[tag])
 
+    from app.modules.governance.api.pending_actions import task_router as pending_action_tasks
+    from app.modules.knowledge.api.admin import task_router as knowledge_tasks
+
+    api_router.include_router(pending_action_tasks, tags=["governance:pending-actions"])
+    api_router.include_router(knowledge_tasks, tags=["knowledge:tasks"])
+
     # The frozen product publication verbs live at /products/{id}/... rather
     # than under /catalog. Keep the shared /catalog mount for admin CRUD.
     from app.modules.catalog.api.tasks import router as catalog_tasks

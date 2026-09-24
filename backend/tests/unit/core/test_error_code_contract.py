@@ -79,13 +79,11 @@ CLASSES_NOT_YET_DEFINED = frozenset(
         # marketing
         "PROMOTION_RULE_INVALID",
         # knowledge / RAG (Phase 11)
-        "KNOWLEDGE_BASE_NOT_FOUND",
         "DOCUMENT_DUPLICATE",
         "DOCUMENT_PARSE_FAILED",
         # agent (Phase 10)
         "AGENT_GRAPH_VERSION_MISMATCH",
         # pending action (Phase 10/13)
-        "PENDING_ACTION_ALREADY_DECIDED",
         # storage
         "BUCKET_UNAVAILABLE",
         # governance (Phase 13)

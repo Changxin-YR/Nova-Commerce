@@ -94,4 +94,4 @@ dist/assets/vendor-BmrtFxKe.js                   79.29 kB │ gzip:  29.96 kB �
 dist/assets/element-G3pTVDeI.js                 983.73 kB │ gzip: 316.43 kB │ map: 5,246.34 kB
 dist/assets/charts-CXr1f1-c.js                1,083.77 kB │ gzip: 358.27 kB │ map: 5,923.00 kB
 
-✓ built in 4.16s
+✓ built in 2.56s

@@ -17,11 +17,11 @@ month buckets use `YYYY-MM`.
 For each metric, `summary.total` applies the metric to the whole requested
 window. `summary.average` is the arithmetic average of returned bucket values;
 money averages are rounded to integer minor units. `summary.change_ratio`
-compares the total to the immediately preceding window of equal length. When
-there is no positive previous-window denominator, it is `0` by the frozen
-numeric response shape. A ratio with no positive denominator also evaluates to
-`0`; consumers should inspect the numerator and denominator dimensions before
-interpreting a zero refund rate.
+compares the total to the immediately preceding window of equal length. A real
+zero is returned as `0`; when the comparison window has no data, or the metric is
+not applicable, the value is `null`. Ratios with a zero denominator are `null`,
+not `0`; consumers must inspect the numerator and denominator dimensions before
+interpreting the result.
 
 The endpoint requires a merchant staff principal with `analytics:read`. Every
 query filters by the principal's merchant; no metric accepts a merchant ID from

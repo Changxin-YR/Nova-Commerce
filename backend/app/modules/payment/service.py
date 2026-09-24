@@ -272,6 +272,10 @@ class PaymentService:
         """Drive ``PaymentSuccessWorkflow`` and own its transaction boundary."""
         return PaymentSuccessWorkflow(self._session, self._settings).execute(request)
 
+    def lock_attempts_for_order(self, *, order_id: int, user_id: int) -> list[Payment]:
+        """Lock payment attempts before the order lock used by cancellation."""
+        return self._payments.lock_attempts_for_order(order_id=order_id, user_id=user_id)
+
     def record_refused_signature(
         self, request: CallbackRequest, *, reason: str
     ) -> None:

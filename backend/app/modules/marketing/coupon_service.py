@@ -31,7 +31,7 @@ from app.modules.marketing.schemas import PromotionScope
 from app.modules.marketing.service import _scope_products
 from app.modules.order.models import Order, OrderItem
 from app.modules.pricing import CartPrice, CouponRule, PricedLine, PricingService
-from app.modules.pricing.enums import PricingWarning
+from app.modules.pricing.enums import CouponType, PricingWarning
 from app.shared.db.base import utc_now
 
 
@@ -60,7 +60,7 @@ def _products(session: Session, *, merchant_id: int, scope: CouponScope) -> set[
 def _rule(template: CouponTemplate, *, coupon_id: int, sku_ids: set[int]) -> CouponRule:
     return CouponRule(
         coupon_id=coupon_id,
-        coupon_type=template.coupon_type,
+        coupon_type=CouponType(template.coupon_type),
         threshold_amount=template.threshold_amount,
         face_value_amount=template.face_value_amount or 0,
         discount_bps=template.discount_bps or 0,
@@ -239,7 +239,9 @@ class CouponService:
             raise CouponNotFoundError("coupon template not found")
         if template.status != ("DRAFT" if publish else "ACTIVE"):
             raise PromotionConflictError("coupon template cannot make this transition")
-        if publish and template.validity_type == "ABSOLUTE" and template.valid_to <= utc_now():
+        if publish and template.validity_type == "ABSOLUTE" and (
+            template.valid_to is None or template.valid_to <= utc_now()
+        ):
             raise CouponExpiredError("coupon template validity window has ended")
         template.status = "ACTIVE" if publish else "ENDED"
         self._session.commit()
@@ -309,12 +311,18 @@ class CouponService:
         ).scalar_one())
         if existing >= template.per_user_limit:
             raise CouponNotApplicableError("per-user coupon limit is reached")
+        starts: datetime | None
+        ends: datetime | None
         if template.validity_type == "RELATIVE":
+            if template.valid_days is None:
+                raise ValidationError("relative coupon template must define valid_days")
             starts = now
             ends = now + timedelta(days=template.valid_days)
         else:
             starts = template.valid_from
             ends = template.valid_to
+            if starts is None or ends is None:
+                raise ValidationError("absolute coupon template must define a validity window")
             if ends <= now:
                 raise CouponExpiredError("coupon template validity window has ended")
         coupon = UserCoupon(
@@ -414,7 +422,11 @@ class CouponService:
                 UserCoupon.user_id == order.user_id,
             ).with_for_update()
         ).scalar_one_or_none()
-        if coupon is None or coupon.status != "LOCKED" or coupon.order_id != order.id:
+        if coupon is None:
+            return
+        if coupon.status in {"UNUSED", "EXPIRED"} and coupon.order_id is None:
+            return
+        if coupon.status != "LOCKED" or coupon.order_id != order.id:
             raise ValidationError("paid order does not hold its selected coupon")
         coupon.status = "USED"
         coupon.used_at = now

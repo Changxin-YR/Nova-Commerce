@@ -19,6 +19,11 @@ five modules a symbol lives in, and the surface is what the module-layout
 diagram in design section 3 promises.
 """
 
+from app.modules.payment.compensation import (
+    CompensationRefundResult,
+    PaymentCompensationService,
+    RefundSender,
+)
 from app.modules.payment.enums import (
     CALLBACK_PROCESS_STATUSES,
     PAYMENT_CHANNELS,
@@ -27,7 +32,7 @@ from app.modules.payment.enums import (
     PaymentChannel,
     PaymentRecordStatus,
 )
-from app.modules.payment.models import Payment, PaymentCallback
+from app.modules.payment.models import Payment, PaymentCallback, PaymentCompensationRefund
 from app.modules.payment.providers import (
     PAYLOAD_REDACTED,
     CallbackHeaders,
@@ -76,6 +81,7 @@ __all__ = [
     "CallbackHeaders",
     "CallbackProcessStatus",
     "CallbackRequest",
+    "CompensationRefundResult",
     "CreatePaymentRequest",
     "InsertedCallback",
     "MockPayRequest",
@@ -83,6 +89,8 @@ __all__ = [
     "PaymentCallback",
     "PaymentCallbackRepository",
     "PaymentChannel",
+    "PaymentCompensationRefund",
+    "PaymentCompensationService",
     "PaymentCreateOut",
     "PaymentCreateResult",
     "PaymentOut",
@@ -91,6 +99,7 @@ __all__ = [
     "PaymentRepository",
     "PaymentService",
     "PaymentSuccessWorkflow",
+    "RefundSender",
     "SignatureVerdict",
     "callback_secret_for",
     "canonical_payment_request_hash",

@@ -612,6 +612,7 @@ class CreateOrderWorkflow:
                 sku_ids={line.sku_id for line in lines},
                 now=utc_now(),
                 for_update=True,
+                priced_lines=priced_lines,
             )
             coupon_rule = None
             if coupon_id is not None:
@@ -659,6 +660,8 @@ class CreateOrderWorkflow:
             client_request_id=client_request_id,
             request_hash=request_hash,
             coupon_id=coupon_id,
+            promotion_id=snapshot.promotion_ids[0] if snapshot.promotion_ids else None,
+            pricing_snapshot=self._pricing_snapshot(rules=rules, snapshot=snapshot),
             address_id=address_id,
             address_snapshot=address_snapshot,
             remark=remark,
@@ -945,6 +948,8 @@ class CreateOrderWorkflow:
         client_request_id: str,
         request_hash: str,
         coupon_id: int | None,
+        promotion_id: int | None,
+        pricing_snapshot: dict,
         address_id: int,
         address_snapshot: dict[str, object],
         remark: str | None,
@@ -982,6 +987,8 @@ class CreateOrderWorkflow:
             paid_amount=0,
             refunded_amount=0,
             coupon_id=coupon_id,
+            promotion_id=promotion_id,
+            pricing_snapshot=pricing_snapshot,
             address_id=address_id,
             receiver_name=str(address_snapshot.get("receiver_name") or ""),
             receiver_phone=str(address_snapshot.get("receiver_phone") or ""),
@@ -1001,6 +1008,40 @@ class CreateOrderWorkflow:
         order.order_no = f"{settings.ORDER_NO_PREFIX}{now:%Y%m%d}{order.id:06d}"
         self._session.flush()
         return order
+
+    @staticmethod
+    def _pricing_snapshot(*, rules: PricingRules, snapshot: PriceSnapshot) -> dict:
+        """Persist the resolved policy inputs beside the arithmetic snapshot."""
+        promotion = rules.promotion
+        coupon = rules.coupon
+        return {
+            "promotion": None if promotion is None else {
+                "id": promotion.promotion_id,
+                "type": str(promotion.promotion_type),
+                "threshold_amount": promotion.threshold_amount,
+                "discount_amount": promotion.discount_amount,
+                "discount_bps": promotion.discount_bps,
+                "reduction_amount": promotion.reduction_amount,
+                "max_discount_amount": promotion.max_discount_amount,
+                "applicable_sku_ids": sorted(promotion.applicable_sku_ids or ()),
+            },
+            "coupon": None if coupon is None else {
+                "id": coupon.coupon_id,
+                "type": str(coupon.coupon_type),
+                "threshold_amount": coupon.threshold_amount,
+                "face_value_amount": coupon.face_value_amount,
+                "discount_bps": coupon.discount_bps,
+                "max_discount_amount": coupon.max_discount_amount,
+                "applicable_sku_ids": sorted(coupon.applicable_sku_ids or ()),
+            },
+            "shipping_policy": snapshot.shipping_policy,
+            "promotion_allocations": {
+                str(row.sku_id): row.amount for row in snapshot.promotion_allocations
+            },
+            "coupon_allocations": {
+                str(row.sku_id): row.amount for row in snapshot.coupon_allocations
+            },
+        }
 
     @staticmethod
     def _first_item_name(snapshot: PriceSnapshot) -> str:

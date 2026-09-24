@@ -348,7 +348,9 @@ class FulfillmentRepository:
         return int(self._session.execute(stmt).scalar_one())
 
     # -- internals -------------------------------------------------------
-    def _paginate(self, stmt: Select[object], *, page: int, page_size: int) -> tuple[list[Fulfillment], int]:
+    def _paginate(
+        self, stmt: Select[tuple[Fulfillment]], *, page: int, page_size: int
+    ) -> tuple[list[Fulfillment], int]:
         # Count from the filter chain, not from a fetched page: a page-size cap is
         # not a bound on how many packages exist.
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())

@@ -264,7 +264,7 @@ class AuthSessionRepository:
             stmt = stmt.where(AuthSession.id != except_session_id)
         result = self._session.execute(stmt)
         self._session.flush()
-        return int(result.rowcount or 0)
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def touch(self, auth_session: AuthSession, *, when: datetime | None = None) -> None:
         """Record last use. Enables idle-timeout and stale-session reporting."""
@@ -338,7 +338,7 @@ class AuthSessionRepository:
             .values(revoked_at=utc_now(), revoked_reason=reason)
         )
         self._session.flush()
-        return int(result.rowcount or 0)
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def delete_expired(self, *, before: datetime | None = None) -> int:
         """Housekeeping for the reconciliation job (spec §50).
@@ -357,7 +357,7 @@ class AuthSessionRepository:
             )
         )
         self._session.flush()
-        return int(result.rowcount or 0)
+        return int(getattr(result, "rowcount", 0) or 0)
 
 
 class RoleRepository:

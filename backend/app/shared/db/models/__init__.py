@@ -6,6 +6,7 @@ context that nobody else may import is a table nobody else can use; the choice i
 either a shared model or a duplicated one, and a duplicated one drifts.
 """
 
+from app.shared.db.models.audit import AuditRecord
 from app.shared.db.models.idempotency import IdempotencyRecord, IdempotencyStatus
 from app.shared.db.models.outbox import (
     MAX_PUBLISH_ATTEMPTS,
@@ -17,6 +18,7 @@ from app.shared.db.models.outbox import (
 __all__ = [
     "MAX_PUBLISH_ATTEMPTS",
     "OUTBOX_STATUSES",
+    "AuditRecord",
     "IdempotencyRecord",
     "IdempotencyStatus",
     "OutboxMessage",

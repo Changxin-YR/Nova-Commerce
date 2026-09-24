@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
@@ -24,6 +25,7 @@ from app.modules.marketing.preview_token import PREVIEW_TTL, issue_preview_token
 from app.modules.marketing.schemas import PromotionCreate, PromotionDraft, PromotionScope
 from app.modules.order.models import Order, OrderItem
 from app.modules.pricing import PricedLine, PricingService, PromotionRule
+from app.modules.pricing.enums import PromotionType
 from app.shared.db.base import utc_now
 
 
@@ -84,7 +86,7 @@ def promotion_rule(promotion: Promotion, *, eligible_sku_ids: set[int]) -> Promo
     config = promotion.rule_config
     return PromotionRule(
         promotion_id=promotion.id,
-        promotion_type=promotion.promotion_type,
+        promotion_type=PromotionType(promotion.promotion_type),
         threshold_amount=config.get("threshold_amount", 0),
         discount_amount=config.get("discount_amount", 0),
         discount_bps=config.get("discount_bps", 0),
@@ -105,8 +107,14 @@ class PromotionService:
         sku_ids: set[int],
         now: datetime,
         for_update: bool,
+        priced_lines: Sequence[PricedLine] | None = None,
     ) -> tuple[PromotionRule | None, Promotion | None]:
-        """Select one eligible active rule; order creation may reserve its quota."""
+        """Select one eligible active rule; order creation may reserve its quota.
+
+        When the cart lines are available, every candidate is sent through the
+        pricing authority before selection.  Priority is only a deterministic
+        tie breaker; it cannot make a weaker discount win over a better one.
+        """
         if not sku_ids:
             return None, None
         sku_rows = self._session.execute(
@@ -127,6 +135,7 @@ class PromotionService:
         )
         if for_update:
             query = query.with_for_update()
+        candidates: list[tuple[int, int, int, PromotionRule, Promotion]] = []
         for promotion in self._session.execute(query).scalars():
             scope = PromotionScope.model_validate(promotion.scope)
             eligible = {
@@ -138,8 +147,18 @@ class PromotionService:
                 or row[3] in scope.brand_ids
             }
             if eligible:
-                return promotion_rule(promotion, eligible_sku_ids=eligible), promotion
-        return None, None
+                rule = promotion_rule(promotion, eligible_sku_ids=eligible)
+                if priced_lines is None:
+                    discount = 0
+                else:
+                    discount = PricingService().calculate_cart_price(
+                        priced_lines, promotion=rule
+                    ).promotion_discount_amount
+                candidates.append((discount, promotion.priority, -promotion.id, rule, promotion))
+        if not candidates:
+            return None, None
+        _discount, _priority, _id, rule, promotion = max(candidates, key=lambda item: item[:3])
+        return rule, promotion
 
     def preview(self, *, principal: Principal, draft: PromotionDraft) -> dict:
         merchant_id = _merchant(principal, write=True)

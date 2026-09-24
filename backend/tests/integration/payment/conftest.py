@@ -45,8 +45,9 @@ from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.order.enums import OrderStatus, PaymentStatus
 from app.modules.order.models import Order, OrderItem, OrderStatusLog
 from app.modules.payment.enums import PaymentChannel, PaymentRecordStatus
-from app.modules.payment.models import Payment
+from app.modules.payment.models import Payment, PaymentCompensationRefund
 from app.shared.db.base import utc_now
+from app.shared.db.models.audit import AuditRecord
 from app.shared.db.models.outbox import OutboxMessage
 from app.shared.db.session import configure_database, get_session_factory
 
@@ -418,6 +419,8 @@ def _purge(shop: Shop) -> None:
                 "order_no": shop.order_no,
             },
         )
+        session.execute(delete(PaymentCompensationRefund).where(PaymentCompensationRefund.order_id == shop.order_id))
+        session.execute(delete(AuditRecord).where(AuditRecord.merchant_id == shop.merchant_id))
         session.execute(delete(Payment).where(Payment.order_id == shop.order_id))
         session.execute(
             text(

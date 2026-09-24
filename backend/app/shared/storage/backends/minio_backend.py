@@ -160,6 +160,7 @@ class MinioObjectStorage(ObjectStorage):
         resolved_type = content_type or guess_content_type(key)
         checksum = sha256_hex(data)
         merged_metadata = {"sha256": checksum, **(metadata or {})}
+        minio_metadata: dict[str, str | list[str] | tuple[str]] = dict(merged_metadata)
 
         try:
             result = self._client.put_object(
@@ -168,7 +169,7 @@ class MinioObjectStorage(ObjectStorage):
                 data=io.BytesIO(data),
                 length=len(data),
                 content_type=resolved_type,
-                metadata=merged_metadata,
+                metadata=minio_metadata,
             )
         except S3Error as exc:
             msg = f"put_object failed for {bucket}/{key}: {exc.code}"

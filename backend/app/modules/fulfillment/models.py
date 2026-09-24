@@ -103,7 +103,7 @@ def _sku_id_for_insert(context: Any) -> int | None:
     Returns ``None`` when it cannot resolve, letting the database raise its own
     ``NOT NULL`` error rather than inventing a value here.
     """
-    params = getattr(context, "get_current_parameters", lambda: {})() or {}
+    params: dict[str, object] = getattr(context, "get_current_parameters", lambda: {})() or {}
     order_item_id = params.get("order_item_id")
     session = getattr(context, "session", None)
     if order_item_id is None or session is None:

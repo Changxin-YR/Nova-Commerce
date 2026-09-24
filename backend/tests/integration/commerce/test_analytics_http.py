@@ -101,7 +101,7 @@ def test_paid_order_drives_all_five_metrics_with_scope_and_permissions(shop: Sho
             "from": yesterday.isoformat(), "to": yesterday.isoformat(),
         })
         assert empty["series"] == []
-        assert empty["summary"] == {"total": 0, "average": 0, "change_ratio": 0.0}
+        assert empty["summary"] == {"total": None, "average": None, "change_ratio": None}
 
         invalid = client.get("/api/v1/analytics/admin/metrics/sales.gmv", headers=headers,
                              params={"from": paid_day.isoformat(), "to": yesterday.isoformat()})

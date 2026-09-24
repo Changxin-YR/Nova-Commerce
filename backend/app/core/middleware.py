@@ -17,7 +17,7 @@ from collections.abc import Awaitable, Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.context import (
     REQUEST_ID_HEADER,
@@ -31,10 +31,6 @@ from app.core.errors import ErrorCode, envelope
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-
-Message = dict[str, object]
-Receive = Callable[[], Awaitable[Message]]
-Send = Callable[[Message], Awaitable[None]]
 
 #: Paths excluded from access logging so the log stream stays readable.
 _QUIET_PATHS = frozenset({"/health/live", "/health/ready", "/metrics", "/favicon.ico"})
@@ -113,7 +109,7 @@ class BodySizeLimitMiddleware:
         self.max_bytes = max_bytes
         self.exempt_paths = exempt_paths
 
-    async def __call__(self, scope: Message, receive: Receive, send: Send) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return

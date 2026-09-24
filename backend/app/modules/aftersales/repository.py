@@ -331,7 +331,9 @@ class AfterSaleRepository:
         return int(self._session.execute(stmt).scalar_one())
 
     # -- internals -------------------------------------------------------
-    def _paginate(self, stmt: Select[object], *, page: int, page_size: int) -> tuple[list[AfterSale], int]:
+    def _paginate(
+        self, stmt: Select[tuple[AfterSale]], *, page: int, page_size: int
+    ) -> tuple[list[AfterSale], int]:
         # Count from the filter chain, not from a fetched page: a page-size cap is not
         # a bound on how many claims exist.
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
@@ -566,7 +568,9 @@ class RefundRepository:
         return self._paginate(stmt, page=page, page_size=page_size)
 
     # -- internals -------------------------------------------------------
-    def _paginate(self, stmt: Select[object], *, page: int, page_size: int) -> tuple[list[Refund], int]:
+    def _paginate(
+        self, stmt: Select[tuple[Refund]], *, page: int, page_size: int
+    ) -> tuple[list[Refund], int]:
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
         total = int(self._session.execute(count_stmt).scalar_one())
 

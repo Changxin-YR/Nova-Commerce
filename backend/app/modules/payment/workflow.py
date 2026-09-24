@@ -67,6 +67,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
+from app.modules.audit.service import AuditService
 from app.modules.inventory.enums import OperatorType as MovementOperatorType, ReferenceType
 from app.modules.inventory.service import InventoryService
 from app.modules.marketing.coupon_service import CouponService
@@ -85,6 +86,7 @@ from app.modules.payment.providers import (
     verify_signature,
 )
 from app.modules.payment.repository import (
+    LATE_PAYMENT_STATUSES,
     SETTLEABLE_STATUSES,
     PaymentCallbackRepository,
     PaymentRepository,
@@ -215,6 +217,7 @@ class PaymentSuccessWorkflow:
         #: event row must commit with the settlement, so it is appended to *this*
         #: transaction rather than written after the caller commits.
         self._outbox = OutboxWriter(session)
+        self._audit = AuditService(session)
 
     # -- public ----------------------------------------------------------
     def execute(self, request: CallbackRequest) -> CallbackExecution:
@@ -383,7 +386,7 @@ class PaymentSuccessWorkflow:
                 detail="this payment was already settled before this delivery",
             )
 
-        if payment.status not in SETTLEABLE_STATUSES:
+        if payment.status not in SETTLEABLE_STATUSES and payment.status not in LATE_PAYMENT_STATUSES:
             decided = self._refuse_state(callback, payment)
             return CallbackExecution(
                 callback=callback,
@@ -432,6 +435,29 @@ class PaymentSuccessWorkflow:
                 detail="the payment names an order that does not exist",
             )
 
+        now = utc_now()
+        if (
+            order.order_status == OrderStatus.PENDING_PAYMENT.value
+            and order.expires_at is not None
+            and order.expires_at <= now
+        ):
+            from app.modules.order.reconciliation import close_expired_order
+
+            close_expired_order(self._session, order_id=order.id, now=now)
+
+        if payment.status in LATE_PAYMENT_STATUSES and order.order_status != OrderStatus.CLOSED.value:
+            decided = self._refuse_state(callback, payment)
+            return CallbackExecution(
+                callback=callback,
+                payment=payment,
+                order=order,
+                replayed=False,
+                uncommitted=True,
+                error_code=decided.code,
+                status=payment.status,
+                detail=decided.detail,
+            )
+
         if order.payment_status == PaymentStatus.PAID.value:
             # The order is already paid. Treat as a replay for the same reason as
             # step 3: the money is in, and the *only* thing a second effect could
@@ -447,6 +473,48 @@ class PaymentSuccessWorkflow:
                 error_code="PAYMENT_CALLBACK_DUPLICATE",
                 status=payment.status,
                 detail="the order is already paid",
+            )
+
+        if order.order_status == OrderStatus.CLOSED.value:
+            now = utc_now()
+            self._payments.record_success(
+                payment,
+                paid_amount=amount,
+                external_transaction_no=self._resolve_external_transaction_no(request),
+                paid_at=now,
+            )
+            order.payment_status = PaymentStatus.PAID.value
+            order.paid_amount = amount
+            order.paid_at = now
+            order.updated_at = now
+            self._orders.touch_version(order)
+            self._payments.ensure_compensation_refund(
+                payment, callback_id=callback.id, amount=amount
+            )
+            self._audit.record(
+                merchant_id=order.merchant_id,
+                actor_id=None,
+                actor_type="SYSTEM",
+                action="payment.late_success_compensation_required",
+                resource_type="ORDER",
+                resource_id=order.id,
+                result="SUCCESS",
+                before={"order_status": order.order_status, "payment_status": PaymentStatus.UNPAID.value},
+                after={
+                    "order_status": order.order_status,
+                    "payment_status": order.payment_status,
+                    "paid_amount": amount,
+                    "compensation_refund_status": "PENDING",
+                },
+            )
+            self._callbacks.mark_processed(callback)
+            return CallbackExecution(
+                callback=callback,
+                payment=payment,
+                order=order,
+                processed=True,
+                status=payment.status,
+                detail="late payment recorded; order remains closed and requires compensation refund",
             )
 
         if order.order_status != OrderStatus.PENDING_PAYMENT.value:
@@ -584,6 +652,16 @@ class PaymentSuccessWorkflow:
 
         # -- step 11: finalise the callback ---------------------------------
         self._callbacks.mark_processed(callback)
+        self._audit.record(
+            merchant_id=order.merchant_id,
+            actor_id=None,
+            actor_type="SYSTEM",
+            action="payment.settled",
+            resource_type="PAYMENT",
+            resource_id=payment.id,
+            result="SUCCESS",
+            after={"order_no": order.order_no, "paid_amount": payment.paid_amount},
+        )
 
         logger.info(
             "payment settled",
@@ -766,4 +844,3 @@ class _Refusal:
 
     code: str
     detail: str
-

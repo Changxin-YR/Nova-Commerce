@@ -62,7 +62,7 @@ class Base(DeclarativeBase):
     metadata = metadata
 
     #: Applied per table so utf8mb4/InnoDB are not repeated in every model.
-    __table_args__: ClassVar[dict[str, Any]] = MYSQL_TABLE_OPTIONS
+    __table_args__: object = MYSQL_TABLE_OPTIONS
 
     def __repr__(self) -> str:
         pk = getattr(self, "id", None)

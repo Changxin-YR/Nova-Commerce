@@ -5,8 +5,11 @@ from __future__ import annotations
 from celery import Celery
 
 from app.core.config import get_settings
+from app.modules.governance.service import PendingActionService
 from app.modules.marketing.reconciliation import run_coupon_expiry_cycle
 from app.modules.order.reconciliation import run_expired_order_cycle
+from app.modules.payment.compensation import run_compensation_cycle
+from app.shared.db.session import session_scope
 from app.shared.outbox.publisher import run_publish_cycle
 
 settings = get_settings()
@@ -29,6 +32,14 @@ celery_app.conf.update(
         "expire-coupons": {
             "task": "nova.coupons.expire_due",
             "schedule": 60.0,
+        },
+        "compensate-late-payments": {
+            "task": "nova.payments.compensate_late",
+            "schedule": 30.0,
+        },
+        "expire-pending-actions": {
+            "task": "nova.governance.expire_pending",
+            "schedule": 30.0,
         },
     },
 )
@@ -55,3 +66,14 @@ def close_expired_orders() -> int:
 def expire_coupons() -> int:
     """Expire unused coupons whose validity window has closed."""
     return run_coupon_expiry_cycle()
+
+
+@celery_app.task(name="nova.payments.compensate_late", ignore_result=True)
+def compensate_late_payments() -> int:
+    return run_compensation_cycle()
+
+
+@celery_app.task(name="nova.governance.expire_pending", ignore_result=True)
+def expire_pending_actions() -> int:
+    with session_scope() as session:
+        return PendingActionService(session).expire()

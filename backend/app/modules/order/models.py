@@ -46,6 +46,7 @@ today's promotion rules. The constraint makes the freeze self-consistent.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -82,6 +83,9 @@ from app.shared.db.types import BigIntUnsigned, DateTimeMS, MoneyMinor
 
 __all__ = ["Order", "OrderItem", "OrderStatusLog"]
 
+if TYPE_CHECKING:
+    from app.modules.fulfillment.models import Fulfillment
+
 
 def _sql_vocabulary(values: tuple[str, ...]) -> str:
     """Render a vocabulary tuple as the SQL list of a ``CHECK (col IN (...))``.
@@ -106,6 +110,8 @@ class Order(Base, PkMixin, TimestampMixin, MerchantScopedMixin, VersionMixin):
     """
 
     __tablename__ = "orders"
+    if TYPE_CHECKING:
+        shipments: list[Fulfillment]
     __table_args__ = (
         # Human/URL-facing identifier, unique per merchant. Scoped by merchant
         # rather than globally because V1's single merchant is a deployment
@@ -231,6 +237,10 @@ class Order(Base, PkMixin, TimestampMixin, MerchantScopedMixin, VersionMixin):
     #: exist cannot be created, and adding it in Phase 6 is an ordinary migration
     #: rather than a redesign.
     coupon_id: Mapped[int | None] = mapped_column(BigIntUnsigned, nullable=True, index=True)
+    #: The one product-level promotion selected by the pricing policy.
+    promotion_id: Mapped[int | None] = mapped_column(BigIntUnsigned, nullable=True, index=True)
+    #: Immutable explanation of the rules and allocations used at creation time.
+    pricing_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     #: The address is *snapshotted* rather than joined (section 35): an edit to
     #: ``user_addresses`` must never rewrite a historical order. The FK is kept

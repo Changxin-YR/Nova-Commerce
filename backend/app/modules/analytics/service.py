@@ -53,9 +53,9 @@ def _bucket(day: date, granularity: Granularity) -> str:
     return day.isoformat()
 
 
-def _ratio(numerator: int | float, denominator: int | float) -> float:
+def _ratio(numerator: int | float, denominator: int | float) -> float | None:
     if denominator <= 0:
-        return 0.0
+        return None
     return float(round(Decimal(str(numerator)) / Decimal(str(denominator)), 6))
 
 
@@ -141,15 +141,15 @@ class AnalyticsService:
     def _turnover(
         self, merchant_id: int, start: datetime, end: datetime,
         granularity: Granularity,
-    ) -> tuple[dict[str, float], float]:
+    ) -> tuple[dict[str, float | None], float | None]:
         items = self._items(merchant_id, start, end)
         sold: dict[str, int] = defaultdict(int)
         for paid_day, _, quantity, _, _ in items:
             sold[_bucket(paid_day, granularity)] += quantity
         if not sold:
-            return {}, 0.0
+            return {}, None
         positions = self._inventory_positions(merchant_id, start)
-        result: dict[str, float] = {}
+        result: dict[str, float | None] = {}
         for key, quantity in sold.items():
             if granularity == "month":
                 year, month = map(int, key.split("-"))
@@ -181,28 +181,35 @@ class AnalyticsService:
         previous_start = start - span
         current_paid = self._paid(merchant_id, start, end)
         previous_paid = self._paid(merchant_id, previous_start, start)
-        values: dict[str, int | float] = defaultdict(int)
+        values: dict[str, int | float | None] = defaultdict(int)
         dimensions: list[dict[str, str]] = []
+        total: int | float | None
+        previous: int | float | None
         if metric == "sales.gmv":
             for day, amount, _ in current_paid:
-                values[_bucket(day, granularity)] += amount
-            total = sum(amount for _, amount, _ in current_paid)
-            previous = sum(amount for _, amount, _ in previous_paid)
+                key = _bucket(day, granularity)
+                values[key] = (values.get(key) or 0) + amount
+            total = sum(amount for _, amount, _ in current_paid) if current_paid else None
+            previous = sum(amount for _, amount, _ in previous_paid) if previous_paid else None
         elif metric == "sales.order_count":
             for day, _, _ in current_paid:
-                values[_bucket(day, granularity)] += 1
-            total, previous = len(current_paid), len(previous_paid)
+                key = _bucket(day, granularity)
+                values[key] = (values.get(key) or 0) + 1
+            total = len(current_paid) if current_paid else None
+            previous = len(previous_paid) if previous_paid else None
         elif metric == "product.performance":
             items = self._items(merchant_id, start, end)
             by_sku: dict[tuple[int, str], int] = defaultdict(int)
             for day, amount, _, sku_id, sku_name in items:
-                values[_bucket(day, granularity)] += amount
+                key = _bucket(day, granularity)
+                values[key] = (values.get(key) or 0) + amount
                 by_sku[(sku_id, sku_name)] += amount
             if by_sku:
                 top = max(by_sku, key=lambda sku: (by_sku[sku], -sku[0]))
                 dimensions = [{"key": "sku_id", "label": "Top SKU", "value": f"{top[1]} (#{top[0]})"}]
-            total = sum(amount for _, amount, _, _, _ in items)
-            previous = sum(amount for _, amount, _, _, _ in self._items(merchant_id, previous_start, start))
+            total = sum(amount for _, amount, _, _, _ in items) if items else None
+            previous_items = self._items(merchant_id, previous_start, start)
+            previous = sum(amount for _, amount, _, _, _ in previous_items) if previous_items else None
         elif metric == "refund.rate":
             refunded: dict[str, int] = defaultdict(int)
             collected: dict[str, int] = defaultdict(int)
@@ -212,21 +219,39 @@ class AnalyticsService:
                 collected[_bucket(day, granularity)] += amount
             for key in refunded.keys() | collected.keys():
                 values[key] = _ratio(refunded[key], collected[key])
-            total = _ratio(sum(refunded.values()), sum(collected.values()))
+            total = (
+                _ratio(sum(refunded.values()), sum(collected.values()))
+                if refunded or collected
+                else None
+            )
             dimensions = [
                 {"key": "refunded_amount", "label": "Refunded minor units", "value": str(sum(refunded.values()))},
                 {"key": "collected_amount", "label": "Collected minor units", "value": str(sum(collected.values()))},
             ]
-            previous_refunded = sum(amount for _, amount in self._refunds(merchant_id, previous_start, start))
-            previous = _ratio(previous_refunded, sum(amount for _, amount, _ in previous_paid))
+            previous_refunds = self._refunds(merchant_id, previous_start, start)
+            previous = (
+                _ratio(
+                    sum(amount for _, amount in previous_refunds),
+                    sum(amount for _, amount, _ in previous_paid),
+                )
+                if previous_refunds or previous_paid
+                else None
+            )
         else:
             values, total = self._turnover(merchant_id, start, end, granularity)
             _, previous = self._turnover(merchant_id, previous_start, start, granularity)
         series = [{"bucket": key, "value": value} for key, value in sorted(values.items())]
-        average = sum(values.values()) / len(values) if values else 0
+        numeric_values = [value for value in values.values() if value is not None]
+        average: int | float | None = (
+            sum(numeric_values) / len(numeric_values) if numeric_values else None
+        )
         if METRIC_UNITS[metric] == "minor_currency":
-            average = round(average)
-        change_ratio = _ratio(total - previous, previous) if previous else 0.0
+            average = None if average is None else round(average)
+        change_ratio = (
+            None
+            if total is None or previous is None
+            else _ratio(total - previous, previous)
+        )
         return {
             "metric": metric,
             "unit": METRIC_UNITS[metric],

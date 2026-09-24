@@ -42,10 +42,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.payment.enums import CallbackProcessStatus, PaymentRecordStatus
-from app.modules.payment.models import Payment, PaymentCallback
+from app.modules.payment.models import Payment, PaymentCallback, PaymentCompensationRefund
 from app.shared.db.base import utc_now
 
-__all__ = ["InsertedCallback", "PaymentCallbackRepository", "PaymentRepository"]
+__all__ = [
+    "InsertedCallback",
+    "PaymentCallbackRepository",
+    "PaymentRepository",
+]
 
 #: The record statuses from which a verified callback may still settle the
 #: payment. A payment that is already ``SUCCESS`` is handled *before* this check as
@@ -56,6 +60,7 @@ SETTLEABLE_STATUSES: tuple[str, ...] = (
     PaymentRecordStatus.INITIATED.value,
     PaymentRecordStatus.PAYING.value,
 )
+LATE_PAYMENT_STATUSES: tuple[str, ...] = (PaymentRecordStatus.CLOSED.value,)
 
 
 class PaymentRepository:
@@ -104,6 +109,63 @@ class PaymentRepository:
         payment.paid_at = paid_at or utc_now()
         self._session.flush()
         return payment
+
+    def ensure_compensation_refund(
+        self, payment: Payment, *, callback_id: int | None, amount: int
+    ) -> PaymentCompensationRefund:
+        existing = self._session.execute(
+            select(PaymentCompensationRefund).where(
+                PaymentCompensationRefund.payment_id == payment.id
+            ).with_for_update()
+        ).scalar_one_or_none()
+        if existing is not None:
+            return existing
+        refund = PaymentCompensationRefund(
+            merchant_id=payment.merchant_id,
+            payment_id=payment.id,
+            order_id=payment.order_id,
+            callback_id=callback_id,
+            amount=amount,
+            status="PENDING",
+        )
+        self._session.add(refund)
+        self._session.flush()
+        return refund
+
+    def get_compensation_refund_for_update(
+        self, *, compensation_id: int | None = None, payment_id: int | None = None
+    ) -> PaymentCompensationRefund | None:
+        if (compensation_id is None) == (payment_id is None):
+            raise ValueError("exactly one compensation or payment id is required")
+        predicate = (
+            PaymentCompensationRefund.id == compensation_id
+            if compensation_id is not None
+            else PaymentCompensationRefund.payment_id == payment_id
+        )
+        return self._session.execute(
+            select(PaymentCompensationRefund).where(predicate).with_for_update()
+        ).scalar_one_or_none()
+
+    def list_compensation_refunds(self, *, limit: int = 100) -> list[PaymentCompensationRefund]:
+        return list(
+            self._session.execute(
+                select(PaymentCompensationRefund)
+                .where(PaymentCompensationRefund.status.in_(("PENDING", "PROCESSING")))
+                .order_by(PaymentCompensationRefund.created_at, PaymentCompensationRefund.id)
+                .limit(limit)
+            ).scalars()
+        )
+
+    def lock_attempts_for_order(self, *, order_id: int, user_id: int) -> list[Payment]:
+        return list(
+            self._session.execute(
+                select(Payment)
+                .where(Payment.order_id == order_id, Payment.user_id == user_id)
+                .order_by(Payment.id)
+                .execution_options(populate_existing=True)
+                .with_for_update()
+            ).scalars()
+        )
 
     def apply_refund(self, payment: Payment, *, amount: int) -> Payment:
         """Add ``amount`` to the refunded total and roll the record's status up.
@@ -173,7 +235,11 @@ class PaymentRepository:
         lock. This is the lock that makes step 3/4/6 of
         ``PaymentSuccessWorkflow`` atomic with respect to every other delivery.
         """
-        return self.get_by_payment_no(payment_no, for_update=True)
+        candidate = self.get_by_payment_no(payment_no)
+        if candidate is None:
+            return None
+        attempts = self.lock_attempts_for_order(order_id=candidate.order_id, user_id=candidate.user_id)
+        return next((attempt for attempt in attempts if attempt.payment_no == payment_no), None)
 
     def get_latest_for_order(self, order_id: int) -> Payment | None:
         """The most recent attempt for an order.

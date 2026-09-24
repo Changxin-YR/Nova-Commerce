@@ -47,8 +47,14 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import OrderNotFoundError, PermissionDeniedError, ValidationError
+from app.core.errors import (
+    OrderNotCancellableError,
+    OrderNotFoundError,
+    PermissionDeniedError,
+    ValidationError,
+)
 from app.core.logging import get_logger
+from app.modules.audit.service import AuditService
 from app.modules.identity.enums import DataScope, PermissionCode
 from app.modules.identity.service import AddressService, Principal
 from app.modules.inventory.enums import ReferenceType
@@ -76,6 +82,8 @@ from app.modules.order.workflow import (
     order_release_movement_key,
     validate_coupon_input,
 )
+from app.modules.payment.enums import PaymentRecordStatus
+from app.modules.payment.service import PaymentService
 from app.modules.pricing import CartPrice, PricingService
 from app.shared.db.base import utc_now
 
@@ -117,6 +125,7 @@ class OrderService:
         self._logs = OrderStatusLogRepository(session)
         self._inventory = InventoryService(session)
         self._addresses = AddressService(session)
+        self._audit = AuditService(session)
 
     # ------------------------------------------------------------------
     # Preview
@@ -164,6 +173,7 @@ class OrderService:
                 sku_ids={line.sku_id for line in lines},
                 now=utc_now(),
                 for_update=False,
+                priced_lines=priced_lines,
             )
             coupon_rule = None
             if coupon_id is not None:
@@ -242,6 +252,16 @@ class OrderService:
         for the customer to release it. ``ORDER_ALREADY_EXPIRED (50005)`` belongs to the
         payment path, where paying an expired order is the actual problem.
         """
+        candidate = self._orders.get_by_order_no(order_no, user_id=principal.user_id)
+        if candidate is None:
+            raise OrderNotFoundError("order not found", context={"order_no": order_no})
+
+        # Payment callbacks lock Payment -> Order. Cancellation takes the same
+        # order so the two writers cannot deadlock while deciding ownership of
+        # the payment intent.
+        payments = PaymentService(self._session).lock_attempts_for_order(
+            order_id=candidate.id, user_id=principal.user_id
+        )
         order = self._orders.get_by_order_no_for_update(order_no, user_id=principal.user_id)
         if order is None:
             # The same answer whether the order does not exist or belongs to somebody
@@ -249,14 +269,30 @@ class OrderService:
             raise OrderNotFoundError("order not found", context={"order_no": order_no})
 
         # 50010 for every refused transition, whatever state the order was in.
+        if order.order_status == OrderStatus.CANCELLED.value:
+            raise OrderNotCancellableError(
+                "order is already cancelled",
+                context={"from_status": order.order_status, "to_status": OrderStatus.CANCELLED.value},
+            )
         OrderStateMachine.to_cancelled(order.order_status)
 
-        CouponService(self._session).release(order=order, now=utc_now())
+        before = order.to_dict()
+        now = utc_now()
+        for payment in payments:
+            if payment.status in {
+                PaymentRecordStatus.INITIATED.value,
+                PaymentRecordStatus.PAYING.value,
+            }:
+                payment.status = PaymentRecordStatus.CLOSED.value
+                payment.closed_at = now
+                payment.updated_at = now
+
+        CouponService(self._session).release(order=order, now=now)
         self._release_reserved_stock(principal=principal, order=order)
 
         order.order_status = OrderStatus.CANCELLED.value
         order.cancel_reason = reason or DEFAULT_CANCEL_REASON
-        order.cancelled_at = utc_now()
+        order.cancelled_at = now
         order.version = (order.version or 0) + 1
 
         self._logs.append(
@@ -267,6 +303,17 @@ class OrderService:
             operator_id=principal.user_id,
             reason=order.cancel_reason,
             trace_id=None,
+        )
+        self._audit.record(
+            merchant_id=order.merchant_id,
+            actor_id=principal.user_id,
+            actor_type="STAFF" if principal.is_staff else "USER",
+            action="order.cancel",
+            resource_type="ORDER",
+            resource_id=order.id,
+            result="SUCCESS",
+            before=before,
+            after=order.to_dict(),
         )
         self._session.commit()
 

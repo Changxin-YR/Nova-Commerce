@@ -331,3 +331,34 @@ class PaymentCallback(Base, PkMixin, TimestampMixin):
             f"<PaymentCallback {self.provider}:{self.provider_event_id} "
             f"{self.process_status} payment_no={self.payment_no}>"
         )
+
+
+class PaymentCompensationRefund(Base, PkMixin, TimestampMixin, MerchantScopedMixin):
+    """Idempotent refund intent created when money arrives after order closure."""
+
+    __tablename__ = "payment_compensation_refunds"
+    __table_args__ = (
+        UniqueConstraint("payment_id", name="uq_compensation_refunds_payment"),
+        CheckConstraint(
+            "status IN ('PENDING','PROCESSING','SUCCEEDED','FAILED','RECONCILIATION_REQUIRED')",
+            name="status_valid",
+        ),
+        CheckConstraint("amount > 0", name="amount_positive"),
+        Index("ix_compensation_refunds_status_created", "status", "created_at"),
+    )
+
+    merchant_id: Mapped[int] = mapped_column(
+        BigIntUnsigned, ForeignKey("merchants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+
+    payment_id: Mapped[int] = mapped_column(
+        BigIntUnsigned, ForeignKey("payments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    order_id: Mapped[int] = mapped_column(
+        BigIntUnsigned, ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    callback_id: Mapped[int | None] = mapped_column(BigIntUnsigned, nullable=True, index=True)
+    amount: Mapped[int] = mapped_column(MoneyMinor, nullable=False)
+    status: Mapped[str] = mapped_column(status_column(32), nullable=False, default="PENDING", server_default="PENDING")
+    provider_refund_no: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)

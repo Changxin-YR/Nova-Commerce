@@ -94,7 +94,12 @@ def get_admin_refund(refund_no: str, principal: ConsolePrincipal, session: Sessi
     )
     if refund is None:
         raise RefundNotFoundError("refund not found")
-    return envelope(data=to_refund(refund).model_dump(mode="json"))
+    after_sale_no = session.execute(
+        select(AfterSale.after_sale_no).where(AfterSale.id == refund.after_sale_id)
+    ).scalar_one_or_none()
+    if after_sale_no is None:
+        raise RefundNotFoundError("refund claim not found")
+    return envelope(data=to_refund(refund, after_sale_no=after_sale_no).model_dump(mode="json"))
 
 
 def _claim_numbers(session: Session, refunds: list) -> dict[int, str]:

@@ -18,11 +18,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
-from app.core.errors import ErrorCode, IdempotencyKeyRequiredError, envelope
+from app.core.errors import IdempotencyKeyRequiredError, envelope
 from app.core.logging import get_logger
 from app.modules.identity.dependencies import ConsolePrincipal, CurrentPrincipal
 from app.modules.identity.enums import PermissionCode
-from app.modules.inventory.enums import MovementType, OperatorType, ReferenceType
+from app.modules.inventory.enums import MovementType, OperatorType
 from app.modules.inventory.repository import InventoryRepository
 from app.modules.inventory.schemas import (
     AdjustmentPreviewOut,
@@ -158,8 +158,6 @@ def get_inventory(
 
         raise InventoryNotFoundError(f"no stock record for SKU {sku_id}")
     return envelope(data=_to_out(inventory, repository).model_dump(mode="json"))
-
-
 @router.get(
     "/admin/{sku_id}/movements",
     summary="Ledger for one SKU",
@@ -331,5 +329,3 @@ def create_adjustment(
     return envelope(data=_to_out(inventory, repository).model_dump(mode="json"))
 
 
-_ = ReferenceType  # referenced by the service signature; kept importable here
-_ = ErrorCode

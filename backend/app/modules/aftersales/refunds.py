@@ -207,7 +207,7 @@ def allocate_refund_across_lines(
     # fallback below re-derives the same floors and hands the leftover units out from the last
     # line backwards *skipping any line already at its weight*, which is the same rule with the
     # one correction that keeps it inside every line's remaining capacity.
-    shares = allocate_pro_rata(amount, weights)
+    shares: Sequence[int] = allocate_pro_rata(amount, weights)
 
     # Measured, so the split between "trusted" and "fallback" is not guesswork: over 20,000 random
     # inputs satisfying this function's precondition (`amount <= sum(weights)`), the two agree

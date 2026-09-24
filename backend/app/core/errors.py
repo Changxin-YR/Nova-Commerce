@@ -640,6 +640,7 @@ CouponAlreadyLockedError = _error("Coupon is locked by another order", ErrorCode
 CouponThresholdNotMetError = _error("Coupon threshold is not met", ErrorCode.COUPON_THRESHOLD_NOT_MET, http_status=409)
 
 # -- knowledge / RAG --------------------------------------------------------
+KnowledgeBaseNotFoundError = _error("Knowledge base not found", ErrorCode.KNOWLEDGE_BASE_NOT_FOUND, http_status=404)
 DocumentNotFoundError = _error("Document not found", ErrorCode.DOCUMENT_NOT_FOUND, http_status=404)
 DocumentStateInvalidError = _error("Document is not in a valid state", ErrorCode.DOCUMENT_STATE_INVALID, http_status=409)
 DocumentUnsupportedTypeError = _error("Unsupported document type", ErrorCode.DOCUMENT_UNSUPPORTED_TYPE, http_status=415)
@@ -690,6 +691,7 @@ PromptInjectionDetectedError = _error(
 PendingActionNotFoundError = _error("Pending action not found", ErrorCode.PENDING_ACTION_NOT_FOUND, http_status=404)
 PendingActionStateInvalidError = _error("Pending action is not awaiting a decision", ErrorCode.PENDING_ACTION_STATE_INVALID, http_status=409)
 PendingActionExpiredError = _error("Pending action has expired", ErrorCode.PENDING_ACTION_EXPIRED, http_status=410)
+PendingActionAlreadyDecidedError = _error("Pending action has already been decided", ErrorCode.PENDING_ACTION_ALREADY_DECIDED, http_status=409)
 PendingActionPayloadChangedError = _error(
     "The underlying business state changed; re-preview before approving",
     ErrorCode.PENDING_ACTION_PAYLOAD_CHANGED,

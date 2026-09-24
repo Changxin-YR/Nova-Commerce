@@ -108,7 +108,8 @@ def cache_get(key: str) -> str | None:
     """Read-through cache get. Fails open: a cache miss on a broken cache is
     indistinguishable from a cold cache, and both are safe."""
     try:
-        return get_redis().get(key)
+        value = get_redis().get(key)
+        return value.decode("utf-8") if isinstance(value, bytes) else value
     except RedisError:
         logger.warning("cache get failed; treating as a miss", key=key)
         return None

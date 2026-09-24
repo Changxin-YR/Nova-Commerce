@@ -166,7 +166,7 @@ class CatalogService:
         if product.status == "ARCHIVED":
             raise ProductStateInvalidError("archived product cannot be edited")
         changes = body.model_dump(exclude_unset=True)
-        self._references(product.merchant_id, changes.get("category_id"), changes.get("brand_id"))
+        self._references(self._merchant(principal), changes.get("category_id"), changes.get("brand_id"))
         for field, value in changes.items():
             setattr(product, "name" if field == "title" else field, value)
         self.session.commit()
@@ -177,7 +177,7 @@ class CatalogService:
         product = self._owned(principal, product_id, lock=True)
         if product.status == "ARCHIVED":
             raise ProductStateInvalidError("archived product cannot receive SKUs")
-        sku = self._new_sku(merchant_id=product.merchant_id, product_id=product.id, body=body)
+        sku = self._new_sku(merchant_id=self._merchant(principal), product_id=product.id, body=body)
         self.session.add(sku)
         try:
             self.session.flush()
