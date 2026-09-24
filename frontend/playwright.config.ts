@@ -1,15 +1,15 @@
 /**
  * Playwright config (§135: the frontend gate includes Playwright).
  *
- * The dev server is started on 5173 (`npm run dev`) and reused when it is already
- * running, so a developer who has the app open does not get a second server. The API is
- * proxied to 127.0.0.1:8000 by `vite.config.ts`; e2e specs that need data must seed it
- * through the API rather than assuming fixtures exist.
+ * Playwright owns a dedicated dev-server port. Reusing any server on the port
+ * can silently test another app that happens to be running on this machine.
+ * The API is proxied to 127.0.0.1:8000 by `vite.config.ts`; e2e specs that need
+ * data must seed it through the API rather than assuming fixtures exist.
  */
 
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = Number(process.env.E2E_PORT ?? 5173)
+const PORT = Number(process.env.E2E_PORT ?? 4174)
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`
 
 export default defineConfig({
@@ -38,9 +38,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
+    command: `npm run dev -- --port ${PORT} --strictPort`,
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })
