@@ -6,12 +6,12 @@
     "build"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T05:06:34.411898+00:00",
-  "duration_ms": 14031,
+  "timestamp": "2026-09-24T05:38:42.617009+00:00",
+  "duration_ms": 21541,
   "exit_code": 0,
   "git": {
-    "revision": "9760bf469e0b482e1e94a3e9f5f1ce61d75cbc76\n",
-    "subject": "fix(e2e): start an owned browser test server\n",
+    "revision": "3db990fc618cda58fec01ba74585f2d146df9a89\n",
+    "subject": "feat(catalog): upload merchant product images to object storage\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -38,6 +38,6 @@
       "pass": true
     }
   ],
-  "stderr_tail": "",
+  "stderr_tail": "\u001b[33m[PLUGIN_TIMINGS] \u001b[0mPlugin hooks ran for 3.3s of this 9.6s build (35%).\n2 hooks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:\n  - vite:css transform (38 calls)\n  - unplugin-vue-components transform (2385 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.\n\n",
   "verdict": "PASS"
 }

@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-24T04:59:04.395214+00:00",
-  "duration_ms": 146666,
+  "timestamp": "2026-09-24T05:30:23.493351+00:00",
+  "duration_ms": 288317,
   "exit_code": 0,
-  "summary": "366 passed, 1 warning in 142.90s (0:02:22)",
+  "summary": "367 passed, 1 warning in 284.06s (0:04:44)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "7f54da4d359b87c4ff0890c231fd86515a374030\n",
-    "subject": "feat(analytics): serve merchant metrics from settled commerce data\n",
+    "revision": "3db990fc618cda58fec01ba74585f2d146df9a89\n",
+    "subject": "feat(catalog): upload merchant product images to object storage\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 366,
+    "testcase_count": 367,
     "outcomes": [
       {
         "name": "test_refund_rate_uses_successful_refund_money",
@@ -456,6 +456,10 @@
       },
       {
         "name": "test_product_scope_and_task_permissions",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_product_image_upload_is_scoped_and_persisted_in_minio",
         "actual": "PASSED"
       },
       {
@@ -2134,6 +2138,12 @@
     },
     {
       "name": "test_product_scope_and_task_permissions",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_product_image_upload_is_scoped_and_persisted_in_minio",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

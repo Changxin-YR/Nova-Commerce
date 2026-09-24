@@ -1,653 +1,657 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="300" failures="0" errors="0" time="1.7578658">
-    <testsuite name="src/agent/__tests__/sse.spec.ts" timestamp="2026-09-24T05:07:01.492Z" hostname="WHHHH" tests="16" failures="0" errors="0" skipped="0" time="0.0136699">
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; parses one complete frame" time="0.0034194">
+<testsuites name="vitest tests" tests="301" failures="0" errors="0" time="1.6526101">
+    <testsuite name="src/agent/__tests__/sse.spec.ts" timestamp="2026-09-24T05:39:17.850Z" hostname="WHHHH" tests="16" failures="0" errors="0" skipped="0" time="0.0127136">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; parses one complete frame" time="0.0038461">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; parses MULTIPLE frames delivered in one chunk" time="0.0005264">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; parses MULTIPLE frames delivered in one chunk" time="0.0005585">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; handles a frame split across chunk boundaries" time="0.0005574">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; handles a frame split across chunk boundaries" time="0.0006603">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; ignores comment/keep-alive lines" time="0.0003771">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; ignores comment/keep-alive lines" time="0.0004333">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; normalizes CRLF line endings" time="0.0003392">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; normalizes CRLF line endings" time="0.0004098">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; joins multi-line data fields" time="0.0002027">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="createSseParser &gt; joins multi-line data fields" time="0.0002592">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; decodes a well-formed event" time="0.0004456">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; decodes a well-formed event" time="0.0004488">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; drops a frame with invalid JSON" time="0.002628">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; drops a frame with invalid JSON" time="0.0006252">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; drops a frame with no data" time="0.0003113">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; drops a frame with no data" time="0.0001836">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; uses the SSE `event:` field when the payload omits `event`" time="0.0003581">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="decodeSseFrame &gt; uses the SSE `event:` field when the payload omits `event`" time="0.0002858">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; accepts only the 12 frozen names" time="0.0005651">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; accepts only the 12 frozen names" time="0.0007309">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; drops an UNKNOWN event name instead of rendering it" time="0.000249">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; drops an UNKNOWN event name instead of rendering it" time="0.0002726">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; drops a payload that is not an object" time="0.0001906">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; drops a payload that is not an object" time="0.0002183">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; drops an event without a run_id" time="0.0001348">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; drops an event without a run_id" time="0.0001894">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; rejects a chart_spec on any event other than final_answer" time="0.0001765">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="parseAgentEvent — fail closed &gt; rejects a chart_spec on any event other than final_answer" time="0.0002543">
         </testcase>
-        <testcase classname="src/agent/__tests__/sse.spec.ts" name="toToolProgress &gt; projects the identifying fields of a tool event" time="0.0010917">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/api/__tests__/client.refresh.spec.ts" timestamp="2026-09-24T05:07:01.501Z" hostname="WHHHH" tests="7" failures="0" errors="0" skipped="0" time="0.0794677">
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; refreshes ONCE for N concurrent 401s and replays every request" time="0.0622692">
-        </testcase>
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; rotates through the HttpOnly cookie without sending a refresh token in JSON" time="0.0027953">
-        </testcase>
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; does not refresh when the request succeeds" time="0.0011669">
-        </testcase>
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; allows a SECOND refresh after the first one settled (promise is not cached)" time="0.00298">
-        </testcase>
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; fails fast without looping when the retry also returns 401" time="0.0039151">
-        </testcase>
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; propagates a trace id on every attempt and stores it for error reporting" time="0.0019285">
-        </testcase>
-        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; clears the session only when the refresh itself fails" time="0.0017092">
+        <testcase classname="src/agent/__tests__/sse.spec.ts" name="toToolProgress &gt; projects the identifying fields of a tool event" time="0.0009685">
         </testcase>
     </testsuite>
-    <testsuite name="src/api/__tests__/error.spec.ts" timestamp="2026-09-24T05:07:01.503Z" hostname="WHHHH" tests="16" failures="0" errors="0" skipped="0" time="0.017615">
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; reads code, message and trace_id from the envelope" time="0.0042835">
+    <testsuite name="src/api/__tests__/client.refresh.spec.ts" timestamp="2026-09-24T05:39:17.858Z" hostname="WHHHH" tests="7" failures="0" errors="0" skipped="0" time="0.0796957">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; refreshes ONCE for N concurrent 401s and replays every request" time="0.0661963">
         </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; falls back to a curated message when the code is unknown, never the raw one" time="0.0006478">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; rotates through the HttpOnly cookie without sending a refresh token in JSON" time="0.002187">
         </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; NEVER surfaces a 5xx envelope message verbatim (gateway/proxy leakage)" time="0.0007706">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; does not refresh when the request succeeds" time="0.0012871">
         </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; maps forbidden codes to the permission UI path" time="0.0004265">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; allows a SECOND refresh after the first one settled (promise is not cached)" time="0.0020137">
         </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; treats MERCHANT_MISMATCH as forbidden rather than unauthenticated" time="0.0005049">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; fails fast without looping when the retry also returns 401" time="0.0035042">
         </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; maps token codes to the unauthenticated path" time="0.0008929">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; propagates a trace id on every attempt and stores it for error reporting" time="0.0008977">
         </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; does NOT treat ACCOUNT_DISABLED as a refreshable session (it clears the session)" time="0.0006131">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; marks 429 and 503 as retryable" time="0.0005164">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; maps a network failure to a retryable negative code" time="0.0004257">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; distinguishes a timeout from a network failure" time="0.0004563">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; maps a cancellation to a non-retryable, non-error state" time="0.0005285">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; handles a response with NO envelope (gateway HTML) without leaking the body" time="0.0005045">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; maps a bare 401/403/404 without an envelope to the matching code" time="0.0005314">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; passes an already-normalized error through unchanged" time="0.0009327">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; handles a plain Error and a totally unknown throwable" time="0.0016744">
-        </testcase>
-        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; uses the interceptor trace id when the envelope has none" time="0.0006603">
+        <testcase classname="src/api/__tests__/client.refresh.spec.ts" name="NovaHttpClient single-flight refresh &gt; clears the session only when the refresh itself fails" time="0.0013182">
         </testcase>
     </testsuite>
-    <testsuite name="src/charts/__tests__/buildEChartsOption.spec.ts" timestamp="2026-09-24T05:07:01.509Z" hostname="WHHHH" tests="8" failures="0" errors="0" skipped="0" time="0.0159747">
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; builds a line chart with categories and series" time="0.0077353">
+    <testsuite name="src/api/__tests__/error.spec.ts" timestamp="2026-09-24T05:39:17.860Z" hostname="WHHHH" tests="16" failures="0" errors="0" skipped="0" time="0.0136834">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; reads code, message and trace_id from the envelope" time="0.0043697">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; builds a bar chart and a pie chart" time="0.0010579">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; falls back to a curated message when the code is unknown, never the raw one" time="0.0004963">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; renders a gauge from a single value" time="0.0004783">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; NEVER surfaces a 5xx envelope message verbatim (gateway/proxy leakage)" time="0.0009461">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; returns empty options for a table spec (tables are HTML, not canvas)" time="0.0005155">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; maps forbidden codes to the permission UI path" time="0.0006519">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; formats money axes in MAJOR units without touching the underlying data" time="0.0005485">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; treats MERCHANT_MISMATCH as forbidden rather than unauthenticated" time="0.0005901">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; uses a safe per-series colour and falls back to the palette" time="0.0004636">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; maps token codes to the unauthenticated path" time="0.0007878">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; emits NO executable text derived from agent strings" time="0.0012651">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; does NOT treat ACCOUNT_DISABLED as a refreshable session (it clears the session)" time="0.0004591">
         </testcase>
-        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; keeps a category literally named __proto__ as data only" time="0.0009483">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — backend envelope &gt; marks 429 and 503 as retryable" time="0.0006466">
         </testcase>
-    </testsuite>
-    <testsuite name="src/charts/__tests__/sanitizeChartSpec.spec.ts" timestamp="2026-09-24T05:07:01.513Z" hostname="WHHHH" tests="19" failures="0" errors="0" skipped="0" time="0.0289898">
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — happy path &gt; accepts a valid spec and rebuilds it as plain data" time="0.0073951">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; maps a network failure to a retryable negative code" time="0.0004082">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — happy path &gt; keeps a safe colour and drops an unsafe one" time="0.0008879">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; distinguishes a timeout from a network failure" time="0.0002495">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — happy path &gt; accepts a CSS variable colour token (design-token theming)" time="0.0004761">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; maps a cancellation to a non-retryable, non-error state" time="0.0003921">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects an unknown chart kind instead of guessing" time="0.000449">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; handles a response with NO envelope (gateway HTML) without leaking the body" time="0.0002772">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects a missing kind" time="0.0002339">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; maps a bare 401/403/404 without an envelope to the matching code" time="0.0002794">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects non-objects and arrays" time="0.0003607">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; passes an already-normalized error through unchanged" time="0.0001659">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects a spec with no usable series" time="0.0003229">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; handles a plain Error and a totally unknown throwable" time="0.000254">
         </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects a table without columns or rows" time="0.0002643">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; never carries a function through, even nested in a series" time="0.0017764">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; drops __proto__ / constructor keys instead of assigning them (prototype pollution)" time="0.0005105">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; ignores inherited properties (only own keys are read)" time="0.0001944">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; strips control characters that could forge log lines or terminal escapes" time="0.0004745">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; drops NaN / Infinity so a layout cannot be broken silently" time="0.0002973">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; caps series, categories, data points and table rows" time="0.0073538">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; truncates over-long strings instead of shipping a megabyte label" time="0.0006535">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — alignment &gt; aligns categories and data to the shorter side and explains why" time="0.0005844">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — alignment &gt; keeps only the first series for pie and gauge" time="0.0019335">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — alignment &gt; renders a table preserving column order and dropping unknown keys" time="0.0006136">
-        </testcase>
-        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="formatSpecValue &gt; converts minor units for money specs without floating point drift" time="0.0005317">
+        <testcase classname="src/api/__tests__/error.spec.ts" name="normalizeError — transport failures &gt; uses the interceptor trace id when the envelope has none" time="0.0001917">
         </testcase>
     </testsuite>
-    <testsuite name="src/components/ui/__tests__/PriceText.spec.ts" timestamp="2026-09-24T05:07:01.518Z" hostname="WHHHH" tests="12" failures="0" errors="0" skipped="0" time="0.0863837">
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; renders 299900 cents as ¥2,999.00" time="0.0348317">
+    <testsuite name="src/charts/__tests__/buildEChartsOption.spec.ts" timestamp="2026-09-24T05:39:17.865Z" hostname="WHHHH" tests="8" failures="0" errors="0" skipped="0" time="0.0128733">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; builds a line chart with categories and series" time="0.0057701">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; keeps the cents padded so 5 cents never renders as .5" time="0.006669">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; builds a bar chart and a pie chart" time="0.0009905">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; groups thousands above 4 digits" time="0.0064524">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; renders a gauge from a single value" time="0.0004637">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; can drop grouping for narrow table cells" time="0.0045201">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; returns empty options for a table spec (tables are HTML, not canvas)" time="0.0004402">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; renders a negative amount with a sign rather than a stray hyphen inside the digits" time="0.004604">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; formats money axes in MAJOR units without touching the underlying data" time="0.0005383">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; renders zero explicitly instead of leaving the field blank" time="0.002826">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; uses a safe per-series colour and falls back to the palette" time="0.0004823">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; omits the cents when asked, without rounding the integer up" time="0.0036444">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; emits NO executable text derived from agent strings" time="0.0011287">
         </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; can hide the currency symbol for columns with a &quot;金额&quot; header" time="0.0027811">
-        </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — original (list) price &gt; shows a struck-through original price only when it is actually higher" time="0.0058233">
-        </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — original (list) price &gt; hides the original price when none was supplied" time="0.0026634">
-        </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — accessibility + theming &gt; exposes one readable sentence to assistive tech" time="0.0044567">
-        </testcase>
-        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — accessibility + theming &gt; applies the size scale class and the muted variant" time="0.0043541">
+        <testcase classname="src/charts/__tests__/buildEChartsOption.spec.ts" name="buildEChartsOption &gt; keeps a category literally named __proto__ as data only" time="0.0004515">
         </testcase>
     </testsuite>
-    <testsuite name="src/composables/__tests__/useAsyncState.spec.ts" timestamp="2026-09-24T05:07:01.520Z" hostname="WHHHH" tests="13" failures="0" errors="0" skipped="0" time="0.0874012">
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="isEmptyPaged &gt; detects the empty paged envelope" time="0.0029084">
+    <testsuite name="src/charts/__tests__/sanitizeChartSpec.spec.ts" timestamp="2026-09-24T05:39:17.867Z" hostname="WHHHH" tests="19" failures="0" errors="0" skipped="0" time="0.0224521">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — happy path &gt; accepts a valid spec and rebuilds it as plain data" time="0.0051545">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="isEmptyPaged &gt; does not treat a non-empty page as empty" time="0.0006104">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — happy path &gt; keeps a safe colour and drops an unsafe one" time="0.0008591">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="isEmptyPaged &gt; ignores shapes that are not paged payloads" time="0.0005716">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — happy path &gt; accepts a CSS variable colour token (design-token theming)" time="0.0004104">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports empty for an empty bare array" time="0.0028201">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects an unknown chart kind instead of guessing" time="0.0005994">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports empty for an empty PAGED payload (the console regression)" time="0.0006973">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects a missing kind" time="0.0002898">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports success for a populated paged payload" time="0.0099435">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects non-objects and arrays" time="0.0002974">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports empty for null and undefined results" time="0.0154319">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects a spec with no usable series" time="0.0003061">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; honours a caller-supplied isEmpty predicate over the built-in heuristic" time="0.0305331">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — fail closed &gt; rejects a table without columns or rows" time="0.0002388">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; maps a forbidden failure to permission_denied, not error (§104 UI consequence)" time="0.0014501">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; never carries a function through, even nested in a series" time="0.0014996">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; maps a plain failure to error" time="0.0142724">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; drops __proto__ / constructor keys instead of assigning them (prototype pollution)" time="0.0004154">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; refresh() re-runs the loader without passing through loading" time="0.0020664">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; ignores inherited properties (only own keys are read)" time="0.0001788">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; returns null from execute() on failure so callers can branch" time="0.0021551">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; strips control characters that could forge log lines or terminal escapes" time="0.0004878">
         </testcase>
-        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; resolves the deferred value (guards against a loader that never settles)" time="0.0006208">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; drops NaN / Infinity so a layout cannot be broken silently" time="0.0002676">
         </testcase>
-    </testsuite>
-    <testsuite name="src/directives/__tests__/permission.spec.ts" timestamp="2026-09-24T05:07:01.524Z" hostname="WHHHH" tests="8" failures="0" errors="0" skipped="0" time="0.0662943">
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; removes the element when the code is not granted" time="0.0355745">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; caps series, categories, data points and table rows" time="0.0063306">
         </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; keeps the element when the code IS granted" time="0.0051815">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — security &gt; truncates over-long strings instead of shipping a megabyte label" time="0.0005077">
         </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; treats an empty value as &quot;no requirement&quot; and keeps the element" time="0.0040517">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — alignment &gt; aligns categories and data to the shorter side and explains why" time="0.0003669">
         </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; supports multiple codes with .any (default) semantics" time="0.0036747">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — alignment &gt; keeps only the first series for pie and gauge" time="0.000973">
         </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; supports .all semantics" time="0.0045407">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="sanitizeChartSpec — alignment &gt; renders a table preserving column order and dropping unknown keys" time="0.000356">
         </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; works under the v-can alias too" time="0.0028025">
-        </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; removes the node, so an unprivileged user cannot reach it via the DOM" time="0.0079736">
-        </testcase>
-        <testcase classname="src/directives/__tests__/permission.spec.ts" name="__isAllowed (pure decision function) &gt; handles any/all/empty cases" time="0.0004452">
+        <testcase classname="src/charts/__tests__/sanitizeChartSpec.spec.ts" name="formatSpecValue &gt; converts minor units for money specs without floating point drift" time="0.0003582">
         </testcase>
     </testsuite>
-    <testsuite name="src/domain/__tests__/availability.spec.ts" timestamp="2026-09-24T05:07:01.527Z" hostname="WHHHH" tests="22" failures="0" errors="0" skipped="0" time="0.0125492">
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; uses the approved amount when the merchant approved something" time="0.0024189">
+    <testsuite name="src/components/ui/__tests__/PriceText.spec.ts" timestamp="2026-09-24T05:39:17.873Z" hostname="WHHHH" tests="12" failures="0" errors="0" skipped="0" time="0.0872949">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; renders 299900 cents as ¥2,999.00" time="0.034664">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; falls back to the requested amount while nothing is approved yet" time="0.0003503">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; keeps the cents padded so 5 cents never renders as .5" time="0.0057718">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; subtracts what was already refunded (partial refunds)" time="0.0004231">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; groups thousands above 4 digits" time="0.0046106">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; never returns a negative cap, even if the server reports an over-refund" time="0.000285">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; can drop grouping for narrow table cells" time="0.0042041">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; allows approve/reject only while PROCESSING" time="0.0004597">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; renders a negative amount with a sign rather than a stray hyphen inside the digits" time="0.0046736">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; allows a first refund on PROCESSING and a further one on PARTIAL_REFUNDED" time="0.000336">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; renders zero explicitly instead of leaving the field blank" time="0.0030035">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; refuses a refund when nothing is left or the request is closed" time="0.0002805">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; omits the cents when asked, without rounding the integer up" time="0.0030109">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; exposes the right row-action set for each status" time="0.0009932">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — minor units to major units &gt; can hide the currency symbol for columns with a &quot;金额&quot; header" time="0.0025416">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; explains a closed request instead of hiding the column" time="0.000487">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — original (list) price &gt; shows a struck-through original price only when it is actually higher" time="0.0094502">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="validateRefundAmount — rejects before the server has to &gt; accepts an amount inside the cap" time="0.000371">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — original (list) price &gt; hides the original price when none was supplied" time="0.0023337">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="validateRefundAmount — rejects before the server has to &gt; rejects a non-integer, zero, negative, or over-cap amount" time="0.0003394">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — accessibility + theming &gt; exposes one readable sentence to assistive tech" time="0.0044072">
         </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; requires a usable optimistic-lock version" time="0.0004068">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; reads sellable stock from the SERVER field and never recomputes it" time="0.0002393">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; flags over-reserved rows, which are an integrity problem not a display quirk" time="0.0001972">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; flags low stock by sellable quantity, not raw on-hand" time="0.0001974">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; rejects a no-op or negative-resulting adjustment" time="0.0003001">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; validates against the server number, not on_hand_qty - locked_qty" time="0.0001767">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; narrows a frozen Inventory row without inventing fields" time="0.0002444">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; allows a decision only while PENDING" time="0.0003402">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; requires human approval for HIGH and CRITICAL, and NOT for READ/LOW/MEDIUM" time="0.0002278">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; derives both decide flags from the status in one place" time="0.0003097">
-        </testcase>
-        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; explains why each non-decidable state is blocked" time="0.0003651">
+        <testcase classname="src/components/ui/__tests__/PriceText.spec.ts" name="PriceText — accessibility + theming &gt; applies the size scale class and the muted variant" time="0.0059116">
         </testcase>
     </testsuite>
-    <testsuite name="src/domain/__tests__/listParams.spec.ts" timestamp="2026-09-24T05:07:01.534Z" hostname="WHHHH" tests="21" failures="0" errors="0" skipped="0" time="0.0146042">
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; defaults to page 1 with the default page size" time="0.0027437">
+    <testsuite name="src/composables/__tests__/useAsyncState.spec.ts" timestamp="2026-09-24T05:39:17.877Z" hostname="WHHHH" tests="13" failures="0" errors="0" skipped="0" time="0.0693789">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="isEmptyPaged &gt; detects the empty paged envelope" time="0.0027446">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; clamps page to at least 1 (a stale filter can leave page at 0 or negative)" time="0.0003832">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="isEmptyPaged &gt; does not treat a non-empty page as empty" time="0.0004711">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; caps page_size so a hand-edited URL cannot request everything" time="0.0002509">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="isEmptyPaged &gt; ignores shapes that are not paged payloads" time="0.0003744">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; truncates fractional paging values instead of forwarding them" time="0.0002254">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports empty for an empty bare array" time="0.0092673">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; falls back to defaults for non-numeric input" time="0.0017572">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports empty for an empty PAGED payload (the console regression)" time="0.0005634">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="optionalText &gt; trims and drops empty or whitespace-only input" time="0.0005981">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports success for a populated paged payload" time="0.0031072">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; omits the status key entirely when &quot;全部&quot; is selected" time="0.000437">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; reports empty for null and undefined results" time="0.0088517">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; forwards a chosen frozen status verbatim" time="0.0004427">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; honours a caller-supplied isEmpty predicate over the built-in heuristic" time="0.0128062">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; trims the keyword and keeps paging" time="0.0004435">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; maps a forbidden failure to permission_denied, not error (§104 UI consequence)" time="0.0119697">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; treats a whitespace-only keyword as no filter" time="0.0003303">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; maps a plain failure to error" time="0.0039087">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; sends only paging when no filter is set" time="0.0002994">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; refresh() re-runs the loader without passing through loading" time="0.0015793">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; maps the order-number box onto the backend keyword parameter" time="0.0003049">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; returns null from execute() on failure so callers can branch" time="0.0008117">
         </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; forwards all three frozen status filters independently" time="0.0003583">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; forwards a date window and omits empty ends" time="0.0011321">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; accepts every frozen OrderStatus as a filter value" time="0.0003062">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildAfterSaleListParams &gt; omits empty filters and maps the number box onto keyword" time="0.0002754">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildAfterSaleListParams &gt; forwards the frozen after-sale statuses" time="0.0001931">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildInventoryListParams &gt; sends low_stock_only only when the toggle is ON" time="0.0002192">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildInventoryListParams &gt; maps the product filter onto product_id and the keyword separately" time="0.0002334">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildKnowledgeDocParams + buildAnalyticsParams &gt; builds paging plus an optional keyword for documents" time="0.0002438">
-        </testcase>
-        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildKnowledgeDocParams + buildAnalyticsParams &gt; always sends granularity, and dates only when set" time="0.0002744">
+        <testcase classname="src/composables/__tests__/useAsyncState.spec.ts" name="useAsyncState — status derivation &gt; resolves the deferred value (guards against a loader that never settles)" time="0.0100626">
         </testcase>
     </testsuite>
-    <testsuite name="src/domain/agent/__tests__/availability.spec.ts" timestamp="2026-09-24T05:07:01.541Z" hostname="WHHHH" tests="7" failures="0" errors="0" skipped="0" time="0.0108318">
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; allows cancelling a RUNNING run" time="0.0034693">
+    <testsuite name="src/directives/__tests__/permission.spec.ts" timestamp="2026-09-24T05:39:17.880Z" hostname="WHHHH" tests="8" failures="0" errors="0" skipped="0" time="0.0615507">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; removes the element when the code is not granted" time="0.0338395">
         </testcase>
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; allows cancelling a run WAITING_APPROVAL — it is live and holding budget" time="0.0005949">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; keeps the element when the code IS granted" time="0.0050413">
         </testcase>
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; REFUSES cancelling a terminal run" time="0.0003698">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; treats an empty value as &quot;no requirement&quot; and keeps the element" time="0.0035839">
         </testcase>
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; agrees with isTerminalRun for the whole frozen vocabulary" time="0.0004242">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; supports multiple codes with .any (default) semantics" time="0.003625">
         </testcase>
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="§108 agent surface states &gt; WAITING_APPROVAL is the waiting state, and it is live" time="0.0003917">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; supports .all semantics" time="0.0035867">
         </testcase>
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="runActionBlockedReason — explains rather than hides &gt; never returns an empty explanation for any status" time="0.0011311">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; works under the v-can alias too" time="0.0023087">
         </testcase>
-        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="runActionBlockedReason — explains rather than hides &gt; distinguishes an already-cancelled run from a finished one" time="0.0008868">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="permission directive &gt; removes the node, so an unprivileged user cannot reach it via the DOM" time="0.0074624">
         </testcase>
-    </testsuite>
-    <testsuite name="src/domain/analytics/__tests__/unit.spec.ts" timestamp="2026-09-24T05:07:01.543Z" hostname="WHHHH" tests="21" failures="0" errors="0" skipped="0" time="0.0142443">
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — minor_currency stays money, and stays INTEGER &gt; hands the raw minor-unit value through for &lt;PriceText&gt; to render" time="0.0036715">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — minor_currency stays money, and stays INTEGER &gt; never divides by 100 or produces a formatted money string itself" time="0.0010502">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — minor_currency stays money, and stays INTEGER &gt; does not treat a zero amount as empty" time="0.0005022">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; renders an order count as a grouped integer" time="0.0006642">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; groups large counts" time="0.0002529">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; rounds a fractional count instead of showing cents" time="0.0001936">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; renders a negative count with a minus sign" time="0.000184">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; renders 0.12 as 12%, NOT as ¥0.12" time="0.0009278">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; renders a zero ratio as 0%, not as an empty field" time="0.0002311">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; trims a trailing .0 so 0.5 reads as 50%" time="0.0005932">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; keeps one decimal for ratios that need it" time="0.0002043">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; keeps a fraction above one instead of silently rescaling it" time="0.0001891">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; treats a value at or below 1 as a fraction" time="0.0001639">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; tolerates a non-finite value instead of rendering NaN%" time="0.0001609">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="the three units produce three genuinely different renderings &gt; a single numeric value renders differently per unit" time="0.0004123">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="unitLabel &gt; labels each unit for headers and tooltips" time="0.0002069">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; accepts the frozen unit for each of the five metrics" time="0.0002668">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; flags refund.rate arriving as money — the dangerous case" time="0.0001325">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; flags order_count arriving as money" time="0.0001246">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; flags gmv arriving as a ratio" time="0.0001362">
-        </testcase>
-        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; returns null for a metric outside the frozen five" time="0.000181">
+        <testcase classname="src/directives/__tests__/permission.spec.ts" name="__isAllowed (pure decision function) &gt; handles any/all/empty cases" time="0.0005353">
         </testcase>
     </testsuite>
-    <testsuite name="src/domain/knowledge/__tests__/availability.spec.ts" timestamp="2026-09-24T05:07:01.555Z" hostname="WHHHH" tests="15" failures="0" errors="0" skipped="0" time="0.0132116">
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; allows READY and FAILED" time="0.002772">
+    <testsuite name="src/domain/__tests__/availability.spec.ts" timestamp="2026-09-24T05:39:17.882Z" hostname="WHHHH" tests="22" failures="0" errors="0" skipped="0" time="0.0124838">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; uses the approved amount when the merchant approved something" time="0.0027296">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; REFUSES while PROCESSING — a parse/embed job is already in flight" time="0.000698">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; falls back to the requested amount while nothing is approved yet" time="0.0004737">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; REFUSES an ARCHIVED document, which would silently resurrect it" time="0.0002896">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; subtracts what was already refunded (partial refunds)" time="0.0002915">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; REFUSES UPLOADED — nothing has been parsed yet, so &quot;re-process&quot; has no meaning" time="0.0003624">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="afterSaleRefundable — the cap the server enforces independently &gt; never returns a negative cap, even if the server reports an over-refund" time="0.0003491">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canArchive — withdrawing a document (§53) &gt; allows UPLOADED, READY and FAILED" time="0.0004066">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; allows approve/reject only while PROCESSING" time="0.0003975">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canArchive — withdrawing a document (§53) &gt; REFUSES while PROCESSING — the in-flight job would write chunks into an archived document" time="0.0002525">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; allows a first refund on PROCESSING and a further one on PARTIAL_REFUNDED" time="0.0003076">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canArchive — withdrawing a document (§53) &gt; REFUSES an already ARCHIVED document (the action is not idempotent as a button)" time="0.000222">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; refuses a refund when nothing is left or the request is closed" time="0.000231">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="the two actions are never both unavailable by accident (every non-terminal state offers one) &gt; READY and FAILED offer both; UPLOADED offers archive only" time="0.0002761">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; exposes the right row-action set for each status" time="0.0010017">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="the two actions are never both unavailable by accident (every non-terminal state offers one) &gt; PROCESSING and ARCHIVED are the only operator-terminal states" time="0.0004635">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="after-sale decisions &gt; explains a closed request instead of hiding the column" time="0.0004439">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="the two actions are never both unavailable by accident (every non-terminal state offers one) &gt; covers the whole frozen vocabulary, so a new status cannot slip through untested" time="0.0013293">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="validateRefundAmount — rejects before the server has to &gt; accepts an amount inside the cap" time="0.0004384">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="§108 knowledge surface states &gt; PROCESSING is the live/processing state" time="0.0003976">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="validateRefundAmount — rejects before the server has to &gt; rejects a non-integer, zero, negative, or over-cap amount" time="0.0003678">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="§108 knowledge surface states &gt; FAILED is the state that needs operator attention" time="0.0005202">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; requires a usable optimistic-lock version" time="0.0003919">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="docActionBlockedReason — the UI explains WHY instead of hiding the rule &gt; explains that a parsing document is busy, per action" time="0.000545">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; reads sellable stock from the SERVER field and never recomputes it" time="0.0002403">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="docActionBlockedReason — the UI explains WHY instead of hiding the rule &gt; explains that an archived document is out of the active set" time="0.0002979">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; flags over-reserved rows, which are an integrity problem not a display quirk" time="0.0001835">
         </testcase>
-        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="docActionBlockedReason — the UI explains WHY instead of hiding the rule &gt; never returns an empty explanation for any status/action pair" time="0.0008468">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; flags low stock by sellable quantity, not raw on-hand" time="0.0002142">
         </testcase>
-    </testsuite>
-    <testsuite name="src/domain/marketing/__tests__/availability.spec.ts" timestamp="2026-09-24T05:07:01.560Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.0096431">
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; offers 上线 only on a DRAFT" time="0.0027231">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; rejects a no-op or negative-resulting adjustment" time="0.0002807">
         </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; offers 下线 only on an ACTIVE promotion" time="0.0003822">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; validates against the server number, not on_hand_qty - locked_qty" time="0.0002233">
         </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; treats ENDED as terminal, offering neither action" time="0.000263">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="inventory adjustment &gt; narrows a frozen Inventory row without inventing fields" time="0.00026">
         </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; exactly one action is available for each non-terminal state" time="0.0012796">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; allows a decision only while PENDING" time="0.0002767">
         </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; explains every blocked transition instead of hiding the rule" time="0.0006397">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; requires human approval for HIGH and CRITICAL, and NOT for READ/LOW/MEDIUM" time="0.0002424">
         </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; offers only UNUSED coupons as available" time="0.0002788">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; derives both decide flags from the status in one place" time="0.0002609">
         </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; never presents a LOCKED coupon as available — it is committed to another order" time="0.0002342">
-        </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; never presents a USED or EXPIRED coupon as available" time="0.000457">
-        </testcase>
-        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; covers the whole frozen coupon vocabulary, so a new status cannot slip through" time="0.000591">
+        <testcase classname="src/domain/__tests__/availability.spec.ts" name="pending actions (HITL) &gt; explains why each non-decidable state is blocked" time="0.0002202">
         </testcase>
     </testsuite>
-    <testsuite name="src/domain/orders/__tests__/availability.spec.ts" timestamp="2026-09-24T05:07:01.563Z" hostname="WHHHH" tests="44" failures="0" errors="0" skipped="0" time="0.0177024">
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; READS the server field" time="0.002681">
+    <testsuite name="src/domain/__tests__/listParams.spec.ts" timestamp="2026-09-24T05:39:17.887Z" hostname="WHHHH" tests="21" failures="0" errors="0" skipped="0" time="0.0129999">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; defaults to page 1 with the default page size" time="0.0033861">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; uses the server figure even when it disagrees with its own arithmetic" time="0.0003219">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; clamps page to at least 1 (a stale filter can leave page at 0 or negative)" time="0.0006208">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; never returns a negative amount, even if the server sends one" time="0.0002221">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; caps page_size so a hand-edited URL cannot request everything" time="0.0003593">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; is 0 for an unpaid order, so a refund is never offered on it" time="0.0002816">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; truncates fractional paging values instead of forwarding them" time="0.0003183">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; fails safe to 0 on a malformed payload instead of deriving a number" time="0.0003278">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="normalizePaging &gt; falls back to defaults for non-numeric input" time="0.0002818">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; a partial refund leaves the remaining balance refundable" time="0.0001767">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="optionalText &gt; trims and drops empty or whitespace-only input" time="0.0004174">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; a fully refunded order has nothing left" time="0.0002126">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; omits the status key entirely when &quot;全部&quot; is selected" time="0.000375">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="isUnshippedFulfillment — the carrier is the server’s own answer &gt; treats carrier === null as outstanding" time="0.000348">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; forwards a chosen frozen status verbatim" time="0.0004935">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="isUnshippedFulfillment — the carrier is the server’s own answer &gt; treats a stamped carrier CODE as already shipped" time="0.0002333">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; trims the keyword and keeps paging" time="0.0002938">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="isUnshippedFulfillment — the carrier is the server’s own answer &gt; is exactly a null check — only the server’s explicit null counts" time="0.0002088">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildProductListParams &gt; treats a whitespace-only keyword as no filter" time="0.0002727">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="findUnshippedFulfillment — picking the package a ship click acts on &gt; returns the first fulfillment with no carrier" time="0.0001822">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; sends only paging when no filter is set" time="0.0003315">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="findUnshippedFulfillment — picking the package a ship click acts on &gt; returns undefined when every package has shipped" time="0.0002219">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; maps the order-number box onto the backend keyword parameter" time="0.0003048">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="findUnshippedFulfillment — picking the package a ship click acts on &gt; never returns an id for an already-shipped package" time="0.0001073">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; forwards all three frozen status filters independently" time="0.0003387">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; allows cancelling an unpaid order that has not shipped" time="0.0002729">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; forwards a date window and omits empty ends" time="0.0008878">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; allows cancelling a paid but unshipped order" time="0.000118">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildOrderListParams &gt; accepts every frozen OrderStatus as a filter value" time="0.0001393">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; REFUSES cancel once anything shipped, even though status is still PROCESSING (§31)" time="0.0002027">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildAfterSaleListParams &gt; omits empty filters and maps the number box onto keyword" time="0.0001818">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; REFUSES cancel on terminal orders" time="0.0001925">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildAfterSaleListParams &gt; forwards the frozen after-sale statuses" time="0.0001471">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; REFUSES cancel once money has been refunded" time="0.0001869">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildInventoryListParams &gt; sends low_stock_only only when the toggle is ON" time="0.0001885">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; allows shipping a paid, processing, unshipped order with an unshipped fulfillment" time="0.0001814">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildInventoryListParams &gt; maps the product filter onto product_id and the keyword separately" time="0.0001907">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; allows shipping a partially shipped order (a second package)" time="0.0001525">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildKnowledgeDocParams + buildAnalyticsParams &gt; builds paging plus an optional keyword for documents" time="0.0001704">
         </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping when no fulfillment exists — there would be no URL to call" time="0.0001677">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping a fulfillment the server has already stamped with a carrier" time="0.0002679">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping an unpaid order" time="0.0007221">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping an already fully shipped or delivered order" time="0.0002186">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping a cancelled or completed order" time="0.0003643">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; allows confirming a shipped or partially shipped processing order" time="0.0002546">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; REFUSES confirming before anything shipped" time="0.0001691">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; REFUSES confirming an order that is already DELIVERED (receipt already given)" time="0.0000846">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; REFUSES confirming an unpaid order" time="0.0002416">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; allows a refund while money remains on a paid order" time="0.0002866">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; allows a further refund after a partial one" time="0.0005072">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; REFUSES when there is no refundable balance" time="0.0002713">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; REFUSES on an unpaid order even if a balance were reported" time="0.0001647">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; an unpaid, unshipped order exposes cancel but NOT ship" time="0.0003002">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a paid, unshipped order exposes cancel + ship, but not confirm-receipt" time="0.0009416">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a shipped order exposes confirm-receipt and NO ship" time="0.0002589">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a delivered order exposes neither ship nor confirm-receipt" time="0.0002091">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a completed order exposes no row actions except detail" time="0.0001911">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a cancelled order exposes no row actions at all" time="0.0002043">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains a shipped order cannot be cancelled" time="0.0006247">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains an unpaid order cannot ship" time="0.0001485">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains a missing fulfillment instead of pretending the order cannot ship" time="0.0001147">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains that a package already carrying a carrier cannot be shipped again" time="0.0001519">
-        </testcase>
-        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains an empty refundable balance" time="0.0001864">
+        <testcase classname="src/domain/__tests__/listParams.spec.ts" name="buildKnowledgeDocParams + buildAnalyticsParams &gt; always sends granularity, and dates only when set" time="0.0002377">
         </testcase>
     </testsuite>
-    <testsuite name="src/stores/__tests__/aiThread.spec.ts" timestamp="2026-09-24T05:07:01.577Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.0224845">
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; starts a message on run_started and reaches succeeded on final_answer" time="0.0093813">
+    <testsuite name="src/domain/agent/__tests__/availability.spec.ts" timestamp="2026-09-24T05:39:17.892Z" hostname="WHHHH" tests="7" failures="0" errors="0" skipped="0" time="0.005558">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; allows cancelling a RUNNING run" time="0.0020063">
         </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; tracks tool progress and updates it in place on tool_completed" time="0.0020447">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; allows cancelling a run WAITING_APPROVAL — it is live and holding budget" time="0.0002266">
         </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; enters waiting_approval and renders an ActionProposal block (never auto-executes)" time="0.001763">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; REFUSES cancelling a terminal run" time="0.0001929">
         </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; reflects an approval decision on the block" time="0.0014943">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="canCancelAgentRun &gt; agrees with isTerminalRun for the whole frozen vocabulary" time="0.0002462">
         </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; RENDERS A VALID chart and REFUSES an invalid one (fail closed)" time="0.0022024">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="§108 agent surface states &gt; WAITING_APPROVAL is the waiting state, and it is live" time="0.0002288">
         </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; drops out-of-order and duplicate events by seq" time="0.0014952">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="runActionBlockedReason — explains rather than hides &gt; never returns an empty explanation for any status" time="0.000204">
         </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; maps run_failed onto the Failed state with a traceable error" time="0.0006568">
-        </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; cancel() produces the Cancelled state, NOT a failure (§108)" time="0.0006552">
-        </testcase>
-        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; records citations from evidence_ready as a Citation block" time="0.0007095">
+        <testcase classname="src/domain/agent/__tests__/availability.spec.ts" name="runActionBlockedReason — explains rather than hides &gt; distinguishes an already-cancelled run from a finished one" time="0.0002333">
         </testcase>
     </testsuite>
-    <testsuite name="src/stores/__tests__/cart.spec.ts" timestamp="2026-09-24T05:07:01.579Z" hostname="WHHHH" tests="3" failures="0" errors="0" skipped="0" time="0.0177043">
-        <testcase classname="src/stores/__tests__/cart.spec.ts" name="local cart selection (§14.1) &gt; persists SKU and quantity without a cached price" time="0.0107031">
+    <testsuite name="src/domain/analytics/__tests__/unit.spec.ts" timestamp="2026-09-24T05:39:17.894Z" hostname="WHHHH" tests="21" failures="0" errors="0" skipped="0" time="0.0123463">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — minor_currency stays money, and stays INTEGER &gt; hands the raw minor-unit value through for &lt;PriceText&gt; to render" time="0.0042616">
         </testcase>
-        <testcase classname="src/stores/__tests__/cart.spec.ts" name="local cart selection (§14.1) &gt; isolates signed-in users and discards malformed browser rows" time="0.0044007">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — minor_currency stays money, and stays INTEGER &gt; never divides by 100 or produces a formatted money string itself" time="0.0005804">
         </testcase>
-        <testcase classname="src/stores/__tests__/cart.spec.ts" name="local cart selection (§14.1) &gt; routes preview and create to the frozen order API" time="0.0004618">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — minor_currency stays money, and stays INTEGER &gt; does not treat a zero amount as empty" time="0.0003137">
         </testcase>
-    </testsuite>
-    <testsuite name="src/types/__tests__/domain-mirror.spec.ts" timestamp="2026-09-24T05:07:01.581Z" hostname="WHHHH" tests="12" failures="0" errors="0" skipped="0" time="0.0185277">
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frontend/backend contract drift &gt; mirrors every backend ErrorCode name and value" time="0.0058522">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; renders an order count as a grouped integer" time="0.000525">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frontend/backend contract drift &gt; keeps the trace header name in sync with the backend constant" time="0.0030339">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; groups large counts" time="0.0001848">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact order status set" time="0.0004109">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; rounds a fractional count instead of showing cents" time="0.0001894">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact payment status set" time="0.0002971">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — count is NEVER rendered as currency &gt; renders a negative count with a minus sign" time="0.0001897">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact fulfillment status set" time="0.0008538">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; renders 0.12 as 12%, NOT as ¥0.12" time="0.0004862">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact after-sale status set" time="0.0013218">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; renders a zero ratio as 0%, not as an empty field" time="0.0004007">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact coupon status set" time="0.0004726">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; trims a trailing .0 so 0.5 reads as 50%" time="0.0001939">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact knowledge document status set" time="0.000349">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; keeps one decimal for ratios that need it" time="0.0003626">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact pending action status set" time="0.0005013">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; keeps a fraction above one instead of silently rescaling it" time="0.0002158">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact risk level set (READ is the lowest level, not a typo for RED)" time="0.000415">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; treats a value at or below 1 as a fraction" time="0.0001917">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps exactly the 12 frozen agent events, with no chain-of-thought channel" time="0.0015791">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="formatAnalyticsValue — ratio is a percentage, and the trap is explicit &gt; tolerates a non-finite value instead of rendering NaN%" time="0.000212">
         </testcase>
-        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="status codes stay ints and unique &gt; has no duplicate values in the frontend ErrorCode mirror" time="0.000331">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="the three units produce three genuinely different renderings &gt; a single numeric value renders differently per unit" time="0.000354">
         </testcase>
-    </testsuite>
-    <testsuite name="src/utils/__tests__/money.spec.ts" timestamp="2026-09-24T05:07:01.584Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.01558">
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; renders cents without float artifacts" time="0.004225">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="unitLabel &gt; labels each unit for headers and tooltips" time="0.0002307">
         </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; formats with symbol, grouping and sign" time="0.0010986">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; accepts the frozen unit for each of the five metrics" time="0.0002567">
         </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; never produces a float artefact for awkward values" time="0.0009621">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; flags refund.rate arriving as money — the dangerous case" time="0.0001119">
         </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; parses user input in major units back to minor units" time="0.0012389">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; flags order_count arriving as money" time="0.0000635">
         </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; round-trips through parse and format" time="0.0005997">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; flags gmv arriving as a ratio" time="0.0000824">
         </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; splits an amount for the styled price renderer" time="0.0015108">
-        </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; never loses the leading zero of the minor part when splitting" time="0.0014239">
-        </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; sums and computes percentages with integers" time="0.0004322">
-        </testcase>
-        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; rejects non-integer amounts in dev" time="0.0010071">
+        <testcase classname="src/domain/analytics/__tests__/unit.spec.ts" name="checkMetricUnit — catches a server/contract unit mismatch &gt; returns null for a metric outside the frozen five" time="0.0000718">
         </testcase>
     </testsuite>
-    <testsuite name="src/views/console/__tests__/AnalyticsView.spec.ts" timestamp="2026-09-24T05:07:01.586Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0691162">
-        <testcase classname="src/views/console/__tests__/AnalyticsView.spec.ts" name="merchant analytics page &gt; loads all five metrics and renders money, turnover and refund rate with their units" time="0.0667552">
+    <testsuite name="src/domain/knowledge/__tests__/availability.spec.ts" timestamp="2026-09-24T05:39:17.905Z" hostname="WHHHH" tests="15" failures="0" errors="0" skipped="0" time="0.0086147">
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; allows READY and FAILED" time="0.0018481">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; REFUSES while PROCESSING — a parse/embed job is already in flight" time="0.0001977">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; REFUSES an ARCHIVED document, which would silently resurrect it" time="0.0001615">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canReprocess — re-running a document (§53) &gt; REFUSES UPLOADED — nothing has been parsed yet, so &quot;re-process&quot; has no meaning" time="0.0001206">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canArchive — withdrawing a document (§53) &gt; allows UPLOADED, READY and FAILED" time="0.0002407">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canArchive — withdrawing a document (§53) &gt; REFUSES while PROCESSING — the in-flight job would write chunks into an archived document" time="0.0001385">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="canArchive — withdrawing a document (§53) &gt; REFUSES an already ARCHIVED document (the action is not idempotent as a button)" time="0.0002078">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="the two actions are never both unavailable by accident (every non-terminal state offers one) &gt; READY and FAILED offer both; UPLOADED offers archive only" time="0.0001778">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="the two actions are never both unavailable by accident (every non-terminal state offers one) &gt; PROCESSING and ARCHIVED are the only operator-terminal states" time="0.000321">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="the two actions are never both unavailable by accident (every non-terminal state offers one) &gt; covers the whole frozen vocabulary, so a new status cannot slip through untested" time="0.0007434">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="§108 knowledge surface states &gt; PROCESSING is the live/processing state" time="0.0002474">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="§108 knowledge surface states &gt; FAILED is the state that needs operator attention" time="0.0003829">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="docActionBlockedReason — the UI explains WHY instead of hiding the rule &gt; explains that a parsing document is busy, per action" time="0.0004965">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="docActionBlockedReason — the UI explains WHY instead of hiding the rule &gt; explains that an archived document is out of the active set" time="0.000422">
+        </testcase>
+        <testcase classname="src/domain/knowledge/__tests__/availability.spec.ts" name="docActionBlockedReason — the UI explains WHY instead of hiding the rule &gt; never returns an empty explanation for any status/action pair" time="0.0004993">
         </testcase>
     </testsuite>
-    <testsuite name="src/views/console/__tests__/MarketingView.spec.ts" timestamp="2026-09-24T05:07:01.587Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.2618436">
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; opens the form without writing anything" time="0.076154">
+    <testsuite name="src/domain/marketing/__tests__/availability.spec.ts" timestamp="2026-09-24T05:39:17.910Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.0109761">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; offers 上线 only on a DRAFT" time="0.0027106">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; 预览 calls the PREVIEW endpoint and still writes nothing" time="0.0305193">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; offers 下线 only on an ACTIVE promotion" time="0.0005192">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; 确认提交 carries the preview_token the server returned" time="0.0262505">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; treats ENDED as terminal, offering neither action" time="0.0004575">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; renders the SERVER preview warnings instead of swallowing them" time="0.0232423">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; exactly one action is available for each non-terminal state" time="0.0014404">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; a preview failure surfaces an error and does NOT advance to the confirm step" time="0.0183897">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="promotion lifecycle &gt; explains every blocked transition instead of hiding the rule" time="0.0006449">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; editing after a preview DISCARDS the approval, so a stale token cannot be reused" time="0.0219242">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; offers only UNUSED coupons as available" time="0.0004013">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — promotion creation is preview then confirm (§47, §13.2) &gt; PREVIEW builds the payload; nothing is written from the form step" time="0.027991">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; never presents a LOCKED coupon as available — it is committed to another order" time="0.0003977">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — promotion creation is preview then confirm (§47, §13.2) &gt; confirm carries the preview_token, binding the write to what was approved" time="0.0172608">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; never presents a USED or EXPIRED coupon as available" time="0.0003441">
         </testcase>
-        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — promotion creation is preview then confirm (§47, §13.2) &gt; renders server CONFLICTS instead of treating them as an error (§13.2)" time="0.0167986">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/views/console/__tests__/OrdersView.spec.ts" timestamp="2026-09-24T05:07:01.591Z" hostname="WHHHH" tests="15" failures="0" errors="0" skipped="0" time="0.3367801">
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; an UNPAID order offers 取消 but NOT 发货 / 确认收货" time="0.0829767">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; a PAID, unshipped order with an outstanding fulfillment offers 发货 and 取消" time="0.0230544">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; a PAID order whose package ALREADY has a carrier is NOT shippable" time="0.0203963">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; a SHIPPED order offers 确认收货 and NOT 发货 (order_status is still PROCESSING, §31)" time="0.0158341">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; names the goods from the §11 summary fields, without an N+1 detail fetch" time="0.0168774">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; omits the quantity suffix for a single-unit order" time="0.0159326">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; queries the fulfillment queue for outstanding packages only" time="0.0129884">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; 取消 calls orderApi.cancel (POST /orders/{no}/cancel) and refreshes the list" time="0.0274887">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; 确认收货 calls orderApi.confirmReceipt (POST /orders/{no}/confirm-receipt)" time="0.0233275">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; 发货 uses the queue id, then calls fulfillmentAdminApi.ship with EXACTLY three fields" time="0.0409408">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; does not open the ship dialog when the queue reports nothing outstanding" time="0.0116398">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — 403 from an action is handled, not crashed &gt; shows a permission notice when the server rejects the action with FORBIDDEN" time="0.0237031">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — §108 states &gt; renders the Empty state when the server returns no rows" time="0.0072993">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — §108 states &gt; renders the Error state with a retry affordance when the list call fails" time="0.0066429">
-        </testcase>
-        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — §108 states &gt; renders the PermissionDenied state (not a generic error) for a forbidden list call" time="0.0045475">
+        <testcase classname="src/domain/marketing/__tests__/availability.spec.ts" name="coupon availability &gt; covers the whole frozen coupon vocabulary, so a new status cannot slip through" time="0.0003248">
         </testcase>
     </testsuite>
-    <testsuite name="src/views/consumer/__tests__/CheckoutView.spec.ts" timestamp="2026-09-24T05:07:01.597Z" hostname="WHHHH" tests="2" failures="0" errors="0" skipped="0" time="0.3744814">
-        <testcase classname="src/views/consumer/__tests__/CheckoutView.spec.ts" name="checkout sends server-owned order inputs &gt; previews selected SKU quantities with numeric address and coupon IDs" time="0.3299325">
+    <testsuite name="src/domain/orders/__tests__/availability.spec.ts" timestamp="2026-09-24T05:39:17.913Z" hostname="WHHHH" tests="44" failures="0" errors="0" skipped="0" time="0.0109507">
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; READS the server field" time="0.0019993">
         </testcase>
-        <testcase classname="src/views/consumer/__tests__/CheckoutView.spec.ts" name="checkout sends server-owned order inputs &gt; creates an order with the same business inputs and one idempotency value" time="0.0422514">
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; uses the server figure even when it disagrees with its own arithmetic" time="0.0002565">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; never returns a negative amount, even if the server sends one" time="0.0001873">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; is 0 for an unpaid order, so a refund is never offered on it" time="0.0001128">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; fails safe to 0 on a malformed payload instead of deriving a number" time="0.0001212">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; a partial refund leaves the remaining balance refundable" time="0.0001012">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="refundableAmount - server-owned, no client-side derivation &gt; a fully refunded order has nothing left" time="0.0000916">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="isUnshippedFulfillment — the carrier is the server’s own answer &gt; treats carrier === null as outstanding" time="0.0001412">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="isUnshippedFulfillment — the carrier is the server’s own answer &gt; treats a stamped carrier CODE as already shipped" time="0.0001526">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="isUnshippedFulfillment — the carrier is the server’s own answer &gt; is exactly a null check — only the server’s explicit null counts" time="0.0002073">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="findUnshippedFulfillment — picking the package a ship click acts on &gt; returns the first fulfillment with no carrier" time="0.0001977">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="findUnshippedFulfillment — picking the package a ship click acts on &gt; returns undefined when every package has shipped" time="0.0001701">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="findUnshippedFulfillment — picking the package a ship click acts on &gt; never returns an id for an already-shipped package" time="0.000109">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; allows cancelling an unpaid order that has not shipped" time="0.0001959">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; allows cancelling a paid but unshipped order" time="0.0001086">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; REFUSES cancel once anything shipped, even though status is still PROCESSING (§31)" time="0.0001222">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; REFUSES cancel on terminal orders" time="0.0001664">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canCancelOrder &gt; REFUSES cancel once money has been refunded" time="0.0002227">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; allows shipping a paid, processing, unshipped order with an unshipped fulfillment" time="0.0001174">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; allows shipping a partially shipped order (a second package)" time="0.0000886">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping when no fulfillment exists — there would be no URL to call" time="0.0000855">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping a fulfillment the server has already stamped with a carrier" time="0.0000657">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping an unpaid order" time="0.0000806">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping an already fully shipped or delivered order" time="0.0000737">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canShipOrder &gt; REFUSES shipping a cancelled or completed order" time="0.0000749">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; allows confirming a shipped or partially shipped processing order" time="0.0001277">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; REFUSES confirming before anything shipped" time="0.0000645">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; REFUSES confirming an order that is already DELIVERED (receipt already given)" time="0.0000458">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canConfirmReceipt &gt; REFUSES confirming an unpaid order" time="0.000078">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; allows a refund while money remains on a paid order" time="0.0001729">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; allows a further refund after a partial one" time="0.0000953">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; REFUSES when there is no refundable balance" time="0.000111">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="canRefundOrder &gt; REFUSES on an unpaid order even if a balance were reported" time="0.0000666">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; an unpaid, unshipped order exposes cancel but NOT ship" time="0.0001764">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a paid, unshipped order exposes cancel + ship, but not confirm-receipt" time="0.0005729">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a shipped order exposes confirm-receipt and NO ship" time="0.0001435">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a delivered order exposes neither ship nor confirm-receipt" time="0.0001236">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a completed order exposes no row actions except detail" time="0.0001334">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionFlags — the row-action matrix &gt; a cancelled order exposes no row actions at all" time="0.0000854">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains a shipped order cannot be cancelled" time="0.0002102">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains an unpaid order cannot ship" time="0.0001067">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains a missing fulfillment instead of pretending the order cannot ship" time="0.0000726">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains that a package already carrying a carrier cannot be shipped again" time="0.0000922">
+        </testcase>
+        <testcase classname="src/domain/orders/__tests__/availability.spec.ts" name="orderActionBlockedReason — the UI explains WHY, it does not silently hide &gt; explains an empty refundable balance" time="0.0000877">
         </testcase>
     </testsuite>
-    <testsuite name="src/views/consumer/__tests__/ProductView.spec.ts" timestamp="2026-09-24T05:07:01.599Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0796075">
-        <testcase classname="src/views/consumer/__tests__/ProductView.spec.ts" name="product detail uses numeric catalog SKU IDs &gt; selects and stores a published SKU from the API response" time="0.0776745">
+    <testsuite name="src/stores/__tests__/aiThread.spec.ts" timestamp="2026-09-24T05:39:17.921Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.0265736">
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; starts a message on run_started and reaches succeeded on final_answer" time="0.0106613">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; tracks tool progress and updates it in place on tool_completed" time="0.0019153">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; enters waiting_approval and renders an ActionProposal block (never auto-executes)" time="0.0016202">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; reflects an approval decision on the block" time="0.0019903">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; RENDERS A VALID chart and REFUSES an invalid one (fail closed)" time="0.0027082">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; drops out-of-order and duplicate events by seq" time="0.0019911">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; maps run_failed onto the Failed state with a traceable error" time="0.0009455">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; cancel() produces the Cancelled state, NOT a failure (§108)" time="0.0011206">
+        </testcase>
+        <testcase classname="src/stores/__tests__/aiThread.spec.ts" name="aiThread store &gt; records citations from evidence_ready as a Citation block" time="0.0010659">
         </testcase>
     </testsuite>
-    <testsuite name="tests/setup-check.spec.ts" timestamp="2026-09-24T05:07:01.600Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0731576">
-        <testcase classname="tests/setup-check.spec.ts" name="toolchain spike &gt; mounts a Vue 3 component in jsdom" time="0.0713117">
+    <testsuite name="src/stores/__tests__/cart.spec.ts" timestamp="2026-09-24T05:39:17.923Z" hostname="WHHHH" tests="3" failures="0" errors="0" skipped="0" time="0.0219304">
+        <testcase classname="src/stores/__tests__/cart.spec.ts" name="local cart selection (§14.1) &gt; persists SKU and quantity without a cached price" time="0.0106839">
+        </testcase>
+        <testcase classname="src/stores/__tests__/cart.spec.ts" name="local cart selection (§14.1) &gt; isolates signed-in users and discards malformed browser rows" time="0.0093614">
+        </testcase>
+        <testcase classname="src/stores/__tests__/cart.spec.ts" name="local cart selection (§14.1) &gt; routes preview and create to the frozen order API" time="0.0002797">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/types/__tests__/domain-mirror.spec.ts" timestamp="2026-09-24T05:39:17.924Z" hostname="WHHHH" tests="12" failures="0" errors="0" skipped="0" time="0.0125215">
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frontend/backend contract drift &gt; mirrors every backend ErrorCode name and value" time="0.0050562">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frontend/backend contract drift &gt; keeps the trace header name in sync with the backend constant" time="0.0011815">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact order status set" time="0.0003918">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact payment status set" time="0.0002779">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact fulfillment status set" time="0.0002309">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact after-sale status set" time="0.000267">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact coupon status set" time="0.0002127">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact knowledge document status set" time="0.0002335">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact pending action status set" time="0.000317">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps the exact risk level set (READ is the lowest level, not a typo for RED)" time="0.0003153">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="frozen enums (§105) &gt; keeps exactly the 12 frozen agent events, with no chain-of-thought channel" time="0.001318">
+        </testcase>
+        <testcase classname="src/types/__tests__/domain-mirror.spec.ts" name="status codes stay ints and unique &gt; has no duplicate values in the frontend ErrorCode mirror" time="0.0002545">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/utils/__tests__/money.spec.ts" timestamp="2026-09-24T05:39:17.928Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.0120194">
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; renders cents without float artifacts" time="0.0026097">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; formats with symbol, grouping and sign" time="0.001037">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; never produces a float artefact for awkward values" time="0.000808">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; parses user input in major units back to minor units" time="0.0008558">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; round-trips through parse and format" time="0.0004782">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; splits an amount for the styled price renderer" time="0.0009428">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; never loses the leading zero of the minor part when splitting" time="0.0011221">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; sums and computes percentages with integers" time="0.0003994">
+        </testcase>
+        <testcase classname="src/utils/__tests__/money.spec.ts" name="money (integer minor units) &gt; rejects non-integer amounts in dev" time="0.0011528">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/console/__tests__/AnalyticsView.spec.ts" timestamp="2026-09-24T05:39:17.930Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0515087">
+        <testcase classname="src/views/console/__tests__/AnalyticsView.spec.ts" name="merchant analytics page &gt; loads all five metrics and renders money, turnover and refund rate with their units" time="0.0495389">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/console/__tests__/MarketingView.spec.ts" timestamp="2026-09-24T05:39:17.931Z" hostname="WHHHH" tests="9" failures="0" errors="0" skipped="0" time="0.2216568">
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; opens the form without writing anything" time="0.0720752">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; 预览 calls the PREVIEW endpoint and still writes nothing" time="0.0283875">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; 确认提交 carries the preview_token the server returned" time="0.017554">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; renders the SERVER preview warnings instead of swallowing them" time="0.0182199">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; a preview failure surfaces an error and does NOT advance to the confirm step" time="0.0157165">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — coupon creation is preview then confirm (§47, §12.1) &gt; editing after a preview DISCARDS the approval, so a stale token cannot be reused" time="0.0156215">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — promotion creation is preview then confirm (§47, §13.2) &gt; PREVIEW builds the payload; nothing is written from the form step" time="0.0198662">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — promotion creation is preview then confirm (§47, §13.2) &gt; confirm carries the preview_token, binding the write to what was approved" time="0.0171129">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/MarketingView.spec.ts" name="console Marketing — promotion creation is preview then confirm (§47, §13.2) &gt; renders server CONFLICTS instead of treating them as an error (§13.2)" time="0.0148871">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/console/__tests__/OrdersView.spec.ts" timestamp="2026-09-24T05:39:17.934Z" hostname="WHHHH" tests="15" failures="0" errors="0" skipped="0" time="0.2532284">
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; an UNPAID order offers 取消 but NOT 发货 / 确认收货" time="0.0737576">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; a PAID, unshipped order with an outstanding fulfillment offers 发货 and 取消" time="0.0210956">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; a PAID order whose package ALREADY has a carrier is NOT shippable" time="0.0162207">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; a SHIPPED order offers 确认收货 and NOT 发货 (order_status is still PROCESSING, §31)" time="0.0115648">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; names the goods from the §11 summary fields, without an N+1 detail fetch" time="0.0139392">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; omits the quantity suffix for a single-unit order" time="0.0117789">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — row actions follow the frozen state machine &gt; queries the fulfillment queue for outstanding packages only" time="0.0118076">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; 取消 calls orderApi.cancel (POST /orders/{no}/cancel) and refreshes the list" time="0.0150572">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; 确认收货 calls orderApi.confirmReceipt (POST /orders/{no}/confirm-receipt)" time="0.0134471">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; 发货 uses the queue id, then calls fulfillmentAdminApi.ship with EXACTLY three fields" time="0.0275078">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — actions call the FROZEN task endpoints &gt; does not open the ship dialog when the queue reports nothing outstanding" time="0.0094253">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — 403 from an action is handled, not crashed &gt; shows a permission notice when the server rejects the action with FORBIDDEN" time="0.0125648">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — §108 states &gt; renders the Empty state when the server returns no rows" time="0.0038393">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — §108 states &gt; renders the Error state with a retry affordance when the list call fails" time="0.0042947">
+        </testcase>
+        <testcase classname="src/views/console/__tests__/OrdersView.spec.ts" name="console Orders — §108 states &gt; renders the PermissionDenied state (not a generic error) for a forbidden list call" time="0.0043858">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/console/__tests__/ProductsView.spec.ts" timestamp="2026-09-24T05:39:17.939Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0909271">
+        <testcase classname="src/views/console/__tests__/ProductsView.spec.ts" name="merchant product image upload &gt; uploads the chosen file as primary and refreshes the product cover" time="0.0893937">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/consumer/__tests__/CheckoutView.spec.ts" timestamp="2026-09-24T05:39:17.939Z" hostname="WHHHH" tests="2" failures="0" errors="0" skipped="0" time="0.4598354">
+        <testcase classname="src/views/consumer/__tests__/CheckoutView.spec.ts" name="checkout sends server-owned order inputs &gt; previews selected SKU quantities with numeric address and coupon IDs" time="0.4242775">
+        </testcase>
+        <testcase classname="src/views/consumer/__tests__/CheckoutView.spec.ts" name="checkout sends server-owned order inputs &gt; creates an order with the same business inputs and one idempotency value" time="0.0342658">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/consumer/__tests__/ProductView.spec.ts" timestamp="2026-09-24T05:39:17.940Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0455052">
+        <testcase classname="src/views/consumer/__tests__/ProductView.spec.ts" name="product detail uses numeric catalog SKU IDs &gt; selects and stores a published SKU from the API response" time="0.0444616">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/setup-check.spec.ts" timestamp="2026-09-24T05:39:17.941Z" hostname="WHHHH" tests="1" failures="0" errors="0" skipped="0" time="0.0233315">
+        <testcase classname="tests/setup-check.spec.ts" name="toolchain spike &gt; mounts a Vue 3 component in jsdom" time="0.0216049">
         </testcase>
     </testsuite>
 </testsuites>
