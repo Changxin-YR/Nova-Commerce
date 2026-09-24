@@ -6,12 +6,12 @@
     "build"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T00:25:15.470255+00:00",
-  "duration_ms": 7751,
+  "timestamp": "2026-09-24T00:41:19.553013+00:00",
+  "duration_ms": 8256,
   "exit_code": 0,
   "git": {
-    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
-    "subject": "feat(api): connect identity and public catalog purchase flow\n",
+    "revision": "44df02b2e277d0d94f3ab1bb8c46ade75fbf165f\n",
+    "subject": "feat(catalog): add merchant product administration\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",

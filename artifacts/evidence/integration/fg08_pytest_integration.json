@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-24T00:25:21.712723+00:00",
-  "duration_ms": 97048,
+  "timestamp": "2026-09-24T00:41:26.055091+00:00",
+  "duration_ms": 99200,
   "exit_code": 0,
-  "summary": "362 passed, 1 warning in 93.99s (0:01:33)",
+  "summary": "364 passed, 1 warning in 96.11s (0:01:36)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
-    "subject": "feat(api): connect identity and public catalog purchase flow\n",
+    "revision": "44df02b2e277d0d94f3ab1bb8c46ade75fbf165f\n",
+    "subject": "feat(catalog): add merchant product administration\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 362,
+    "testcase_count": 364,
     "outcomes": [
       {
         "name": "test_apply_then_read_back_through_the_frozen_paths",
@@ -440,6 +440,14 @@
       },
       {
         "name": "test_expired_sessions_are_cleanable",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_merchant_creates_and_publishes_product",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_product_scope_and_task_permissions",
         "actual": "PASSED"
       },
       {
@@ -2094,6 +2102,18 @@
     },
     {
       "name": "test_expired_sessions_are_cleanable",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_merchant_creates_and_publishes_product",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_product_scope_and_task_permissions",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

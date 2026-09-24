@@ -6,12 +6,12 @@
     "--reporter=json"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T00:25:31.591180+00:00",
-  "duration_ms": 8024,
+  "timestamp": "2026-09-24T00:41:36.933975+00:00",
+  "duration_ms": 7468,
   "exit_code": 0,
   "git": {
-    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
-    "subject": "feat(api): connect identity and public catalog purchase flow\n",
+    "revision": "44df02b2e277d0d94f3ab1bb8c46ade75fbf165f\n",
+    "subject": "feat(catalog): add merchant product administration\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,8 +32,8 @@
   "browser_report": {
     "path": "artifacts\\evidence\\e2e\\fg21_playwright.report.json",
     "stats": {
-      "startTime": "2026-09-24T00:25:32.096Z",
-      "duration": 7476.656,
+      "startTime": "2026-09-24T00:41:37.601Z",
+      "duration": 6757.029,
       "expected": 5,
       "skipped": 0,
       "unexpected": 0,
