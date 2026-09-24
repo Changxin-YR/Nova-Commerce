@@ -491,6 +491,8 @@ SkuNotFoundError = _error("SKU not found", ErrorCode.SKU_NOT_FOUND, http_status=
 SkuNotAvailableError = _error("SKU is not available for sale", ErrorCode.SKU_NOT_AVAILABLE, http_status=409)
 CategoryNotFoundError = _error("Category not found", ErrorCode.CATEGORY_NOT_FOUND, http_status=404)
 BrandNotFoundError = _error("Brand not found", ErrorCode.BRAND_NOT_FOUND, http_status=404)
+ProductAlreadyPublishedError = _error("Product is already published", ErrorCode.PRODUCT_ALREADY_PUBLISHED, http_status=409)
+ProductStateInvalidError = _error("Product state does not allow this action", ErrorCode.PRODUCT_STATE_INVALID, http_status=409)
 
 # -- inventory --------------------------------------------------------------
 InsufficientStockError = _error(

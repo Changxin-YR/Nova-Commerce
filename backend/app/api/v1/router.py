@@ -83,6 +83,12 @@ def build_api_router() -> APIRouter:
             # tests in this repo probe by ANSWER rather than by registration.
             api_router.include_router(router, prefix=prefix, tags=[tag])
 
+    # The frozen product publication verbs live at /products/{id}/... rather
+    # than under /catalog. Keep the shared /catalog mount for admin CRUD.
+    from app.modules.catalog.api.tasks import router as catalog_tasks
+
+    api_router.include_router(catalog_tasks, tags=["catalog:tasks"])
+
     return api_router
 
 

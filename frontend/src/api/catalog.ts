@@ -19,7 +19,7 @@ export const catalogApi = {
     return httpClient.get<Paged<ProductSummary>>(API.catalog.products, { params: query })
   },
 
-  async product(id: string): Promise<Product> {
+  async product(id: string | number): Promise<Product> {
     return httpClient.get<Product>(API.catalog.productDetail(id))
   },
 
@@ -37,7 +37,7 @@ export const catalogAdminApi = {
     return httpClient.get<Paged<ProductSummary>>(API.catalog.adminProducts, { params: query })
   },
 
-  async product(id: string): Promise<Product> {
+  async product(id: string | number): Promise<Product> {
     return httpClient.get<Product>(API.catalog.adminProduct(id))
   },
 
@@ -45,7 +45,7 @@ export const catalogAdminApi = {
     return httpClient.post<Product>(API.catalog.adminProducts, payload)
   },
 
-  async update(id: string, payload: Partial<ProductPayload>): Promise<Product> {
+  async update(id: string | number, payload: Partial<ProductPayload>): Promise<Product> {
     return httpClient.put<Product>(API.catalog.adminProduct(id), payload)
   },
 
@@ -58,7 +58,7 @@ export const catalogAdminApi = {
     return httpClient.post<Product>(API.catalog.unpublish(id), {})
   },
 
-  async upsertSku(productId: string, payload: SkuPayload): Promise<Sku> {
+  async addSku(productId: string | number, payload: SkuPayload): Promise<Sku> {
     return httpClient.post<Sku>(API.catalog.skus(productId), payload)
   },
 }

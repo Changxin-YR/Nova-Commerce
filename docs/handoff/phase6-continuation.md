@@ -9,8 +9,8 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
   for the current local lead over `origin/main`. No commits from this
   continuation have been pushed.
-- Backend: `python -m pytest tests -q` passed **1160 tests** after the public
-  catalog, HTTP purchase, and paged owner-address increment. One upstream
+- Backend: `python -m pytest tests -q` passed **1162 tests** after the merchant
+  catalog write increment. One upstream
   Starlette/AnyIO deprecation warning remains.
   `ruff check --no-cache backend/app backend/tests backend/migrations` passed.
 - Schema: Alembic head is `f0d29969cfb5`; `alembic check` found no drift.
@@ -81,8 +81,14 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
     product selection accepts numeric API SKU IDs. An HTTP purchase test covers
     login -> catalog -> preview -> order -> payment attempt.
 11. A new FG-13 emitter runs the existing refresh rotation suite and cookie
-    HTTP tests against MySQL at the frozen proof path. Emit after the source
-    commit so the evidence records a clean watched revision.
+    HTTP tests against MySQL at the frozen proof path.
+12. Merchant catalog endpoints now list, create, read and edit products, add
+    SKUs, and publish/unpublish through the frozen root-level task paths.
+    The service checks staff permissions, merchant ownership, category/brand
+    ownership and allowed state transitions. A new MySQL HTTP test covers
+    creation, publication, storefront visibility, duplicate SKU rejection,
+    unauthorized callers and cross-merchant access. Stock still enters through
+    inventory operations; product image upload remains to be implemented.
 
 ## Remaining work, in execution order
 
@@ -109,8 +115,8 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 6. **Remote sync**: all continuation commits remain local. Push only after the
    intended branch/review path is settled. Re-run affected evidence after each
    watched source change and regenerate `FINAL_GATE.md` at the end.
-7. **Live route audit**: `create_app().openapi()["paths"]` now lists 59 paths,
-   including auth, addresses, and public catalog. Merchant catalog writes,
+7. **Live route audit**: `create_app().openapi()["paths"]` now lists 64 paths,
+   including auth, addresses, public catalog and merchant product writes.
    Analytics, knowledge, agent, governance, and audit API routers remain
    absent. The HTTP purchase test reaches payment attempt, but an actual
    browser checkout and payment settlement still need E2E verification.
@@ -120,6 +126,6 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 
 ## Next code entry point
 
-Next implement merchant catalog writes and a browser checkout case, then Phase 6
+Next implement product image upload and a browser checkout case, then Phase 6
 Analytics and the remaining backend modules and gates. Refresh source-watched
 gate artifacts after each source increment and regenerate `FINAL_GATE.md`.

@@ -71,24 +71,19 @@ export interface ProductQuery extends PageQuery {
 export interface ProductPayload {
   title: string
   subtitle?: string
-  category_id: number
+  category_id?: number | null
   brand_id?: number
   description?: string
-  images: { url: string; alt?: string; sort_order?: number }[]
-  skus: {
-    sku_code: string
-    specs: Record<string, string>
-    price_amount: number
-    original_price_amount?: number
-    stock?: number
-  }[]
+  skus?: SkuPayload[]
 }
 
 export interface SkuPayload {
   sku_code: string
+  name: string
   specs: Record<string, string>
   price_amount: number
   original_price_amount?: number
+  purchase_limit?: number
 }
 
 // ---------------------------------------------------------------------------

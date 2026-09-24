@@ -52,15 +52,17 @@ def _active_skus(product: Product) -> list[ProductSku]:
 
 def _summary(product: Product) -> dict:
     skus = _active_skus(product)
-    prices = [sku.price_amount for sku in skus]
-    references = [sku.market_price_amount for sku in skus if sku.market_price_amount > sku.price_amount]
+    cheapest = min(skus, key=lambda sku: (sku.price_amount, sku.id), default=None)
     image = next((image for image in product.images if image.role == "PRIMARY"), None)
     return {
         "id": product.id,
         "title": product.name,
         "cover_url": _image_url(image) if image else None,
-        "min_price_amount": min(prices) if prices else product.min_price,
-        "original_price_amount": min(references) if references else None,
+        "min_price_amount": cheapest.price_amount if cheapest else 0,
+        "original_price_amount": (
+            cheapest.market_price_amount
+            if cheapest and cheapest.market_price_amount > cheapest.price_amount else None
+        ),
         "sales_count": product.sales_count,
         "brand_name": product.brand.name if product.brand else None,
         "tags": [],
