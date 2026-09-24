@@ -4,7 +4,7 @@
 
 vite v8.3.0 building client environment for production...
 transforming...
-✓ 2385 modules transformed.
+✓ 2388 modules transformed.
 rendering chunks...
 computing gzip size...
 dist/index.html                                   0.85 kB │ gzip:   0.39 kB
@@ -13,7 +13,7 @@ dist/assets/ForbiddenView-pNQEjmn1.css            0.30 kB │ gzip:   0.18 kB
 dist/assets/ApexChart-Cub3pAaw.css                0.37 kB │ gzip:   0.21 kB
 dist/assets/AnalyticsView-DJhTq-io.css            0.39 kB │ gzip:   0.22 kB
 dist/assets/DashboardView-hPRHqid8.css            0.54 kB │ gzip:   0.28 kB
-dist/assets/ProfileView-CZkz6eCy.css              0.57 kB │ gzip:   0.29 kB
+dist/assets/ProfileView-39QiMWEL.css              0.57 kB │ gzip:   0.29 kB
 dist/assets/SearchView-PwSeNc5y.css               0.62 kB │ gzip:   0.33 kB
 dist/assets/StatusChip-_p1XI2Zh.css               0.81 kB │ gzip:   0.32 kB
 dist/assets/LoginView-BL345bVH.css                0.83 kB │ gzip:   0.38 kB
@@ -26,6 +26,7 @@ dist/assets/OrdersView-U0mvfRlj.css               1.21 kB │ gzip:   0.49 kB
 dist/assets/AfterSalesView-BPIMbQjc.css           1.21 kB │ gzip:   0.43 kB
 dist/assets/InventoryView-C6NwFtFh.css            1.22 kB │ gzip:   0.47 kB
 dist/assets/ProductCard-qGLCGnb5.css              1.25 kB │ gzip:   0.49 kB
+dist/assets/CouponsView-BkEdewYv.css              1.31 kB │ gzip:   0.48 kB
 dist/assets/AddressesView-DUK79rTH.css            1.42 kB │ gzip:   0.51 kB
 dist/assets/PriceText-B5HslW9d.css                1.44 kB │ gzip:   0.41 kB
 dist/assets/AssistantView-CwXnIgRx.css            1.80 kB │ gzip:   0.57 kB
@@ -39,62 +40,58 @@ dist/assets/CartView-BK1RAj39.css                 3.82 kB │ gzip:   1.01 kB
 dist/assets/CheckoutView-DuHq72g0.css             4.03 kB │ gzip:   0.95 kB
 dist/assets/AiWorkspaceView-bKiliQ4H.css          4.26 kB │ gzip:   1.15 kB
 dist/assets/ProductView-DvL9YRNh.css              4.29 kB │ gzip:   1.09 kB
-dist/assets/StoreLayout-BzT1LBHT.css              5.25 kB │ gzip:   1.19 kB
+dist/assets/StoreLayout-BEuuEMrw.css              5.25 kB │ gzip:   1.19 kB
 dist/assets/HomeView-NLVDaaBZ.css                 5.26 kB │ gzip:   1.34 kB
 dist/assets/MessageBlocks-BzEFdjf0.css            5.48 kB │ gzip:   1.22 kB
 dist/assets/index-_ifb6LZ0.css                   10.23 kB │ gzip:   2.73 kB
 dist/assets/element-jKU1RY2B.css                360.20 kB │ gzip:  47.96 kB
 dist/assets/money-Bn4FPF4z.js                     0.66 kB │ gzip:   0.45 kB │ map:     5.94 kB
-dist/assets/NotFoundView-CQ6vQAY7.js              0.69 kB │ gzip:   0.54 kB │ map:     1.92 kB
+dist/assets/NotFoundView-B6NvTwlT.js              0.69 kB │ gzip:   0.54 kB │ map:     1.92 kB
 dist/assets/unit-BkTRHTwr.js                      0.70 kB │ gzip:   0.50 kB │ map:     4.74 kB
 dist/assets/rolldown-runtime-hePW80VL.js          0.71 kB │ gzip:   0.42 kB
 dist/assets/listParams-iN8o6dBQ.js                0.77 kB │ gzip:   0.38 kB │ map:     9.42 kB
 dist/assets/notification-CYQMVmim.js              1.03 kB │ gzip:   0.58 kB │ map:     4.01 kB
-dist/assets/useAsyncState-Bbjcvlis.js             1.14 kB │ gzip:   0.55 kB │ map:     5.72 kB
-dist/assets/ForbiddenView-B_m70l0X.js             1.22 kB │ gzip:   0.82 kB │ map:     4.60 kB
-dist/assets/PriceText-Bbo4gwdK.js                 1.54 kB │ gzip:   0.74 kB │ map:    11.90 kB
+dist/assets/useAsyncState-CbxUyx9F.js             1.14 kB │ gzip:   0.55 kB │ map:     5.72 kB
+dist/assets/ForbiddenView-C-uh-bdg.js             1.22 kB │ gzip:   0.82 kB │ map:     4.60 kB
+dist/assets/PriceText-a-kRI_eV.js                 1.54 kB │ gzip:   0.74 kB │ map:    11.90 kB
 dist/assets/availability-Cpst27o2.js              1.76 kB │ gzip:   0.84 kB │ map:    13.78 kB
-dist/assets/ProductCard-COK1qA2R.js               1.84 kB │ gzip:   1.03 kB │ map:    10.57 kB
-dist/assets/ProfileView-CkmVT_Ci.js               2.10 kB │ gzip:   1.07 kB │ map:     8.16 kB
-dist/assets/LoginView-CrlqRVCb.js                 2.11 kB │ gzip:   1.30 kB │ map:     9.17 kB
-dist/assets/StatusChip-DqEajPEE.js                2.15 kB │ gzip:   1.13 kB │ map:    12.74 kB
-dist/assets/cart-COnk6lh1.js                      2.24 kB │ gzip:   1.04 kB │ map:     7.29 kB
-dist/assets/SearchView-BFAGgFHS.js                2.25 kB │ gzip:   1.34 kB │ map:     9.77 kB
-dist/assets/AssistantView-BJlaSkWy.js             2.87 kB │ gzip:   1.67 kB │ map:    14.42 kB
-dist/assets/DashboardView-CtHEw7oX.js             2.88 kB │ gzip:   1.59 kB │ map:    15.83 kB
-dist/assets/MockPayView-DV1aCbmX.js               2.92 kB │ gzip:   1.62 kB │ map:    13.94 kB
-dist/assets/StateView-GVRIfVys.js                 3.23 kB │ gzip:   1.59 kB │ map:    15.25 kB
-dist/assets/AfterSaleDetailView-D8rBSAhG.js       3.76 kB │ gzip:   1.73 kB │ map:    15.12 kB
-dist/assets/ConsoleLayout-Dq5g1Us3.js             3.87 kB │ gzip:   1.75 kB │ map:    23.19 kB
-dist/assets/CartView-BRPhw20L.js                  4.59 kB │ gzip:   2.06 kB │ map:    27.24 kB
-dist/assets/AddressesView-5O2tAr4P.js             5.08 kB │ gzip:   1.97 kB │ map:    22.74 kB
-dist/assets/InventoryView-D7ybeWhU.js             5.09 kB │ gzip:   2.43 kB │ map:    25.61 kB
-dist/assets/ProductsView-DlYRbNJm.js              5.71 kB │ gzip:   2.47 kB │ map:    26.50 kB
-dist/assets/HomeView-B_RblBTQ.js                  5.83 kB │ gzip:   2.79 kB │ map:    36.06 kB
-dist/assets/OrdersView-Cy2990S7.js                5.84 kB │ gzip:   2.44 kB │ map:    35.60 kB
-dist/assets/AnalyticsView-Bs1M-CAe.js             5.87 kB │ gzip:   2.44 kB │ map:    27.47 kB
-dist/assets/ProductView-BR98_uKf.js               6.35 kB │ gzip:   2.86 kB │ map:    37.89 kB
-dist/assets/SystemView-CVjhu3QP.js                6.45 kB │ gzip:   3.05 kB │ map:    30.04 kB
-dist/assets/StoreLayout-D3NsF4td.js               6.56 kB │ gzip:   2.83 kB │ map:    37.31 kB
-dist/assets/AfterSalesView-B2L9ZklV.js            6.72 kB │ gzip:   3.02 kB │ map:    28.19 kB
-dist/assets/OrderDetailView-n33g-IUA.js           8.36 kB │ gzip:   3.06 kB │ map:    39.11 kB
-dist/assets/ApexChart-cbIBOX_u.js                 8.79 kB │ gzip:   3.75 kB │ map:    35.28 kB
-dist/assets/CheckoutView-DwEu1vg-.js              8.90 kB │ gzip:   3.63 kB │ map:    45.91 kB
-dist/assets/AfterSalesView-CU2KvAqb.js            9.69 kB │ gzip:   3.86 kB │ map:    48.71 kB
-dist/assets/KnowledgeView-CUL_dKaL.js             9.93 kB │ gzip:   3.96 kB │ map:    53.75 kB
-dist/assets/OrdersView-BjfOh9CR.js               10.12 kB │ gzip:   3.86 kB │ map:    53.09 kB
-dist/assets/AiWorkspaceView-pXrM0rYl.js          10.87 kB │ gzip:   4.43 kB │ map:    60.51 kB
-dist/assets/MessageBlocks-DNxTnHg5.js            13.60 kB │ gzip:   5.51 kB │ map:    75.17 kB
-dist/assets/index-CjMloxyb.js                    15.27 kB │ gzip:   5.70 kB │ map:    33.21 kB
-dist/assets/MarketingView-C9Y73Unq.js            23.70 kB │ gzip:   6.80 kB │ map:   108.23 kB
-dist/assets/api-CuDbWm7s.js                      24.12 kB │ gzip:   7.90 kB │ map:   108.92 kB
+dist/assets/ProductCard-DUb0v7Li.js               1.84 kB │ gzip:   1.03 kB │ map:    10.57 kB
+dist/assets/LoginView-P_GYmgah.js                 2.11 kB │ gzip:   1.31 kB │ map:     9.17 kB
+dist/assets/StatusChip-DKx6UenQ.js                2.15 kB │ gzip:   1.13 kB │ map:    12.74 kB
+dist/assets/ProfileView-C_0kdzNc.js               2.20 kB │ gzip:   1.09 kB │ map:     8.49 kB
+dist/assets/cart-Q7zDrW-D.js                      2.24 kB │ gzip:   1.04 kB │ map:     7.29 kB
+dist/assets/SearchView-CjKhAUvr.js                2.25 kB │ gzip:   1.34 kB │ map:     9.77 kB
+dist/assets/AssistantView-B-gCFQea.js             2.87 kB │ gzip:   1.67 kB │ map:    14.42 kB
+dist/assets/DashboardView-BkCn-lJw.js             2.88 kB │ gzip:   1.59 kB │ map:    15.83 kB
+dist/assets/MockPayView-Dct-ha3u.js               2.92 kB │ gzip:   1.62 kB │ map:    13.94 kB
+dist/assets/StateView-CKuEmt3Y.js                 3.23 kB │ gzip:   1.59 kB │ map:    15.25 kB
+dist/assets/AfterSaleDetailView-CrAh-NLL.js       3.76 kB │ gzip:   1.73 kB │ map:    15.12 kB
+dist/assets/ConsoleLayout-DPWI5wMH.js             3.87 kB │ gzip:   1.75 kB │ map:    23.19 kB
+dist/assets/CouponsView-CTtO5zTp.js               3.95 kB │ gzip:   1.99 kB │ map:    17.54 kB
+dist/assets/CartView-tznYP61A.js                  4.59 kB │ gzip:   2.06 kB │ map:    27.24 kB
+dist/assets/AddressesView-BJwm43Ki.js             5.08 kB │ gzip:   1.97 kB │ map:    22.74 kB
+dist/assets/InventoryView-D6bVTsIW.js             5.09 kB │ gzip:   2.44 kB │ map:    25.61 kB
+dist/assets/ProductsView-DQ-379rV.js              5.71 kB │ gzip:   2.47 kB │ map:    26.50 kB
+dist/assets/HomeView-B8QXs64j.js                  5.83 kB │ gzip:   2.79 kB │ map:    36.06 kB
+dist/assets/OrdersView-B1zTquVO.js                5.84 kB │ gzip:   2.44 kB │ map:    35.60 kB
+dist/assets/AnalyticsView-D0tWYQm2.js             5.87 kB │ gzip:   2.44 kB │ map:    27.47 kB
+dist/assets/ProductView-DjrbMt7T.js               6.35 kB │ gzip:   2.86 kB │ map:    37.89 kB
+dist/assets/SystemView-BooBLSN-.js                6.45 kB │ gzip:   3.05 kB │ map:    30.04 kB
+dist/assets/StoreLayout-dNRnNAV8.js               6.66 kB │ gzip:   2.85 kB │ map:    37.64 kB
+dist/assets/AfterSalesView-BHji_XzF.js            6.72 kB │ gzip:   3.02 kB │ map:    28.19 kB
+dist/assets/OrderDetailView-e3Z1idBZ.js           8.36 kB │ gzip:   3.06 kB │ map:    39.11 kB
+dist/assets/ApexChart-SOTpuCto.js                 8.79 kB │ gzip:   3.75 kB │ map:    35.28 kB
+dist/assets/CheckoutView-DVAxHpVR.js              8.90 kB │ gzip:   3.63 kB │ map:    45.91 kB
+dist/assets/AfterSalesView-BM_iruZS.js            9.69 kB │ gzip:   3.86 kB │ map:    48.71 kB
+dist/assets/KnowledgeView-DwL8BH24.js             9.93 kB │ gzip:   3.96 kB │ map:    53.75 kB
+dist/assets/OrdersView-BKCxmk-A.js               10.12 kB │ gzip:   3.86 kB │ map:    53.09 kB
+dist/assets/AiWorkspaceView-Bp37C9Nu.js          10.87 kB │ gzip:   4.43 kB │ map:    60.51 kB
+dist/assets/MessageBlocks-CQaojwIL.js            13.60 kB │ gzip:   5.51 kB │ map:    75.17 kB
+dist/assets/index-D_qc7R9p.js                    15.52 kB │ gzip:   5.77 kB │ map:    33.50 kB
+dist/assets/MarketingView-DHHkqriX.js            23.70 kB │ gzip:   6.80 kB │ map:   108.23 kB
+dist/assets/api-CRs0t3qB.js                      24.26 kB │ gzip:   7.91 kB │ map:   109.28 kB
 dist/assets/vendor-BmrtFxKe.js                   79.29 kB │ gzip:  29.96 kB │ map:   466.20 kB
 dist/assets/element-G3pTVDeI.js                 983.73 kB │ gzip: 316.43 kB │ map: 5,246.34 kB
 dist/assets/charts-CXr1f1-c.js                1,083.77 kB │ gzip: 358.27 kB │ map: 5,923.00 kB
 
-✓ built in 9.62s
-[33m[PLUGIN_TIMINGS] [0mPlugin hooks ran for 3.3s of this 9.6s build (35%).
-2 hooks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
-  - vite:css transform (38 calls)
-  - unplugin-vue-components transform (2385 calls)
-See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+✓ built in 4.16s

@@ -9,7 +9,7 @@ passed and its watched paths still match the tested revision.
 |---|---|---|---|---|---|
 | FG-01 | Repository State Audit |  | [artifacts/evidence/final/fg01_repo_state.json](artifacts/evidence/final/fg01_repo_state.json) | MISSING | No proof artifact |
 | FG-02 | Backend Static / Startup Check |  | [artifacts/evidence/build/fg02_backend_static.txt](artifacts/evidence/build/fg02_backend_static.txt) | MISSING | No proof artifact |
-| FG-03 | Frontend Typecheck + Build |  | [artifacts/evidence/build/fg03_frontend_build.txt](artifacts/evidence/build/fg03_frontend_build.txt) | STALE | Watched paths changed since the run |
+| FG-03 | Frontend Typecheck + Build |  | [artifacts/evidence/build/fg03_frontend_build.txt](artifacts/evidence/build/fg03_frontend_build.txt) | PASS | 1 assertions at 0213268 |
 | FG-04 | Docker Build |  | [artifacts/evidence/docker/fg04_docker_build.txt](artifacts/evidence/docker/fg04_docker_build.txt) | MISSING | No proof artifact |
 | FG-05 | Alembic Migration |  | [artifacts/evidence/migration/fg05_alembic.txt](artifacts/evidence/migration/fg05_alembic.txt) | MISSING | No proof artifact |
 | FG-06 | Seed Idempotency |  | [artifacts/evidence/migration/fg06_seed_idempotency.json](artifacts/evidence/migration/fg06_seed_idempotency.json) | MISSING | No proof artifact |
@@ -26,8 +26,8 @@ passed and its watched paths still match the tested revision.
 | FG-17 | RAG Prompt Injection | Yes | [artifacts/evidence/rag/fg17_rag_injection.json](artifacts/evidence/rag/fg17_rag_injection.json) | MISSING | No proof artifact |
 | FG-18 | MCP Authorization / Compatibility | Yes | [artifacts/evidence/mcp/fg18_mcp.json](artifacts/evidence/mcp/fg18_mcp.json) | MISSING | No proof artifact |
 | FG-19 | Object Storage |  | [artifacts/evidence/storage/fg19_storage.json](artifacts/evidence/storage/fg19_storage.json) | MISSING | No proof artifact |
-| FG-20 | Vitest |  | [artifacts/evidence/unit/fg20_vitest.xml](artifacts/evidence/unit/fg20_vitest.xml) | STALE | Watched paths changed since the run |
-| FG-21 | Playwright |  | [artifacts/evidence/e2e/fg21_playwright.json](artifacts/evidence/e2e/fg21_playwright.json) | STALE | Watched paths changed since the run |
+| FG-20 | Vitest |  | [artifacts/evidence/unit/fg20_vitest.xml](artifacts/evidence/unit/fg20_vitest.xml) | PASS | 301 assertions at 0213268 |
+| FG-21 | Playwright |  | [artifacts/evidence/e2e/fg21_playwright.json](artifacts/evidence/e2e/fg21_playwright.json) | PASS | 6 assertions at 0213268 |
 | FG-22 | Flagship E2E | Yes | [artifacts/evidence/agent/fg22_flagship_e2e.json](artifacts/evidence/agent/fg22_flagship_e2e.json) | MISSING | No proof artifact |
 | FG-23 | Health Checks |  | [artifacts/evidence/docker/fg23_health.json](artifacts/evidence/docker/fg23_health.json) | MISSING | No proof artifact |
 | FG-24 | Secret Scan |  | [artifacts/evidence/security/fg24_secret_scan.json](artifacts/evidence/security/fg24_secret_scan.json) | MISSING | No proof artifact |

@@ -6,12 +6,12 @@
     "--reporter=json"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T05:39:19.770941+00:00",
-  "duration_ms": 18200,
+  "timestamp": "2026-09-24T05:55:06.410167+00:00",
+  "duration_ms": 22044,
   "exit_code": 0,
   "git": {
-    "revision": "3db990fc618cda58fec01ba74585f2d146df9a89\n",
-    "subject": "feat(catalog): upload merchant product images to object storage\n",
+    "revision": "02132683d249cdde68e7055a90020a5264af57c0\n",
+    "subject": "test(e2e): exercise customer checkout in browser\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,9 +32,9 @@
   "browser_report": {
     "path": "artifacts\\evidence\\e2e\\fg21_playwright.report.json",
     "stats": {
-      "startTime": "2026-09-24T05:39:22.356Z",
-      "duration": 15569.118,
-      "expected": 5,
+      "startTime": "2026-09-24T05:55:06.920Z",
+      "duration": 21456.858,
+      "expected": 6,
       "skipped": 0,
       "unexpected": 0,
       "flaky": 0
@@ -42,6 +42,12 @@
     "parses": true
   },
   "assertions": [
+    {
+      "name": "checkout previews the server total and sends one order to payment",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
     {
       "name": "consumer store boots and shows the home page",
       "expected": "PASSED",

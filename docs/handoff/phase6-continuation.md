@@ -20,9 +20,10 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Frontend: **301 Vitest cases**, typecheck, lint, and production build pass.
   The coupon increment also passed the targeted MySQL integration and marketing
   tests (**9 passed**). Refresh source-watched gates after the source commit.
-- `FINAL_GATE.md` currently shows **2 PASS, 8 STALE, 16 MISSING**, overall
-  **IN PROGRESS**. The latest coupon changes invalidated eight earlier gate
-  artifacts; FG-11 and FG-13 still match their watched paths. This is an
+- `FINAL_GATE.md` currently shows **5 PASS, 5 STALE, 16 MISSING**, overall
+  **IN PROGRESS**. FG-03, FG-20, and FG-21 were refreshed after the browser
+  checkout commit; FG-11 and FG-13 still match their watched paths. The five
+  backend gates changed by the coupon increment remain stale. This is an
   evidence index, not a claim that the whole product is complete.
 
 ## Functionality added in this continuation

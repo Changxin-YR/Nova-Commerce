@@ -7,12 +7,12 @@
     "--outputFile=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\unit\\fg20_vitest.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T05:39:04.878127+00:00",
-  "duration_ms": 13213,
+  "timestamp": "2026-09-24T05:55:06.402062+00:00",
+  "duration_ms": 15100,
   "exit_code": 0,
   "git": {
-    "revision": "3db990fc618cda58fec01ba74585f2d146df9a89\n",
-    "subject": "feat(catalog): upload merchant product images to object storage\n",
+    "revision": "02132683d249cdde68e7055a90020a5264af57c0\n",
+    "subject": "test(e2e): exercise customer checkout in browser\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
