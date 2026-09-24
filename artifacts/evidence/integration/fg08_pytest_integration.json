@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-24T00:41:26.055091+00:00",
-  "duration_ms": 99200,
+  "timestamp": "2026-09-24T04:59:04.395214+00:00",
+  "duration_ms": 146666,
   "exit_code": 0,
-  "summary": "364 passed, 1 warning in 96.11s (0:01:36)",
+  "summary": "366 passed, 1 warning in 142.90s (0:02:22)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "44df02b2e277d0d94f3ab1bb8c46ade75fbf165f\n",
-    "subject": "feat(catalog): add merchant product administration\n",
+    "revision": "7f54da4d359b87c4ff0890c231fd86515a374030\n",
+    "subject": "feat(analytics): serve merchant metrics from settled commerce data\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,8 +32,12 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 364,
+    "testcase_count": 366,
     "outcomes": [
+      {
+        "name": "test_refund_rate_uses_successful_refund_money",
+        "actual": "PASSED"
+      },
       {
         "name": "test_apply_then_read_back_through_the_frozen_paths",
         "actual": "PASSED"
@@ -144,6 +148,10 @@
       },
       {
         "name": "test_a_refund_requires_a_positive_amount",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_paid_order_drives_all_five_metrics_with_scope_and_permissions",
         "actual": "PASSED"
       },
       {
@@ -1495,6 +1503,12 @@
   },
   "assertions": [
     {
+      "name": "test_refund_rate_uses_successful_refund_money",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
       "name": "test_apply_then_read_back_through_the_frozen_paths",
       "expected": "PASSED",
       "actual": "PASSED",
@@ -1658,6 +1672,12 @@
     },
     {
       "name": "test_a_refund_requires_a_positive_amount",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_paid_order_drives_all_five_metrics_with_scope_and_permissions",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true
