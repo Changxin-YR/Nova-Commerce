@@ -9,17 +9,17 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
   for the current local lead over `origin/main`. No commits from this
   continuation have been pushed.
-- Backend: `python -m pytest tests -q` passed **1162 tests** after the merchant
-  catalog write increment. One upstream
+- Backend: `python -m pytest tests -q` passed **1164 tests** after the Analytics
+  increment. One upstream
   Starlette/AnyIO deprecation warning remains.
   `ruff check --no-cache backend/app backend/tests backend/migrations` passed.
 - Schema: Alembic head is `f0d29969cfb5`; `alembic check` found no drift.
   The coupon amount columns were read back as BIGINT, and all coupon checks,
   indexes, and foreign keys were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
-- Frontend: **299 Vitest cases**, typecheck, lint, and production build pass
-  after aligning catalog, address, and profile IDs with the frozen numeric JSON
-  contract. Refresh FG-03/20/21 after commit.
+- Frontend: **300 Vitest cases**, typecheck, lint, and production build pass.
+  Analytics renders all five declared metric units. Refresh FG-03/20/21 after
+  the source commit.
 - `FINAL_GATE.md` currently shows **10 PASS, 16 MISSING**, overall
   **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
   index, not a claim that the whole product is complete.
@@ -89,6 +89,13 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
     creation, publication, storefront visibility, duplicate SKU rejection,
     unauthorized callers and cross-merchant access. Stock still enters through
     inventory operations; product image upload remains to be implemented.
+13. Phase 6 Analytics now serves the five frozen metric names from committed
+    orders, order-item snapshots, inventory movements, and successful refunds.
+    Every response uses the shared metric/unit/period/series/summary/dimensions
+    shape, merchant staff scope and `analytics:read`. The console requests all
+    five metrics and renders money and rates with their declared units. MySQL
+    tests use a real settled order and a real refund workflow; metric definitions
+    and zero-denominator behavior are in `docs/architecture/ANALYTICS_METRICS.md`.
 
 ## Remaining work, in execution order
 
@@ -96,9 +103,11 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    needs a customer coupon discovery/claim surface; promotion stacking policy
    and quota release on cancellation need explicit business rules before
    extending the first single-promotion implementation.
-2. **Phase 6 Analytics**: backend metric queries and frozen admin API responses
-   are absent. The frontend's marketing/analytics views are present but do not
-   prove their backend paths work.
+2. **Phase 6 Analytics**: the five frozen metric endpoints and console reads are
+   present. The merchant dashboard still needs an HTTP/browser check with
+   representative production-scale data, and the summary comparison convention
+   should be reviewed with business stakeholders before relying on it for
+   external reporting.
 3. **§50 reconciliation**: expired pending actions and knowledge ingestion
    recovery remain. Outbox retry, expired-order closure, and coupon expiry are
    scheduled. The expired-order batch currently stops on a failed order and a
@@ -115,9 +124,9 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 6. **Remote sync**: all continuation commits remain local. Push only after the
    intended branch/review path is settled. Re-run affected evidence after each
    watched source change and regenerate `FINAL_GATE.md` at the end.
-7. **Live route audit**: `create_app().openapi()["paths"]` now lists 64 paths,
-   including auth, addresses, public catalog and merchant product writes.
-   Analytics, knowledge, agent, governance, and audit API routers remain
+7. **Live route audit**: `create_app().openapi()["paths"]` now lists 65 paths,
+   including auth, addresses, catalog, merchant product writes, and Analytics.
+   Knowledge, agent, governance, and audit API routers remain
    absent. The HTTP purchase test reaches payment attempt, but an actual
    browser checkout and payment settlement still need E2E verification.
    `PAYMENT_MOCK_ENABLED` is false in the current dev settings, so the mock-pay
@@ -126,6 +135,6 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 
 ## Next code entry point
 
-Next implement product image upload and a browser checkout case, then Phase 6
-Analytics and the remaining backend modules and gates. Refresh source-watched
+Next implement product image upload and a browser checkout case, then the
+remaining backend modules and gates. Refresh source-watched
 gate artifacts after each source increment and regenerate `FINAL_GATE.md`.

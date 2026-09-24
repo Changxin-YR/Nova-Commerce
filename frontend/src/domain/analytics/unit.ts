@@ -24,13 +24,9 @@ export type AnalyticsDisplay =
   | { kind: 'count'; text: string }
   | { kind: 'ratio'; text: string; percent: number }
 
-/** A ratio is a fraction (0.12 = 12%). Accepts and normalises percentage-style input too. */
-export function ratioToPercent(value: number, options: { assumePercentWhenOverOne?: boolean } = {}): number {
-  const { assumePercentWhenOverOne = true } = options
+/** The API contract defines every ratio as a fraction, including values above one. */
+export function ratioToPercent(value: number): number {
   if (!Number.isFinite(value)) return 0
-  // Guard the common backend slip of returning `12` instead of `0.12`: a rate above 1 is
-  // almost never a fraction, and rendering 1200% would be worse than rendering 12%.
-  if (assumePercentWhenOverOne && Math.abs(value) > 1) return value
   return value * 100
 }
 
@@ -80,16 +76,16 @@ export function unitLabel(unit: AnalyticsUnit): string {
 }
 
 /**
- * The five frozen metrics (§120, §124) with their units.
+ * The five metric names frozen by §8 with their V1 operational units.
  *
- * A metric appearing here with the WRONG unit is the exact failure this map prevents, so it is
- * keyed by the frozen metric name rather than inferred from the response.
+ * A metric appearing here with the wrong unit is the failure this map catches, so it is
+ * keyed by metric name rather than inferred from the response.
  */
 export const METRIC_UNITS: Record<string, AnalyticsUnit> = {
   'sales.gmv': 'minor_currency',
   'sales.order_count': 'count',
-  'inventory.turnover': 'count',
-  'product.performance': 'count',
+  'inventory.turnover': 'ratio',
+  'product.performance': 'minor_currency',
   'refund.rate': 'ratio',
 }
 

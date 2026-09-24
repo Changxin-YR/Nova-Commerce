@@ -81,9 +81,9 @@ describe('formatAnalyticsValue — ratio is a percentage, and the trap is explic
     if (result.kind === 'ratio') expect(result.text).toBe('12.3%')
   })
 
-  it('normalises a percentage-style value (12) to 12% rather than 1200%', () => {
-    expect(ratioToPercent(12)).toBe(12)
-    expect(formatAnalyticsValue(12, 'ratio')).toEqual({ kind: 'ratio', text: '12%', percent: 12 })
+  it('keeps a fraction above one instead of silently rescaling it', () => {
+    expect(ratioToPercent(1.2)).toBe(120)
+    expect(formatAnalyticsValue(1.2, 'ratio')).toEqual({ kind: 'ratio', text: '120%', percent: 120 })
   })
 
   it('treats a value at or below 1 as a fraction', () => {
@@ -98,12 +98,12 @@ describe('formatAnalyticsValue — ratio is a percentage, and the trap is explic
 
 describe('the three units produce three genuinely different renderings', () => {
   it('a single numeric value renders differently per unit', () => {
-    const asMoney = formatAnalyticsValue(100, 'minor_currency')
-    const asCount = formatAnalyticsValue(100, 'count')
-    const asRatio = formatAnalyticsValue(100, 'ratio')
+    const asMoney = formatAnalyticsValue(1, 'minor_currency')
+    const asCount = formatAnalyticsValue(1, 'count')
+    const asRatio = formatAnalyticsValue(1, 'ratio')
 
     expect(asMoney.kind).toBe('money')
-    expect(asCount).toEqual({ kind: 'count', text: '100' })
+    expect(asCount).toEqual({ kind: 'count', text: '1' })
     expect(asRatio).toEqual({ kind: 'ratio', text: '100%', percent: 100 })
     // Same input, three outcomes — this is the whole point of reading `unit`.
     expect(new Set([asMoney.kind, asCount.kind, asRatio.kind]).size).toBe(3)

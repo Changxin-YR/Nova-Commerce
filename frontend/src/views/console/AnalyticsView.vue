@@ -9,7 +9,7 @@
  * FROZEN SHAPE (API_CONTRACT.md §8). The contract returns ONE envelope for EVERY analytics
  * endpoint — `{metric, unit, period, series[{bucket,value}], summary, dimensions[]}` — so this
  * page no longer has three unrelated shapes (`SalesTrend`, `TopProduct[]`, `OrderFunnelStage[]`).
- * It has three envelopes, and the shared `unit` field decides how each number is rendered, so a
+ * It has five envelopes, and the shared `unit` field decides how each number is rendered, so a
  * `ratio` can never be drawn as money.
  */
 import { computed } from 'vue'
@@ -45,6 +45,20 @@ const {
   status: funnelStatus,
   execute: loadFunnel,
 } = useAsyncState(() => analyticsApi.metric('sales.order_count', GRANULARITY), { immediate: true })
+
+const {
+  data: turnover,
+  status: turnoverStatus,
+  error: turnoverError,
+  execute: loadTurnover,
+} = useAsyncState(() => analyticsApi.metric('inventory.turnover', GRANULARITY), { immediate: true })
+
+const {
+  data: refunds,
+  status: refundStatus,
+  error: refundError,
+  execute: loadRefunds,
+} = useAsyncState(() => analyticsApi.metric('refund.rate', GRANULARITY), { immediate: true })
 
 /**
  * Turn an envelope into a ChartSpec.
@@ -94,13 +108,8 @@ const funnelSpec = computed<ChartSpec | null>(() =>
   specFromEnvelope(orderCount.value, { kind: 'bar', title: '订单量趋势' }),
 )
 
-/**
- * Ranked table rows, built from the envelope's OWN pairing of `series[bucket]` and
- * `dimensions[].value`. No invented `TopProduct` shape is needed: the dimension labelled `SKU`
- * (per §8's example) is the row label, and the bucket is the period.
- */
+/** The series is a time trend; the top SKU is separate dimension metadata. */
 interface RankedRow {
-  label: string
   bucket: string
   raw: number
   unit: AnalyticsEnvelope['unit']
@@ -109,14 +118,18 @@ interface RankedRow {
 const rankedRows = computed<RankedRow[]>(() => {
   const envelope = topProducts.value
   if (!envelope) return []
-  const dim = envelope.dimensions?.find((d) => d.key === 'sku_no' || d.key === 'product') ?? envelope.dimensions?.[0]
-  return envelope.series.map((point, index) => ({
-    label: index === 0 ? (dim?.value ?? dim?.label ?? '—') : '—',
+  return envelope.series.map((point) => ({
     bucket: point.bucket,
     raw: point.value,
     unit: envelope.unit,
   }))
 })
+const topSkuLabel = computed(() => topProducts.value?.dimensions?.find((d) => d.key === 'sku_id')?.value)
+
+function nonMoneyText(row: RankedRow): string {
+  const display = formatAnalyticsValue(row.raw, row.unit)
+  return display.kind === 'money' ? '' : display.text
+}
 
 /** Unit-aware summary figure for the headline card. */
 const summaryDisplay = computed(() => {
@@ -124,9 +137,22 @@ const summaryDisplay = computed(() => {
   if (!envelope) return null
   return formatAnalyticsValue(envelope.summary.total, envelope.unit)
 })
+const turnoverText = computed(() => `${(turnover.value?.summary.total ?? 0).toFixed(2)} 次`)
+const refundRateText = computed(() => {
+  const dimensions = refunds.value?.dimensions ?? []
+  const refunded = Number(dimensions.find((item) => item.key === 'refunded_amount')?.value ?? 0)
+  const collected = Number(dimensions.find((item) => item.key === 'collected_amount')?.value ?? 0)
+  if (refunded > 0 && collected === 0) return '无本期入账'
+  const display = formatAnalyticsValue(refunds.value?.summary.total ?? 0, 'ratio')
+  return display.kind === 'ratio' ? display.text : '—'
+})
+const unitWarnings = computed(() => [trend.value, topProducts.value, orderCount.value, turnover.value, refunds.value]
+  .filter((item): item is AnalyticsEnvelope => item !== null && item !== undefined)
+  .map((item) => checkMetricUnit(item.metric, item.unit))
+  .filter((warning): warning is string => warning !== null))
 
 async function refresh(): Promise<void> {
-  await Promise.all([loadTrend(), loadTop(), loadFunnel()])
+  await Promise.all([loadTrend(), loadTop(), loadFunnel(), loadTurnover(), loadRefunds()])
 }
 </script>
 
@@ -135,6 +161,9 @@ async function refresh(): Promise<void> {
     <div class="analytics__head">
       <h2 class="nx-section-title">数据分析</h2>
       <button type="button" class="nx-btn" @click="refresh()">刷新</button>
+    </div>
+    <div v-if="unitWarnings.length" class="nx-card" role="alert">
+      <div class="nx-card__body">{{ unitWarnings.join('；') }}</div>
     </div>
 
     <div class="analytics__total nx-card">
@@ -149,7 +178,29 @@ async function refresh(): Promise<void> {
           <template v-else-if="summaryDisplay">{{ summaryDisplay.text }}</template>
           <template v-else>—</template>
         </p>
+        <p v-if="topSkuLabel" class="nx-muted">销售额最高的 SKU：{{ topSkuLabel }}</p>
       </div>
+    </div>
+
+    <div class="analytics__grid">
+      <section class="nx-card">
+        <div class="nx-card__body">
+          <StateView :state="turnoverStatus" :error="turnoverError" @retry="loadTurnover()">
+            <p class="nx-muted">库存周转</p>
+            <p class="analytics__total-value">{{ turnoverText }}</p>
+            <p class="nx-muted">售出件数 ÷ 期初与期末平均在库件数</p>
+          </StateView>
+        </div>
+      </section>
+      <section class="nx-card">
+        <div class="nx-card__body">
+          <StateView :state="refundStatus" :error="refundError" @retry="loadRefunds()">
+            <p class="nx-muted">退款率</p>
+            <p class="analytics__total-value">{{ refundRateText }}</p>
+            <p class="nx-muted">本期成功退款金额 ÷ 本期入账金额</p>
+          </StateView>
+        </div>
+      </section>
     </div>
 
     <section class="nx-card">
@@ -187,24 +238,23 @@ async function refresh(): Promise<void> {
         <table v-if="rankedRows.length" class="nx-table">
           <thead>
             <tr>
-              <th>指标</th>
               <th>时间桶</th>
               <th style="text-align: right">数值</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(row, index) in rankedRows" :key="index">
-              <td>{{ row.label }}</td>
               <td>{{ row.bucket }}</td>
               <td style="text-align: right">
-                {{ row.raw }}
+                <PriceText v-if="row.unit === 'minor_currency'" :amount="row.raw" size="sm" />
+                <template v-else>{{ nonMoneyText(row) }}</template>
               </td>
             </tr>
           </tbody>
         </table>
         <p v-else class="nx-muted">暂无明细数据。</p>
         <p class="nx-muted analytics__note">
-          数值保持服务端原始精度；单位由响应的 <code>unit</code> 字段决定（金额为整数分，比例为小数）。
+          数值由服务端计算；金额按元显示，比例按百分比显示。
         </p>
       </div>
     </section>
