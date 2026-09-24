@@ -18,10 +18,12 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
   indexes, and foreign keys were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
 - Frontend: **301 Vitest cases**, typecheck, lint, and production build pass.
-  Refresh FG-03/20/21 after the source commit.
-- `FINAL_GATE.md` currently shows **10 PASS, 16 MISSING**, overall
-  **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
-  index, not a claim that the whole product is complete.
+  The coupon increment also passed the targeted MySQL integration and marketing
+  tests (**9 passed**). Refresh source-watched gates after the source commit.
+- `FINAL_GATE.md` currently shows **2 PASS, 8 STALE, 16 MISSING**, overall
+  **IN PROGRESS**. The latest coupon changes invalidated eight earlier gate
+  artifacts; FG-11 and FG-13 still match their watched paths. This is an
+  evidence index, not a claim that the whole product is complete.
 
 ## Functionality added in this continuation
 
