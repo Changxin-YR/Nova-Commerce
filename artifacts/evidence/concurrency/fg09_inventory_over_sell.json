@@ -5,12 +5,12 @@
   "spec": "section 113 - 1 unit of stock, 20 concurrent CreateOrder, exactly 1 succeeds",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/concurrency/test_inventory_oversell.py -v --no-header -p no:cacheprovider -m concurrency or integration",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T23:45:25.968582+00:00",
-  "duration_ms": 3175,
+  "timestamp": "2026-09-24T00:26:59.204114+00:00",
+  "duration_ms": 3245,
   "exit_code": 0,
   "git": {
-    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
-    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
+    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
+    "subject": "feat(api): connect identity and public catalog purchase flow\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -23,7 +23,7 @@
     "other_paths_dirty": false,
     "other_paths_dirty_files": []
   },
-  "summary": "6 passed in 1.43s",
+  "summary": "6 passed in 1.52s",
   "infrastructure": {
     "engine": "MySQL 8.4 (real container, not mocked)",
     "why_real": "The property under test is a database behaviour - SELECT ... FOR UPDATE taking an exclusive row lock, and CHECK (available_qty >= 0) refusing a bad write. Neither exists in a mock, so spec section 113 forbids proving this gate against one."

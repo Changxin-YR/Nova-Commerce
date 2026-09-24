@@ -1,0 +1,223 @@
+{
+  "gate_id": "FG-13",
+  "name": "Auth Session / Refresh Rotation",
+  "mandatory": true,
+  "spec": "REQ-AUTH-002 through REQ-AUTH-006 / sections 22-23: store only refresh hashes, rotate on refresh, revoke on logout, reject expired and reused tokens",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration/identity/test_refresh_rotation.py tests/integration/order/test_identity_http.py -v --no-header -p no:cacheprovider -m integration",
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-24T00:24:44.870586+00:00",
+  "duration_ms": 7963,
+  "exit_code": 0,
+  "summary": "30 passed, 1 warning in 5.31s",
+  "verdict": "PASS",
+  "fail_reasons": [],
+  "git": {
+    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
+    "subject": "feat(api): connect identity and public catalog purchase flow\n",
+    "relevant_paths": [
+      "backend/app/core",
+      "backend/app/api",
+      "backend/app/main.py",
+      "backend/app/modules/identity",
+      "backend/app/shared",
+      "backend/migrations",
+      "backend/tests/integration/identity",
+      "backend/tests/integration/order/test_identity_http.py",
+      "backend/tests/integration/order/conftest.py",
+      "scripts/emit_fg13_evidence.py",
+      "scripts/gate_evidence.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "infrastructure": {
+    "engine": "MySQL 8.4 (real container, not mocked)",
+    "why_real": "Session rotation depends on committed rows, hash uniqueness, and revocation state. HTTP tests also verify the refresh cookie and owner-scoped routes."
+  },
+  "junit_report": null,
+  "assertions": [
+    {
+      "name": "test_login_returns_a_usable_pair",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_only_the_refresh_hash_is_persisted",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_rotation_issues_a_new_pair_and_revokes_the_old_session",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_rotated_token_is_no_longer_accepted",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_rotation_can_be_chained_repeatedly",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_reuse_outside_the_grace_window_revokes_the_whole_family",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_reuse_inside_the_grace_window_is_tolerated",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_reuse_of_an_admin_revoked_session_is_never_tolerated",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_unknown_refresh_token_is_rejected_without_revoking_anything",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_empty_refresh_token_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_expired_refresh_token_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_logout_revokes_the_session_and_its_family",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_logout_is_idempotent",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_logout_all_spares_a_nominated_session",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_revoke_session_refuses_another_users_session",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_password_change_revokes_every_session",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_password_change_requires_the_current_password",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_login_rejects_a_wrong_password_without_revealing_which_part_failed",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_account_locks_after_the_configured_number_of_failures",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_successful_login_resets_the_failure_counter",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_disabled_account_cannot_log_in",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_login_by_email_and_username_both_work",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_username_lookup_is_case_insensitive",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_consumer_defaults_to_self_scope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_staff_without_a_role_gets_no_scope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_role_grants_permissions_and_widens_scope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_scope_guard_blocks_cross_user_access",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_expired_sessions_are_cleanable",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_refresh_cookie_rotates_and_logout_revokes",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_address_routes_enforce_owner_scope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "stderr_tail": ""
+}

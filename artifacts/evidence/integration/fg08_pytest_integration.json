@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-23T23:43:52.642492+00:00",
-  "duration_ms": 86023,
+  "timestamp": "2026-09-24T00:25:21.712723+00:00",
+  "duration_ms": 97048,
   "exit_code": 0,
-  "summary": "358 passed, 1 warning in 83.58s (0:01:23)",
+  "summary": "362 passed, 1 warning in 93.99s (0:01:33)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
-    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
+    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
+    "subject": "feat(api): connect identity and public catalog purchase flow\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 358,
+    "testcase_count": 362,
     "outcomes": [
       {
         "name": "test_apply_then_read_back_through_the_frozen_paths",
@@ -440,6 +440,10 @@
       },
       {
         "name": "test_expired_sessions_are_cleanable",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_published_search_detail_and_unpublish_visibility",
         "actual": "PASSED"
       },
       {
@@ -991,6 +995,14 @@
         "actual": "PASSED"
       },
       {
+        "name": "test_refresh_cookie_rotates_and_logout_revokes",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_address_routes_enforce_owner_scope",
+        "actual": "PASSED"
+      },
+      {
         "name": "test_a_percent_promotion_allocates_exactly_and_the_remainder_lands_last",
         "actual": "PASSED"
       },
@@ -1064,6 +1076,10 @@
       },
       {
         "name": "test_promotion_http_preview_create_and_task_routes",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_buyer_can_place_an_order_from_published_sku",
         "actual": "PASSED"
       },
       {
@@ -2083,6 +2099,12 @@
       "pass": true
     },
     {
+      "name": "test_published_search_detail_and_unpublish_visibility",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
       "name": "test_create_persists_an_order_a_line_and_one_status_log",
       "expected": "PASSED",
       "actual": "PASSED",
@@ -2905,6 +2927,18 @@
       "pass": true
     },
     {
+      "name": "test_refresh_cookie_rotates_and_logout_revokes",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_address_routes_enforce_owner_scope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
       "name": "test_a_percent_promotion_allocates_exactly_and_the_remainder_lands_last",
       "expected": "PASSED",
       "actual": "PASSED",
@@ -3014,6 +3048,12 @@
     },
     {
       "name": "test_promotion_http_preview_create_and_task_routes",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_buyer_can_place_an_order_from_published_sku",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

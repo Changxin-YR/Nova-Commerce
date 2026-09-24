@@ -20,7 +20,7 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Frontend: **299 Vitest cases**, typecheck, lint, and production build pass
   after aligning catalog, address, and profile IDs with the frozen numeric JSON
   contract. Refresh FG-03/20/21 after commit.
-- `FINAL_GATE.md` currently shows **9 PASS, 17 MISSING**, overall
+- `FINAL_GATE.md` currently shows **10 PASS, 16 MISSING**, overall
   **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
   index, not a claim that the whole product is complete.
 
@@ -102,8 +102,8 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    `PENDING_PAYMENT` order before the expiry worker closes it. Decide the late
    provider-settlement policy with a reconciliation/refund path before changing
    callback behavior, since provider money may already have moved.
-5. **Project gates**: 17 of 26 artifacts are still missing, including mandatory
-   FG-13–15, FG-17–18, FG-22 and FG-26. Phase 7–16 features and flagship E2E
+5. **Project gates**: 16 of 26 artifacts are still missing, including mandatory
+   FG-14–15, FG-17–18, FG-22 and FG-26. Phase 7–16 features and flagship E2E
    are not complete. `mypy app` reports 85 errors in 20 files; no
    type-clean claim has been made.
 6. **Remote sync**: all continuation commits remain local. Push only after the
@@ -120,6 +120,6 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 
 ## Next code entry point
 
-After the source commit, refresh the source-watched gate artifacts and regenerate
-`FINAL_GATE.md`. Next implement merchant catalog writes and a browser checkout
-case, then Phase 6 Analytics and the remaining backend modules and gates.
+Next implement merchant catalog writes and a browser checkout case, then Phase 6
+Analytics and the remaining backend modules and gates. Refresh source-watched
+gate artifacts after each source increment and regenerate `FINAL_GATE.md`.

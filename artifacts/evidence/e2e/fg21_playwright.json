@@ -6,12 +6,12 @@
     "--reporter=json"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-23T23:46:47.542214+00:00",
-  "duration_ms": 8589,
+  "timestamp": "2026-09-24T00:25:31.591180+00:00",
+  "duration_ms": 8024,
   "exit_code": 0,
   "git": {
-    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
-    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
+    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
+    "subject": "feat(api): connect identity and public catalog purchase flow\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,8 +32,8 @@
   "browser_report": {
     "path": "artifacts\\evidence\\e2e\\fg21_playwright.report.json",
     "stats": {
-      "startTime": "2026-09-23T23:46:49.183Z",
-      "duration": 6916.606000000001,
+      "startTime": "2026-09-24T00:25:32.096Z",
+      "duration": 7476.656,
       "expected": 5,
       "skipped": 0,
       "unexpected": 0,

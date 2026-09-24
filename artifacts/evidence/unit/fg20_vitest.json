@@ -7,12 +7,12 @@
     "--outputFile=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\unit\\fg20_vitest.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-23T23:46:39.496464+00:00",
-  "duration_ms": 6602,
+  "timestamp": "2026-09-24T00:25:23.748608+00:00",
+  "duration_ms": 7228,
   "exit_code": 0,
   "git": {
-    "revision": "0cb7483c51d316312e837acecd13a17e39451038\n",
-    "subject": "feat(marketing): complete coupon lifecycle and checkout contract\n",
+    "revision": "bac5deab55a09277e39eb9206e58a534b44caf16\n",
+    "subject": "feat(api): connect identity and public catalog purchase flow\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,7 +32,7 @@
   "junit_report": {
     "path": "artifacts\\evidence\\unit\\fg20_vitest.xml",
     "parses": true,
-    "testcase_count": 294
+    "testcase_count": 299
   },
   "browser_report": null,
   "assertions": [
@@ -134,6 +134,12 @@
     },
     {
       "name": "NovaHttpClient single-flight refresh > refreshes ONCE for N concurrent 401s and replays every request",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "NovaHttpClient single-flight refresh > rotates through the HttpOnly cookie without sending a refresh token in JSON",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true
@@ -1513,6 +1519,24 @@
       "pass": true
     },
     {
+      "name": "local cart selection (§14.1) > persists SKU and quantity without a cached price",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "local cart selection (§14.1) > isolates signed-in users and discards malformed browser rows",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "local cart selection (§14.1) > routes preview and create to the frozen order API",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
       "name": "frontend/backend contract drift > mirrors every backend ErrorCode name and value",
       "expected": "PASSED",
       "actual": "PASSED",
@@ -1790,6 +1814,12 @@
     },
     {
       "name": "checkout sends server-owned order inputs > creates an order with the same business inputs and one idempotency value",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "product detail uses numeric catalog SKU IDs > selects and stores a published SKU from the API response",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true
