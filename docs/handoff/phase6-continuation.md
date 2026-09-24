@@ -107,6 +107,11 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
     from a new storefront page. The query checks publication, remaining quota,
     expiry, and each customer's claim limit; a MySQL HTTP test proves the list
     changes after a claim. The page also shows owned coupon status.
+16. Playwright now drives the checkout page with controlled API responses: it
+    selects a coupon, checks the server-supplied payable amount, submits exactly
+    one order with matching header/body idempotency keys, creates one payment,
+    and reaches the payment page. All six browser cases pass. This exercises
+    the browser flow; the API responses in this case are fixtures.
 
 ## Remaining work, in execution order
 
@@ -142,10 +147,11 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    browser checkout and payment settlement still need E2E verification.
    `PAYMENT_MOCK_ENABLED` is false in the current dev settings, so the mock-pay
    button cannot settle a payment in this environment until the demo profile
-   explicitly enables it.
+   explicitly enables it. The browser checkout case uses controlled API
+   responses and does not prove live settlement.
 
 ## Next code entry point
 
-Next implement a browser checkout case, then the remaining backend modules and
-gates. Refresh source-watched
-gate artifacts after each source increment and regenerate `FINAL_GATE.md`.
+Next implement the remaining backend modules and gates, then verify live browser
+checkout and settlement with seeded data. Refresh source-watched gate artifacts
+after each source increment and regenerate `FINAL_GATE.md`.
