@@ -6,12 +6,12 @@
     "--reporter=json"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T05:55:06.410167+00:00",
-  "duration_ms": 22044,
+  "timestamp": "2026-09-24T23:34:38.558603+00:00",
+  "duration_ms": 19167,
   "exit_code": 0,
   "git": {
-    "revision": "02132683d249cdde68e7055a90020a5264af57c0\n",
-    "subject": "test(e2e): exercise customer checkout in browser\n",
+    "revision": "2b595a4f5430f16ab6e930f9ea6ec61260157cff\n",
+    "subject": "feat: complete phase6 commerce agent and governance flows\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,9 +32,9 @@
   "browser_report": {
     "path": "artifacts\\evidence\\e2e\\fg21_playwright.report.json",
     "stats": {
-      "startTime": "2026-09-24T05:55:06.920Z",
-      "duration": 21456.858,
-      "expected": 6,
+      "startTime": "2026-09-24T23:34:39.003Z",
+      "duration": 18702.459,
+      "expected": 7,
       "skipped": 0,
       "unexpected": 0,
       "flaky": 0
@@ -44,6 +44,12 @@
   "assertions": [
     {
       "name": "checkout previews the server total and sends one order to payment",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "real browser payment persists all seven transaction facts once",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

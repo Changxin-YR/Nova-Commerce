@@ -7,12 +7,12 @@
     "--outputFile=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\unit\\fg20_vitest.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T05:55:06.402062+00:00",
-  "duration_ms": 15100,
+  "timestamp": "2026-09-24T23:34:38.357348+00:00",
+  "duration_ms": 7597,
   "exit_code": 0,
   "git": {
-    "revision": "02132683d249cdde68e7055a90020a5264af57c0\n",
-    "subject": "test(e2e): exercise customer checkout in browser\n",
+    "revision": "2b595a4f5430f16ab6e930f9ea6ec61260157cff\n",
+    "subject": "feat: complete phase6 commerce agent and governance flows\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",

@@ -18,7 +18,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 6
+      "actualWorkers": 7
     },
     "preserveOutput": "always",
     "projects": [
@@ -27,7 +27,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 6
+          "actualWorkers": 7
         },
         "id": "chromium",
         "name": "chromium",
@@ -85,12 +85,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 6369,
+                  "duration": 3355,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-09-24T05:55:15.026Z",
+                  "startTime": "2026-09-24T23:34:43.887Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -101,6 +101,48 @@
           "id": "25ab1bfc84c57e3e3a45-aa07ac120480d31c3dd5",
           "file": "checkout.spec.ts",
           "line": 11,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "payment-real.spec.ts",
+      "file": "payment-real.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real browser payment persists all seven transaction facts once",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 11734,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-24T23:34:43.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e530c0850888b4a83ddc-02dcd1b76be94b91acae",
+          "file": "payment-real.spec.ts",
+          "line": 15,
           "column": 1
         }
       ]
@@ -131,15 +173,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 5183,
+                      "duration": 3188,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T05:55:14.989Z",
+                      "startTime": "2026-09-24T23:34:43.926Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -165,15 +207,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 6061,
+                      "duration": 3321,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T05:55:14.992Z",
+                      "startTime": "2026-09-24T23:34:43.954Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -199,15 +241,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 4586,
+                      "duration": 2620,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T05:55:15.108Z",
+                      "startTime": "2026-09-24T23:34:43.806Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -233,15 +275,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 4586,
+                      "duration": 2575,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T05:55:14.933Z",
+                      "startTime": "2026-09-24T23:34:43.830Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -267,15 +309,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 6,
+                      "parallelIndex": 6,
                       "status": "passed",
-                      "duration": 5346,
+                      "duration": 3183,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T05:55:14.997Z",
+                      "startTime": "2026-09-24T23:34:44.011Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -295,9 +337,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-09-24T05:55:06.920Z",
-    "duration": 21456.858,
-    "expected": 6,
+    "startTime": "2026-09-24T23:34:39.003Z",
+    "duration": 18702.459,
+    "expected": 7,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
