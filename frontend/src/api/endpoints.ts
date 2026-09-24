@@ -133,6 +133,7 @@ export const API = {
   marketing: {
     coupons: '/marketing/coupons',
     myCoupons: '/marketing/coupons/mine',
+    availableCoupons: '/marketing/coupons/available',
     claim: (couponId: string) => `/marketing/coupons/${couponId}/claim`,
     promotions: '/marketing/promotions',
     adminCoupons: '/marketing/admin/coupons',

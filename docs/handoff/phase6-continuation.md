@@ -101,13 +101,17 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
     transaction. The storefront returns a signed image URL. A real MySQL/MinIO
     HTTP test checks bytes, metadata, permissions and storefront visibility.
     A frontend control uploads the chosen file and refreshes the product list.
+15. Customers can browse coupon templates they can still claim and claim them
+    from a new storefront page. The query checks publication, remaining quota,
+    expiry, and each customer's claim limit; a MySQL HTTP test proves the list
+    changes after a claim. The page also shows owned coupon status.
 
 ## Remaining work, in execution order
 
-1. **Phase 6 Marketing**: coupon core is implemented. The storefront still
-   needs a customer coupon discovery/claim surface; promotion stacking policy
-   and quota release on cancellation need explicit business rules before
-   extending the first single-promotion implementation.
+1. **Phase 6 Marketing**: coupon creation, discovery, claim and order lifecycle
+   are implemented. Promotion stacking policy and quota release on cancellation
+   need explicit business rules before extending the first single-promotion
+   implementation.
 2. **Phase 6 Analytics**: the five frozen metric endpoints and console reads are
    present. The merchant dashboard still needs an HTTP/browser check with
    representative production-scale data, and the summary comparison convention

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -253,6 +253,38 @@ class CouponService:
         ).scalar_one())
         rows = list(self._session.execute(
             select(CouponTemplate).where(predicate)
+            .order_by(CouponTemplate.created_at.desc(), CouponTemplate.id.desc())
+            .limit(page_size).offset((page - 1) * page_size)
+        ).scalars())
+        return rows, total
+
+    def available(
+        self, *, principal: Principal, page: int, page_size: int,
+    ) -> tuple[list[CouponTemplate], int]:
+        """Only templates this customer can still claim at the time of reading."""
+        if principal.is_staff:
+            raise PermissionDeniedError("coupon discovery requires a customer account")
+        now = utc_now()
+        owned_count = (
+            select(func.count(UserCoupon.id))
+            .where(
+                UserCoupon.template_id == CouponTemplate.id,
+                UserCoupon.user_id == principal.user_id,
+            )
+            .correlate(CouponTemplate)
+            .scalar_subquery()
+        )
+        filters = (
+            CouponTemplate.status == "ACTIVE",
+            CouponTemplate.issued_count < CouponTemplate.total_quota,
+            or_(CouponTemplate.validity_type == "RELATIVE", CouponTemplate.valid_to > now),
+            owned_count < CouponTemplate.per_user_limit,
+        )
+        total = int(self._session.execute(
+            select(func.count()).select_from(CouponTemplate).where(*filters)
+        ).scalar_one())
+        rows = list(self._session.execute(
+            select(CouponTemplate).where(*filters)
             .order_by(CouponTemplate.created_at.desc(), CouponTemplate.id.desc())
             .limit(page_size).offset((page - 1) * page_size)
         ).scalars())

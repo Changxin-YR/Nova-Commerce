@@ -41,6 +41,7 @@ const status = computed(() => (auth.user ? 'success' : auth.loading ? 'loading' 
               <RouterLink :to="{ name: 'orders' }" class="nx-btn">我的订单</RouterLink>
               <RouterLink :to="{ name: 'after-sales' }" class="nx-btn">售后申请</RouterLink>
               <RouterLink :to="{ name: 'addresses' }" class="nx-btn">收货地址</RouterLink>
+              <RouterLink :to="{ name: 'coupons' }" class="nx-btn">优惠券</RouterLink>
               <RouterLink :to="{ name: 'ai-assistant' }" class="nx-btn">AI 助手</RouterLink>
             </div>
             <p class="nx-muted profile__note">

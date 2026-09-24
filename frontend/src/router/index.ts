@@ -101,6 +101,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '收货地址', requiresAuth: true },
       },
       {
+        path: 'coupons',
+        name: 'coupons',
+        component: () => import('@/views/consumer/CouponsView.vue'),
+        meta: { title: '优惠券', requiresAuth: true },
+      },
+      {
         path: 'assistant',
         name: 'ai-assistant',
         component: () => import('@/views/consumer/AssistantView.vue'),

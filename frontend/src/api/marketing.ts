@@ -60,6 +60,10 @@ export type PromotionDraft = Omit<
 export type PromotionCreatePayload = PromotionDraft & { preview_token: string }
 
 export const marketingApi = {
+  async availableCoupons(query: PageQuery = {}): Promise<Paged<CouponTemplate>> {
+    return httpClient.get<Paged<CouponTemplate>>(API.marketing.availableCoupons, { params: query })
+  },
+
   async myCoupons(): Promise<OwnedCoupon[]> {
     return httpClient.get<OwnedCoupon[]>(API.marketing.myCoupons)
   },

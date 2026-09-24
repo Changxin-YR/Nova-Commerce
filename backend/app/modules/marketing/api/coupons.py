@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.errors import PermissionDeniedError, envelope
@@ -12,6 +12,7 @@ from app.modules.identity.dependencies import ConsolePrincipal, CurrentPrincipal
 from app.modules.marketing.coupon_schemas import CouponCreate, CouponDraft
 from app.modules.marketing.coupon_service import CouponService
 from app.modules.marketing.models import CouponTemplate, UserCoupon
+from app.modules.order.schemas import page_meta
 from app.shared.db.session import get_session
 
 router = APIRouter()
@@ -85,6 +86,22 @@ def claim_coupon(template_id: int, principal: CurrentPrincipal, session: Session
         raise PermissionDeniedError("coupon claims require a customer account")
     row = CouponService(session).claim(principal=principal, template_id=template_id)
     return envelope(data=user_coupon_data(row))
+
+
+@router.get("/coupons/available", summary="Browse claimable coupon templates")
+def available_coupons(
+    principal: CurrentPrincipal,
+    session: SessionDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> dict:
+    rows, total = CouponService(session).available(
+        principal=principal, page=page, page_size=page_size,
+    )
+    return envelope(data={
+        "items": [template_data(row) for row in rows],
+        "meta": page_meta(page=page, page_size=page_size, total=total).model_dump(),
+    })
 
 
 @router.get("/coupons/mine", summary="List coupons owned by the current customer")

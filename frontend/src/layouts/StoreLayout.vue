@@ -193,6 +193,7 @@ function goToConsole(): void {
           <RouterLink :to="{ name: 'search' }" class="catbar__link">全部商品</RouterLink>
           <RouterLink :to="{ name: 'ai-assistant' }" class="catbar__link">AI 助手</RouterLink>
           <RouterLink :to="{ name: 'orders' }" class="catbar__link">我的订单</RouterLink>
+          <RouterLink :to="{ name: 'coupons' }" class="catbar__link">优惠券</RouterLink>
           <RouterLink :to="{ name: 'after-sales' }" class="catbar__link">售后服务</RouterLink>
         </nav>
       </div>
