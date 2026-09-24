@@ -31,7 +31,7 @@ const {
   { immediate: true },
 )
 
-const results = computed(() => productData.value ?? [])
+const results = computed(() => productData.value?.items ?? [])
 
 watch(
   () => route.query.q,

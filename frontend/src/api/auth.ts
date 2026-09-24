@@ -15,15 +15,12 @@ import type {
   LoginResponse,
   PermissionResponse,
 } from '@/types/api-contract'
-import type { Address } from '@/types/domain'
+import type { Address, Paged } from '@/types/domain'
 
 export const authApi = {
   async login(payload: LoginRequest): Promise<LoginResponse> {
     const result = await httpClient.post<LoginResponse>(API.auth.login, payload)
-    setTokens({
-      accessToken: result.access_token,
-      refreshToken: result.refresh_token,
-    })
+    setTokens({ accessToken: result.access_token })
     return result
   },
 
@@ -42,23 +39,23 @@ export const authApi = {
 }
 
 export const addressApi = {
-  async list(): Promise<Address[]> {
-    return httpClient.get<Address[]>(API.addresses.list)
+  async list(): Promise<Paged<Address>> {
+    return httpClient.get<Paged<Address>>(API.addresses.list)
   },
 
   async create(payload: AddressPayload): Promise<Address> {
     return httpClient.post<Address>(API.addresses.create, payload)
   },
 
-  async update(id: string, payload: Partial<AddressPayload>): Promise<Address> {
+  async update(id: number, payload: Partial<AddressPayload>): Promise<Address> {
     return httpClient.put<Address>(API.addresses.update(id), payload)
   },
 
-  async remove(id: string): Promise<void> {
+  async remove(id: number): Promise<void> {
     await httpClient.delete<void>(API.addresses.remove(id))
   },
 
-  async setDefault(id: string): Promise<Address> {
+  async setDefault(id: number): Promise<Address> {
     return httpClient.post<Address>(API.addresses.setDefault(id), {})
   },
 }

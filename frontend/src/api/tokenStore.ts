@@ -1,8 +1,8 @@
 /**
  * Token storage for the HTTP client.
  *
- * Tokens are kept in an in-memory slot (the source of truth for a running tab)
- * and mirrored into `localStorage` so a page reload does not log the user out.
+ * The short-lived access token is mirrored into localStorage for reloads. The
+ * refresh token is an HttpOnly cookie and is never readable by JavaScript (§23).
  *
  * The auth store is the only writer. The client reads through this module so that
  * `src/api/client.ts` stays free of Pinia imports — Pinia cannot be touched from
@@ -14,11 +14,9 @@ import { STORAGE_KEYS } from '@/config/constants'
 
 export interface TokenPair {
   accessToken: string
-  refreshToken: string
 }
 
 let accessToken = ''
-let refreshToken = ''
 
 /** Called when the client concludes the session is unrecoverable. */
 type SessionExpiredListener = () => void
@@ -30,23 +28,21 @@ export function setTokens(pair: Partial<TokenPair> | null): void {
     return
   }
   if (typeof pair.accessToken === 'string') accessToken = pair.accessToken
-  if (typeof pair.refreshToken === 'string') refreshToken = pair.refreshToken
   persist()
 }
 
 export function getAccessToken(): string {
+  try {
+    globalThis.localStorage?.removeItem(STORAGE_KEYS.refreshToken)
+  } catch {
+    // Legacy browser state may be inaccessible; access-token reads still work.
+  }
   if (!accessToken) accessToken = read(STORAGE_KEYS.accessToken)
   return accessToken
 }
 
-export function getRefreshToken(): string {
-  if (!refreshToken) refreshToken = read(STORAGE_KEYS.refreshToken)
-  return refreshToken
-}
-
 export function clearTokens(): void {
   accessToken = ''
-  refreshToken = ''
   try {
     globalThis.localStorage?.removeItem(STORAGE_KEYS.accessToken)
     globalThis.localStorage?.removeItem(STORAGE_KEYS.refreshToken)
@@ -56,7 +52,7 @@ export function clearTokens(): void {
 }
 
 export function hasSession(): boolean {
-  return Boolean(getAccessToken() || getRefreshToken())
+  return Boolean(getAccessToken())
 }
 
 export function onSessionExpired(listener: SessionExpiredListener): () => void {
@@ -78,14 +74,13 @@ export function emitSessionExpired(): void {
 /** Test seam: reset module-level state between specs. */
 export function __resetTokenStoreForTests(): void {
   accessToken = ''
-  refreshToken = ''
   sessionExpiredListeners.clear()
 }
 
 function persist(): void {
   try {
     globalThis.localStorage?.setItem(STORAGE_KEYS.accessToken, accessToken)
-    globalThis.localStorage?.setItem(STORAGE_KEYS.refreshToken, refreshToken)
+    globalThis.localStorage?.removeItem(STORAGE_KEYS.refreshToken)
   } catch {
     // Private mode / quota exceeded: the tab still works until it is reloaded.
   }

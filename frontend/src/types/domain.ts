@@ -132,29 +132,29 @@ export interface Money {
 }
 
 export interface ImageRef {
-  id: string
+  id: number
   url: string
   alt?: string
   sort_order?: number
 }
 
 export interface Category {
-  id: string
+  id: number
   name: string
-  parent_id: string | null
+  parent_id: number | null
   level: number
   sort_order?: number
 }
 
 export interface Brand {
-  id: string
+  id: number
   name: string
   logo_url?: string
 }
 
 export interface Sku {
-  id: string
-  product_id: string
+  id: number
+  product_id: number
   sku_code: string
   /** e.g. {"color":"深空黑","storage":"256GB"} */
   specs: Record<string, string>
@@ -168,7 +168,7 @@ export interface Sku {
 }
 
 export interface Product {
-  id: string
+  id: number
   title: string
   subtitle?: string
   brand?: Brand
@@ -190,7 +190,7 @@ export interface Product {
 }
 
 export interface ProductSummary {
-  id: string
+  id: number
   title: string
   cover_url?: string
   /** Integer minor units. */
@@ -224,7 +224,7 @@ export interface Cart {
 }
 
 export interface Address {
-  id: string
+  id: number
   receiver_name: string
   receiver_phone: string
   province: string

@@ -79,18 +79,20 @@ describe('NovaHttpClient single-flight refresh', () => {
   let resolveRefresh: (() => void) | null = null
 
   beforeEach(() => {
+    localStorage.clear()
     __resetTokenStoreForTests()
     refreshCalls = 0
     resolveRefresh = null
   })
 
   afterEach(() => {
+    localStorage.clear()
     __resetTokenStoreForTests()
     vi.restoreAllMocks()
   })
 
   it('refreshes ONCE for N concurrent 401s and replays every request', async () => {
-    setTokens({ accessToken: 'stale-token', refreshToken: 'refresh-1' })
+    setTokens({ accessToken: 'stale-token' })
     const { adapter, calls } = makeAdapter({ failFirstWith401: true })
 
     const refreshHandler = vi.fn(
@@ -98,7 +100,7 @@ describe('NovaHttpClient single-flight refresh', () => {
         new Promise<void>((resolve) => {
           refreshCalls += 1
           resolveRefresh = () => {
-            setTokens({ accessToken: 'fresh-token', refreshToken: 'refresh-2' })
+            setTokens({ accessToken: 'fresh-token' })
             resolve()
           }
         }),
@@ -136,8 +138,34 @@ describe('NovaHttpClient single-flight refresh', () => {
     expect(retried).toHaveLength(5)
   })
 
+  it('rotates through the HttpOnly cookie without sending a refresh token in JSON', async () => {
+    localStorage.setItem('nova.refresh_token', 'legacy-value')
+    setTokens({ accessToken: 'stale-token' })
+    const observed: { url: string; data: unknown; withCredentials: boolean | undefined }[] = []
+    const client = new NovaHttpClient()
+    client.axios.defaults.adapter = async (config) => {
+      observed.push({ url: String(config.url), data: config.data, withCredentials: config.withCredentials })
+      if (config.url === '/auth/refresh') {
+        return okResponse(config, { access_token: 'fresh-token' })
+      }
+      if (config.headers.get('Authorization') === 'Bearer stale-token') {
+        const response = unauthorizedResponse(config)
+        throw Object.assign(new Error('401'), {
+          isAxiosError: true, config, response, toJSON: () => ({}),
+        })
+      }
+      return okResponse(config, { ok: true })
+    }
+
+    expect(await client.get<{ ok: boolean }>('/orders')).toEqual({ ok: true })
+    expect(observed.find((call) => call.url === '/auth/refresh')).toEqual({
+      url: '/auth/refresh', data: undefined, withCredentials: true,
+    })
+    expect(localStorage.getItem('nova.refresh_token')).toBeNull()
+  })
+
   it('does not refresh when the request succeeds', async () => {
-    setTokens({ accessToken: 'good-token', refreshToken: 'refresh-1' })
+    setTokens({ accessToken: 'good-token' })
     const { adapter } = makeAdapter({ failFirstWith401: true })
     const refreshHandler = vi.fn(() => Promise.resolve())
 
@@ -150,7 +178,7 @@ describe('NovaHttpClient single-flight refresh', () => {
   })
 
   it('allows a SECOND refresh after the first one settled (promise is not cached)', async () => {
-    setTokens({ accessToken: 'stale-token', refreshToken: 'refresh-1' })
+    setTokens({ accessToken: 'stale-token' })
     const { adapter } = makeAdapter({ failFirstWith401: true })
     const refreshHandler = vi.fn(async () => {
       setTokens({ accessToken: 'fresh-token' })
@@ -169,7 +197,7 @@ describe('NovaHttpClient single-flight refresh', () => {
   })
 
   it('fails fast without looping when the retry also returns 401', async () => {
-    setTokens({ accessToken: 'stale-token', refreshToken: 'refresh-1' })
+    setTokens({ accessToken: 'stale-token' })
     const { adapter, calls } = makeAdapter({ failFirstWith401: true })
     // Refresh "succeeds" but hands back a token the server still rejects.
     const refreshHandler = vi.fn(async () => {
@@ -200,7 +228,7 @@ describe('NovaHttpClient single-flight refresh', () => {
   })
 
   it('clears the session only when the refresh itself fails', async () => {
-    setTokens({ accessToken: 'stale-token', refreshToken: 'refresh-1' })
+    setTokens({ accessToken: 'stale-token' })
     const { adapter } = makeAdapter({ failFirstWith401: true })
     const onSessionExpired = vi.fn()
     const refreshHandler = vi.fn(async () => {

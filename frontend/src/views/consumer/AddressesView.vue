@@ -20,9 +20,9 @@ const {
   execute,
 } = useAsyncState(() => addressApi.list(), { immediate: true })
 
-const addresses = computed(() => addressData.value ?? [])
+const addresses = computed(() => addressData.value?.items ?? [])
 const busy = ref(false)
-const editingId = ref('')
+const editingId = ref<number | null>(null)
 const formOpen = ref(false)
 
 const blank: AddressPayload = {
@@ -34,18 +34,18 @@ const blank: AddressPayload = {
   detail: '',
   postal_code: '',
   is_default: false,
-  tag: '',
+  tag: 'HOME',
 }
 
 const form = reactive<AddressPayload>({ ...blank })
 
 function resetForm(): void {
   Object.assign(form, blank)
-  editingId.value = ''
+  editingId.value = null
   formOpen.value = false
 }
 
-function startEdit(id: string): void {
+function startEdit(id: number): void {
   const address = addresses.value.find((item) => item.id === id)
   if (!address) return
   editingId.value = id
@@ -59,14 +59,14 @@ function startEdit(id: string): void {
     detail: address.detail,
     postal_code: address.postal_code ?? '',
     is_default: address.is_default,
-    tag: address.tag ?? '',
+    tag: address.tag ?? 'HOME',
   })
 }
 
 async function submit(): Promise<void> {
   busy.value = true
   try {
-    if (editingId.value) {
+    if (editingId.value !== null) {
       await addressApi.update(editingId.value, { ...form })
       notifications.success('地址已更新')
     } else {
@@ -83,7 +83,7 @@ async function submit(): Promise<void> {
   }
 }
 
-async function remove(id: string): Promise<void> {
+async function remove(id: number): Promise<void> {
   busy.value = true
   try {
     await addressApi.remove(id)
@@ -97,7 +97,7 @@ async function remove(id: string): Promise<void> {
   }
 }
 
-async function setDefault(id: string): Promise<void> {
+async function setDefault(id: number): Promise<void> {
   busy.value = true
   try {
     await addressApi.setDefault(id)

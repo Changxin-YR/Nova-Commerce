@@ -18,7 +18,6 @@ export { normalizeError, messageForCode, isApiEnvelope } from '@/api/error'
 export {
   clearTokens,
   getAccessToken,
-  getRefreshToken,
   hasSession,
   onSessionExpired,
   setTokens,

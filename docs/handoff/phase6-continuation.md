@@ -9,17 +9,17 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 - Worktree: `main`; use `git log -1 --oneline` for HEAD and `git status -sb`
   for the current local lead over `origin/main`. No commits from this
   continuation have been pushed.
-- Backend: `python -m pytest tests -q` from `backend/` passed **1156 tests**;
-  the eight coupon integration tests passed again after the last service changes.
-  One upstream Starlette/AnyIO deprecation warning remains.
+- Backend: `python -m pytest tests -q` passed **1160 tests** after the public
+  catalog, HTTP purchase, and paged owner-address increment. One upstream
+  Starlette/AnyIO deprecation warning remains.
   `ruff check --no-cache backend/app backend/tests backend/migrations` passed.
 - Schema: Alembic head is `f0d29969cfb5`; `alembic check` found no drift.
   The coupon amount columns were read back as BIGINT, and all coupon checks,
   indexes, and foreign keys were read back from MySQL.
 - `scripts/residue.py` reported zero attributable test rows after the runs.
-- Frontend: current typecheck, lint, and production build pass, with **297 Vitest
-  cases**. The prior FG-03/20/21 artifacts are version-bound and must be
-  refreshed after the local-cart increment.
+- Frontend: **299 Vitest cases**, typecheck, lint, and production build pass
+  after aligning catalog, address, and profile IDs with the frozen numeric JSON
+  contract. Refresh FG-03/20/21 after commit.
 - `FINAL_GATE.md` currently shows **9 PASS, 17 MISSING**, overall
   **IN PROGRESS**. Each PASS is tied to watched Git paths. It is an evidence
   index, not a claim that the whole product is complete.
@@ -67,6 +67,22 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
    The frontend order paths were corrected to `/orders` and `/orders/preview`.
    Three store tests cover persistence, user separation, malformed data, and
    the path contract.
+9. Login, refresh, logout, profile/permission, and owner-scoped address HTTP
+   routes now wrap the existing identity services. The refresh token stays in
+   a configured HttpOnly Cookie; the client sends it with credentials, stores
+   only the short-lived access token, and removes legacy browser token data.
+   MySQL HTTP tests cover rotation, cross-origin rejection, logout revocation,
+   address ownership, and request validation.
+10. The published catalog now serves paged product search, product detail,
+    categories, and brands. Listings derive the displayed minimum from active
+    SKUs; detail includes server stock and omits private SKU cost. Search and
+    detail are checked against a committed MySQL fixture, including the
+    unpublished-product boundary. Home and search consume the paged response;
+    product selection accepts numeric API SKU IDs. An HTTP purchase test covers
+    login -> catalog -> preview -> order -> payment attempt.
+11. A new FG-13 emitter runs the existing refresh rotation suite and cookie
+    HTTP tests against MySQL at the frozen proof path. Emit after the source
+    commit so the evidence records a clean watched revision.
 
 ## Remaining work, in execution order
 
@@ -93,16 +109,17 @@ their original measurements; use this file and `FINAL_GATE.md` for current state
 6. **Remote sync**: all continuation commits remain local. Push only after the
    intended branch/review path is settled. Re-run affected evidence after each
    watched source change and regenerate `FINAL_GATE.md` at the end.
-7. **Live route audit**: `create_app().openapi()["paths"]` currently lists 47
-   paths. Identity and catalog customer APIs are absent, so a browser cannot
-   log in or load products despite frontend compile and shell tests passing.
-   Analytics, knowledge, agent, governance, and audit API routers are also
-   absent. These are actual V1 completion gaps. Implement auth/catalog HTTP
-   first, then a purchase browser case; gate PASS counts alone do not prove it.
+7. **Live route audit**: `create_app().openapi()["paths"]` now lists 59 paths,
+   including auth, addresses, and public catalog. Merchant catalog writes,
+   Analytics, knowledge, agent, governance, and audit API routers remain
+   absent. The HTTP purchase test reaches payment attempt, but an actual
+   browser checkout and payment settlement still need E2E verification.
+   `PAYMENT_MOCK_ENABLED` is false in the current dev settings, so the mock-pay
+   button cannot settle a payment in this environment until the demo profile
+   explicitly enables it.
 
 ## Next code entry point
 
 After the source commit, refresh the source-watched gate artifacts and regenerate
-`FINAL_GATE.md`. Next implement the missing identity and customer catalog APIs,
-then an end-to-end checkout browser case. Phase 6 Analytics remains a separate
-backend and gate increment.
+`FINAL_GATE.md`. Next implement merchant catalog writes and a browser checkout
+case, then Phase 6 Analytics and the remaining backend modules and gates.

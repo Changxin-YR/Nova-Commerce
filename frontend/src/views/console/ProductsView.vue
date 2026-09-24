@@ -26,9 +26,9 @@ const notifications = useNotificationStore()
 const keyword = ref('')
 const statusFilter = ref('')
 const page = ref(1)
-const busyId = ref('')
+const busyId = ref<number | null>(null)
 /** Set of row ids selected via checkboxes (page-local state, so it stays here: §105). */
-const selected = ref<string[]>([])
+const selected = ref<number[]>([])
 
 const { data: pageData, status, error, execute } = useAsyncState(
   () =>
@@ -51,7 +51,7 @@ function toggleAll(): void {
   selected.value = allChecked.value ? [] : products.value.map((p) => p.id)
 }
 
-function toggleOne(id: string): void {
+function toggleOne(id: number): void {
   selected.value = selected.value.includes(id)
     ? selected.value.filter((x) => x !== id)
     : [...selected.value, id]
@@ -63,7 +63,7 @@ function search(): void {
   void execute()
 }
 
-async function transition(id: string, action: 'publish' | 'unpublish'): Promise<void> {
+async function transition(id: number, action: 'publish' | 'unpublish'): Promise<void> {
   busyId.value = id
   try {
     if (action === 'publish') await catalogAdminApi.publish(id)
@@ -74,7 +74,7 @@ async function transition(id: string, action: 'publish' | 'unpublish'): Promise<
     const normalized = normalizeError(e)
     notifications.error('操作失败', normalized.message, normalized.code, normalized.traceId)
   } finally {
-    busyId.value = ''
+    busyId.value = null
   }
 }
 

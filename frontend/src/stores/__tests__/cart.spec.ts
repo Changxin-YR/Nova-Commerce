@@ -29,18 +29,18 @@ describe('local cart selection (§14.1)', () => {
 
   it('isolates signed-in users and discards malformed browser rows', async () => {
     const first = stores()
-    first.auth.user = { id: '1', username: 'one', display_name: 'One', roles: [] }
+    first.auth.user = { id: 1, username: 'one', display_name: 'One', roles: [] }
     await first.cart.addItem('7', '42')
 
     localStorage.setItem('nova:cart:v1:2', JSON.stringify([
       { product_id: '7', sku_id: '42', quantity: -1, selected: true },
     ]))
     const second = stores()
-    second.auth.user = { id: '2', username: 'two', display_name: 'Two', roles: [] }
+    second.auth.user = { id: 2, username: 'two', display_name: 'Two', roles: [] }
     await second.cart.load()
     expect(second.cart.items).toEqual([])
     expect(first.cart.items).toHaveLength(1)
-    first.auth.user = { id: '2', username: 'two', display_name: 'Two', roles: [] }
+    first.auth.user = { id: 2, username: 'two', display_name: 'Two', roles: [] }
     await nextTick()
     expect(first.cart.items).toEqual([])
   })

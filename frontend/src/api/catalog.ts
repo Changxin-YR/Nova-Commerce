@@ -15,20 +15,20 @@ import type {
 import type { Brand, Category, Paged, Product, ProductSummary, Sku } from '@/types/domain'
 
 export const catalogApi = {
-  async searchProducts(query: ProductQuery = {}): Promise<ProductSummary[]> {
-    return httpClient.get<ProductSummary[]>(API.catalog.products, { params: query })
+  async searchProducts(query: ProductQuery = {}): Promise<Paged<ProductSummary>> {
+    return httpClient.get<Paged<ProductSummary>>(API.catalog.products, { params: query })
   },
 
   async product(id: string): Promise<Product> {
     return httpClient.get<Product>(API.catalog.productDetail(id))
   },
 
-  async categories(): Promise<Category[]> {
-    return httpClient.get<Category[]>(API.catalog.categories)
+  async categories(): Promise<Paged<Category>> {
+    return httpClient.get<Paged<Category>>(API.catalog.categories)
   },
 
-  async brands(): Promise<Brand[]> {
-    return httpClient.get<Brand[]>(API.catalog.brands)
+  async brands(): Promise<Paged<Brand>> {
+    return httpClient.get<Paged<Brand>>(API.catalog.brands)
   },
 }
 
@@ -50,11 +50,11 @@ export const catalogAdminApi = {
   },
 
   /** Task endpoint (§99): publishing is an intent, not a `PATCH {status}`. */
-  async publish(id: string): Promise<Product> {
+  async publish(id: number): Promise<Product> {
     return httpClient.post<Product>(API.catalog.publish(id), {})
   },
 
-  async unpublish(id: string): Promise<Product> {
+  async unpublish(id: number): Promise<Product> {
     return httpClient.post<Product>(API.catalog.unpublish(id), {})
   },
 

@@ -33,7 +33,10 @@ describe('checkout sends server-owned order inputs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
-    listAddresses.mockResolvedValue([{ id: '3', is_default: true, receiver_name: 'Test', receiver_phone: '13800000000' }])
+    listAddresses.mockResolvedValue({
+      items: [{ id: '3', is_default: true, receiver_name: 'Test', receiver_phone: '13800000000' }],
+      meta: { page: 1, page_size: 20, total: 1, total_pages: 1 },
+    })
     myCoupons.mockResolvedValue([{
       id: 55, template_id: 8, merchant_id: 1, status: 'UNUSED',
       valid_from: '2020-01-01T00:00:00Z', valid_to: '2099-01-01T00:00:00Z',

@@ -21,14 +21,13 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   access_token: string
-  refresh_token: string
   token_type: string
   expires_in: number
   user: CurrentUser
 }
 
 export interface CurrentUser {
-  id: string
+  id: number
   username: string
   display_name: string
   email?: string
@@ -36,7 +35,7 @@ export interface CurrentUser {
   avatar_url?: string
   /** Server-owned. The client only mirrors these for UX (§104). */
   roles: string[]
-  merchant_id?: string
+  merchant_id?: number | null
 }
 
 export interface PermissionResponse {
@@ -62,8 +61,8 @@ export interface AddressPayload {
 // ---------------------------------------------------------------------------
 
 export interface ProductQuery extends PageQuery {
-  category_id?: string
-  brand_id?: string
+  category_id?: number
+  brand_id?: number
   min_price_amount?: number
   max_price_amount?: number
   status?: string
@@ -72,8 +71,8 @@ export interface ProductQuery extends PageQuery {
 export interface ProductPayload {
   title: string
   subtitle?: string
-  category_id: string
-  brand_id?: string
+  category_id: number
+  brand_id?: number
   description?: string
   images: { url: string; alt?: string; sort_order?: number }[]
   skus: {

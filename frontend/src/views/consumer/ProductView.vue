@@ -34,6 +34,7 @@ const { data: product, status, error, execute } = useAsyncState(
   () => catalogApi.product(productId.value),
   { immediate: true },
 )
+watch(productId, () => { void execute() })
 
 const selectedSkuId = ref('')
 const quantity = ref(1)
@@ -41,7 +42,7 @@ const activeImage = ref(0)
 const submitting = ref(false)
 
 const skus = computed(() => product.value?.skus ?? [])
-const selectedSku = computed(() => skus.value.find((sku) => sku.id === selectedSkuId.value) ?? null)
+const selectedSku = computed(() => skus.value.find((sku) => String(sku.id) === selectedSkuId.value) ?? null)
 const images = computed(() => product.value?.images ?? [])
 const currentImage = computed(() => images.value[activeImage.value] ?? images.value[0] ?? null)
 
@@ -57,9 +58,12 @@ const listPrice = computed(
 function ensureSkuSelected(): void {
   if (selectedSkuId.value) return
   const first = skus.value.find((sku) => (sku.available_stock ?? 0) > 0) ?? skus.value[0]
-  if (first) selectedSkuId.value = first.id
+  if (first) selectedSkuId.value = String(first.id)
 }
-watch(product, ensureSkuSelected, { immediate: true })
+watch(product, () => {
+  selectedSkuId.value = ''
+  ensureSkuSelected()
+}, { immediate: true })
 
 /** Flatten a SKU's specs into the chip label: "深空黑 / 256GB". */
 function skuLabel(sku: { specs: Record<string, string> }): string {
@@ -89,7 +93,7 @@ async function addToCart(): Promise<boolean> {
   if (!selectedSku.value || soldOut.value) return false
   submitting.value = true
   try {
-    await cart.addItem(productId.value, selectedSku.value.id, quantity.value, {
+    await cart.addItem(productId.value, String(selectedSku.value.id), quantity.value, {
       product_title: product.value?.title,
       sku_name: skuLabel(selectedSku.value),
       cover_url: currentImage.value?.url,
@@ -177,12 +181,12 @@ async function buyNow(): Promise<void> {
                 type="button"
                 class="pdetail__sku"
                 :class="{
-                  'pdetail__sku--active': sku.id === selectedSkuId,
+                  'pdetail__sku--active': String(sku.id) === selectedSkuId,
                   'pdetail__sku--disabled': (sku.available_stock ?? 0) <= 0,
                 }"
                 :disabled="(sku.available_stock ?? 0) <= 0"
                 :title="(sku.available_stock ?? 0) <= 0 ? '该规格缺货' : undefined"
-                @click="selectedSkuId = sku.id"
+                @click="selectedSkuId = String(sku.id)"
               >
                 <span class="pdetail__skulabel">{{ skuLabel(sku) }}</span>
                 <PriceText :amount="sku.price_amount" size="sm" />

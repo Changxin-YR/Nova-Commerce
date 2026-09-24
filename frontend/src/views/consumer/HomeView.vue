@@ -14,10 +14,8 @@
  * Banners are pure CSS gradient compositions with OUR copy. No third-party artwork,
  * logo or trademark is used anywhere (spec §127).
  *
- * All data comes from the API. When the catalog module is not yet serving data, the page
- * renders its real empty/error state — it never fabricates a success state. `PREVIEW_ROWS`
- * below is explicitly-labelled local preview content used only to make the layout
- * reviewable; it is attached to the empty state, not passed off as server data.
+ * Product data comes from the published catalog API and empty/error states are
+ * rendered directly when no products are available.
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -27,7 +25,6 @@ import { useAuthStore } from '@/stores/auth'
 import StateView from '@/components/ui/StateView.vue'
 import ProductCard from '@/components/ui/ProductCard.vue'
 import PriceText from '@/components/ui/PriceText.vue'
-import type { ProductSummary } from '@/types/domain'
 
 const auth = useAuthStore()
 
@@ -78,97 +75,8 @@ const {
   refresh: refreshProducts,
 } = useAsyncState(() => catalogApi.searchProducts({ page_size: 20 }), { immediate: true })
 
-const products = computed(() => productData.value ?? [])
+const products = computed(() => productData.value?.items ?? [])
 const activeTab = ref('hot')
-
-/**
- * Local preview rows: shown ONLY when the API returned no data, and only so the dense
- * layout can be reviewed before the catalog module lands. `tags: ['预览数据']` keeps them
- * visually distinguishable from server data. Delete this block once the catalog serves
- * real products.
- */
-const PREVIEW_ROWS: ProductSummary[] = [
-  {
-    id: 'preview-1',
-    title: '【预览数据】14 英寸轻薄本 32G+1T 高刷屏',
-    cover_url: undefined,
-    min_price_amount: 599900,
-    original_price_amount: 699900,
-    sales_count: 12800,
-    rating: 4.9,
-    brand_name: 'Nova',
-    tags: ['自营', '秒杀', '预览数据'],
-    status: 'PUBLISHED',
-  },
-  {
-    id: 'preview-2',
-    title: '【预览数据】主动降噪蓝牙耳机 40 小时续航',
-    cover_url: undefined,
-    min_price_amount: 89900,
-    original_price_amount: 129900,
-    sales_count: 45600,
-    rating: 4.8,
-    brand_name: 'Nova',
-    tags: ['自营', '领券', '预览数据'],
-    status: 'PUBLISHED',
-  },
-  {
-    id: 'preview-3',
-    title: '【预览数据】智能手表 血氧心率 双频定位',
-    cover_url: undefined,
-    min_price_amount: 109900,
-    original_price_amount: 149900,
-    sales_count: 8300,
-    rating: 4.7,
-    brand_name: 'Nova',
-    tags: ['满减', '新品', '预览数据'],
-    status: 'PUBLISHED',
-  },
-  {
-    id: 'preview-4',
-    title: '【预览数据】65W 氮化镓充电器 三接口',
-    cover_url: undefined,
-    min_price_amount: 12900,
-    original_price_amount: 19900,
-    sales_count: 96000,
-    rating: 4.9,
-    brand_name: 'Nova',
-    tags: ['自营', '秒杀', '预览数据'],
-    status: 'PUBLISHED',
-  },
-  {
-    id: 'preview-5',
-    title: '【预览数据】扫拖一体机器人 自动集尘',
-    cover_url: undefined,
-    min_price_amount: 249900,
-    original_price_amount: 299900,
-    sales_count: 3400,
-    rating: 4.6,
-    brand_name: 'Nova',
-    tags: ['自营', '满减', '预览数据'],
-    status: 'PUBLISHED',
-  },
-  {
-    id: 'preview-6',
-    title: '【预览数据】2K 电竞显示器 165Hz 低延迟',
-    cover_url: undefined,
-    min_price_amount: 159900,
-    original_price_amount: 189900,
-    sales_count: 5100,
-    rating: 4.8,
-    brand_name: 'Nova',
-    tags: ['领券', '预览数据'],
-    status: 'PUBLISHED',
-  },
-]
-
-/** Server data when present; preview rows when the catalog is empty. */
-const gridProducts = computed(() => (products.value.length > 0 ? products.value : PREVIEW_ROWS))
-const usingPreview = computed(() => products.value.length === 0)
-
-const displayStatus = computed(() =>
-  productStatus.value === 'empty' && usingPreview.value ? 'success' : productStatus.value,
-)
 
 const SERVICE_ICONS = [
   { label: '正品保障', hint: '官方授权' },
@@ -238,7 +146,7 @@ const SERVICE_ICONS = [
             {{ auth.isLoggedIn ? auth.displayName : '欢迎来到 Nova' }}
           </p>
           <p class="nx-muted home__user-hint">
-            {{ auth.isLoggedIn ? '查看我的订单与售后进度' : '登录后可同步购物车与订单' }}
+            {{ auth.isLoggedIn ? '查看我的订单与售后进度' : '登录后可结算商品并查看订单' }}
           </p>
           <div class="home__user-actions">
             <RouterLink v-if="!auth.isLoggedIn" :to="{ name: 'login' }" class="nx-btn nx-btn--primary nx-btn--block">
@@ -280,13 +188,9 @@ const SERVICE_ICONS = [
         </button>
       </header>
 
-      <p v-if="usingPreview" class="home__preview-note">
-        商品接口暂未返回数据，当前展示的是<b>本地预览数据</b>（标签已标注），用于确认楼层与卡片版式。
-      </p>
-
-      <StateView :state="displayStatus" :error="productError" @retry="loadProducts()">
+      <StateView :state="productStatus" :error="productError" @retry="loadProducts()">
         <div class="home__grid">
-          <ProductCard v-for="product in gridProducts" :key="product.id" :product="product" />
+          <ProductCard v-for="product in products" :key="product.id" :product="product" />
         </div>
       </StateView>
     </section>
@@ -299,7 +203,7 @@ const SERVICE_ICONS = [
       </header>
 
       <ol class="ranklist">
-        <li v-for="(product, index) in gridProducts.slice(0, 5)" :key="`rank-${product.id}`">
+        <li v-for="(product, index) in products.slice(0, 5)" :key="`rank-${product.id}`">
           <span class="ranklist__no" :class="{ 'ranklist__no--top': index < 3 }">{{ index + 1 }}</span>
           <RouterLink :to="{ name: 'product', params: { id: product.id } }" class="ranklist__title">
             {{ product.title }}
@@ -428,19 +332,6 @@ const SERVICE_ICONS = [
   &__more {
     margin-left: auto;
     font-size: 12px;
-  }
-
-  &__preview-note {
-    margin: 0 0 10px;
-    padding: 6px 10px;
-    background: var(--nx-warning-soft);
-    border: 1px solid var(--nx-warning);
-    font-size: 12px;
-    color: var(--nx-warning);
-
-    b {
-      font-weight: 700;
-    }
   }
 
   &__grid {

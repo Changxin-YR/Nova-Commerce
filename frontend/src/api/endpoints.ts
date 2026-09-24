@@ -26,19 +26,19 @@ export const API = {
   // -- catalog ------------------------------------------------------------
   catalog: {
     products: '/catalog/public/products',
-    productDetail: (id: string) => `/catalog/public/products/${id}`,
+    productDetail: (id: string | number) => `/catalog/public/products/${id}`,
     categories: '/catalog/public/categories',
     brands: '/catalog/public/brands',
     adminProducts: '/catalog/admin/products',
-    adminProduct: (id: string) => `/catalog/admin/products/${id}`,
+    adminProduct: (id: string | number) => `/catalog/admin/products/${id}`,
     /**
      * TASK endpoint (§99). Path is the FROZEN one from PROJECT_BASELINE.yaml
      * `task_endpoints`: `POST /api/v1/products/{id}/publish` — note the absence of the
      * `/catalog/admin` module prefix, unlike the list/detail routes above.
      */
-    publish: (id: string) => `/products/${id}/publish`,
-    unpublish: (id: string) => `/products/${id}/unpublish`,
-    skus: (productId: string) => `/catalog/admin/products/${productId}/skus`,
+    publish: (id: string | number) => `/products/${id}/publish`,
+    unpublish: (id: string | number) => `/products/${id}/unpublish`,
+    skus: (productId: string | number) => `/catalog/admin/products/${productId}/skus`,
   },
 
   // -- inventory ----------------------------------------------------------
@@ -123,9 +123,9 @@ export const API = {
   addresses: {
     list: '/auth/users/addresses',
     create: '/auth/users/addresses',
-    update: (id: string) => `/auth/users/addresses/${id}`,
-    remove: (id: string) => `/auth/users/addresses/${id}`,
-    setDefault: (id: string) => `/auth/users/addresses/${id}/default`,
+    update: (id: string | number) => `/auth/users/addresses/${id}`,
+    remove: (id: string | number) => `/auth/users/addresses/${id}`,
+    setDefault: (id: string | number) => `/auth/users/addresses/${id}/default`,
   },
 
   // -- marketing ----------------------------------------------------------

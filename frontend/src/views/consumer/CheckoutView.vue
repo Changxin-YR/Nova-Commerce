@@ -46,7 +46,7 @@ const {
   execute: loadAddresses,
 } = useAsyncState(() => addressApi.list(), { immediate: false })
 
-const addressList = computed(() => addresses.value ?? [])
+const addressList = computed(() => addresses.value?.items ?? [])
 const availableCoupons = computed(() => {
   const now = Date.now()
   return ownedCoupons.value.filter((coupon) =>
@@ -88,7 +88,7 @@ async function refreshPage(): Promise<void> {
     marketingApi.myCoupons().then((coupons) => { ownedCoupons.value = coupons }).catch(() => undefined),
   ])
   const preferred = addressList.value.find((a) => a.is_default) ?? addressList.value[0]
-  if (preferred && !selectedAddressId.value) selectedAddressId.value = preferred.id
+  if (preferred && !selectedAddressId.value) selectedAddressId.value = String(preferred.id)
   if (orderItems.value.length > 0) await loadPreview()
 }
 
@@ -163,13 +163,13 @@ async function createOrder(): Promise<void> {
                   v-for="address in addressList"
                   :key="address.id"
                   class="checkout__address"
-                  :class="{ 'checkout__address--active': address.id === selectedAddressId }"
+                  :class="{ 'checkout__address--active': String(address.id) === selectedAddressId }"
                 >
                   <input
                     v-model="selectedAddressId"
                     type="radio"
                     name="address"
-                    :value="address.id"
+                    :value="String(address.id)"
                     @change="loadPreview()"
                   />
                   <span class="checkout__address-body">

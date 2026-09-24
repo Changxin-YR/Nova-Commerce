@@ -41,7 +41,6 @@ import {
   clearTokens,
   emitSessionExpired,
   getAccessToken,
-  getRefreshToken,
   setTokens,
 } from '@/api/tokenStore'
 import { TRACE_ID_HEADER, newTraceId, readTraceIdHeader, setLastTraceId } from '@/utils/trace'
@@ -83,9 +82,6 @@ export interface NovaClientOptions {
 /** Shape returned by the refresh endpoint. */
 interface RefreshPayload {
   access_token?: string
-  refresh_token?: string
-  accessToken?: string
-  refreshToken?: string
 }
 
 /**
@@ -121,6 +117,7 @@ export class NovaHttpClient {
   constructor(options: NovaClientOptions = {}) {
     this.axios = axios.create({
       baseURL: options.baseURL ?? API_BASE_URL,
+      withCredentials: true,
       timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       headers: { 'Content-Type': CONTENT_TYPE_JSON, Accept: CONTENT_TYPE_JSON },
       // Let the interceptor decide: a 401 must reach us instead of throwing early.
@@ -326,24 +323,18 @@ export class NovaHttpClient {
   }
 
   private async defaultRefresh(): Promise<void> {
-    const refreshToken = getRefreshToken()
-    if (!refreshToken) {
-      throw transportError(TRANSPORT_CODES.SESSION_EXPIRED, '登录已过期，请重新登录')
-    }
     const response = await this.axios.request<ApiEnvelope<RefreshPayload>>({
       method: 'POST',
       url: '/auth/refresh',
-      data: { refresh_token: refreshToken },
       skipAuthRefresh: true,
     } as NovaRequestConfig)
 
     const payload = response.data.data ?? {}
-    const accessToken = payload.access_token ?? payload.accessToken ?? ''
-    const nextRefresh = payload.refresh_token ?? payload.refreshToken ?? refreshToken
+    const accessToken = payload.access_token ?? ''
     if (!accessToken) {
       throw transportError(TRANSPORT_CODES.MALFORMED_RESPONSE, '服务返回格式异常，请联系技术支持')
     }
-    setTokens({ accessToken, refreshToken: nextRefresh })
+    setTokens({ accessToken })
   }
 
   private sessionExpired(): void {
