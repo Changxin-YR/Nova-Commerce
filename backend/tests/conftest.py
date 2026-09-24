@@ -111,8 +111,13 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     if config.getoption("-m") and "integration" not in str(config.getoption("-m")):
         return
 
-    from app.shared.db.session import ping_database
-    from app.shared.redis_client import ping_redis
+    from app.core.config import get_settings
+    from app.shared.db.session import configure_database, ping_database
+    from app.shared.redis_client import configure_redis, ping_redis
+
+    settings = get_settings()
+    configure_database(settings)
+    configure_redis(settings)
 
     mysql_ok, _ = ping_database()
     redis_ok, _ = ping_redis()
