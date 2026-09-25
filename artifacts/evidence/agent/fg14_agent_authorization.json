@@ -1,0 +1,40 @@
+{
+  "gate_id": "FG-14",
+  "command": [
+    "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/integration/order/test_phase6_routers.py::test_agent_permissions_scope_and_thread_ownership",
+    "-q",
+    "--junit-xml=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\agent\\fg14_agent_authorization.xml"
+  ],
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-24T23:51:52.777402+00:00",
+  "exit_code": 0,
+  "assertions": [
+    {
+      "name": "test_agent_permissions_scope_and_thread_ownership",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "junit_report": {
+    "path": "artifacts\\evidence\\agent\\fg14_agent_authorization.xml",
+    "parses": true,
+    "testcase_count": 1
+  },
+  "git": {
+    "revision": "59bc18d2c06b2c97851ff59483f0e8d898089675",
+    "relevant_paths_dirty": false,
+    "relevant_paths": [
+      "backend/app",
+      "backend/tests/integration/order",
+      "backend/migrations",
+      "scripts/emit_phase6_agent_gates.py"
+    ]
+  },
+  "verdict": "PASS",
+  "stdout_tail": "2026-09-25 07:51:55 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\n2026-09-25 07:51:55 [info     ] redis configured               host=127.0.0.1 port=16379\n.                                                                        [100%]\n============================== warnings summary ===============================\ntests/integration/order/test_phase6_routers.py::test_agent_permissions_scope_and_thread_ownership\n  C:\\Users\\27363\\Desktop\\store\\.venv\\Lib\\site-packages\\starlette\\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.\n    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n1 passed, 1 warning in 1.71s\n",
+  "stderr_tail": ""
+}

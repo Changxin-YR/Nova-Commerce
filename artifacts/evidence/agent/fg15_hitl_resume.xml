@@ -1,0 +1,1122 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="6" failures="0" skipped="0" tests="8" time="253.508" timestamp="2026-09-25T07:52:01.006191+08:00" hostname="WHHHH"><testcase classname="tests.integration.order.test_pending_actions" name="test_expired_approval_is_persisted_and_cannot_resume" time="0.639" /><testcase classname="tests.integration.order.test_pending_actions" name="test_concurrent_approval_has_one_winner_and_one_audit" time="1.719" /><testcase classname="tests.integration.order.test_pending_actions" name="test_resume_revalidates_before_execution" time="0.446" /><testcase classname="tests.integration.order.test_pending_actions" name="test_approved_action_cannot_resume_after_expiry" time="5.082" /><testcase classname="tests.integration.order.test_pending_actions" name="test_langgraph_checkpoint_resume_revalidates_database[False]" time="0.423" /><testcase classname="tests.integration.order.test_pending_actions" name="test_langgraph_checkpoint_resume_revalidates_database[True]" time="120.604"><error message="failed on setup with &quot;sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (The read operation timed out)')&#10;[SQL: SELECT permissions.code, permissions.resource, permissions.action, permissions.description, permissions.is_grantable, permissions.id, permissions.created_at, permissions.updated_at &#10;FROM permissions &#10;WHERE permissions.code = %(code_1)s]&#10;[parameters: {'code_1': 'order:read'}]&#10;(Background on this error at: https://sqlalche.me/e/20/e3q8)&quot;">self = &lt;pymysql.connections.Connection object at 0x00000201E75166D0&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+&gt;               data = self._rfile.read(num_bytes)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\pymysql\connections.py:818: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\..\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\socket.py:718: in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\ssl.py:1314: in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;ssl.SSLSocket [closed] fd=-1, family=2, type=1, proto=0&gt;, len = 8192
+buffer = &lt;memory at 0x00000201E6F96E00&gt;
+
+    def read(self, len=1024, buffer=None):
+        """Read up to LEN bytes and return them.
+        Return zero-length string on EOF."""
+    
+        self._checkClosed()
+        if self._sslobj is None:
+            raise ValueError("Read on closed or unwrapped SSL socket.")
+        try:
+            if buffer is not None:
+&gt;               return self._sslobj.read(len, buffer)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               TimeoutError: The read operation timed out
+
+..\..\..\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\ssl.py:1166: TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+self = &lt;sqlalchemy.engine.base.Connection object at 0x00000201E7514F90&gt;
+dialect = &lt;sqlalchemy.dialects.mysql.pymysql.MySQLDialect_pymysql object at 0x00000201E6EE3950&gt;
+context = &lt;sqlalchemy.dialects.mysql.mysqldb.MySQLExecutionContext_mysqldb object at 0x00000201E7563A90&gt;
+statement = &lt;sqlalchemy.dialects.mysql.mysqldb.MySQLCompiler_mysqldb object at 0x00000201E7478510&gt;
+parameters = [{'code_1': 'order:read'}]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -&gt; CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+&gt;                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:1969: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:952: in do_execute
+    cursor.execute(statement, parameters)
+..\.venv\Lib\site-packages\pymysql\cursors.py:170: in execute
+    result = self._query(query)
+             ^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\cursors.py:335: in _query
+    conn.query(q)
+..\.venv\Lib\site-packages\pymysql\connections.py:581: in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:857: in _read_query_result
+    result.read()
+..\.venv\Lib\site-packages\pymysql\connections.py:1290: in read
+    first_packet = self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E75166D0&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query (The read operation timed out)')
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+fixturedef = &lt;FixtureDef argname='shop' scope='function' baseid='tests/integration/order'&gt;
+request = &lt;SubRequest 'shop' for &lt;Function test_langgraph_checkpoint_resume_revalidates_database[True]&gt;&gt;
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -&gt; object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+                return (yield)
+            if not _is_coroutine_or_asyncgen(fixturedef.func):
+&gt;               return (yield)
+                        ^^^^^
+
+..\.venv\Lib\site-packages\pytest_asyncio\plugin.py:926: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\integration\order\conftest.py:334: in shop
+    permission = roles.get_permission_by_code(PermissionCode.ORDER_READ.value)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\modules\identity\repository.py:395: in get_permission_by_code
+    return self._session.execute(
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:2373: in execute
+    return self._execute_internal(
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:2271: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+..\.venv\Lib\site-packages\sqlalchemy\orm\context.py:306: in orm_execute_statement
+    result = conn.execute(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:1421: in execute
+    return meth(
+..\.venv\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:1643: in _execute_clauseelement
+    ret = self._execute_context(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:2365: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:952: in do_execute
+    cursor.execute(statement, parameters)
+..\.venv\Lib\site-packages\pymysql\cursors.py:170: in execute
+    result = self._query(query)
+             ^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\cursors.py:335: in _query
+    conn.query(q)
+..\.venv\Lib\site-packages\pymysql\connections.py:581: in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:857: in _read_query_result
+    result.read()
+..\.venv\Lib\site-packages\pymysql\connections.py:1290: in read
+    first_packet = self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E75166D0&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (The read operation timed out)')
+E               [SQL: SELECT permissions.code, permissions.resource, permissions.action, permissions.description, permissions.is_grantable, permissions.id, permissions.created_at, permissions.updated_at 
+E               FROM permissions 
+E               WHERE permissions.code = %(code_1)s]
+E               [parameters: {'code_1': 'order:read'}]
+E               (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError</error><error message="failed on teardown with &quot;sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (timed out)')&#10;(Background on this error at: https://sqlalche.me/e/20/e3q8)&quot;">self = &lt;pymysql.connections.Connection object at 0x00000201E9AB8050&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+&gt;               data = self._rfile.read(num_bytes)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\pymysql\connections.py:818: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;socket.SocketIO object at 0x00000201E834FD30&gt;
+b = &lt;memory at 0x00000201E7637E80&gt;
+
+    def readinto(self, b):
+        """Read up to len(b) bytes into the writable buffer *b* and return
+        the number of bytes read.  If the socket is non-blocking and no bytes
+        are available, None is returned.
+    
+        If *b* is non-empty, a 0 return value indicates that the connection
+        was shutdown at the other end.
+        """
+        self._checkClosed()
+        self._checkReadable()
+        if self._timeout_occurred:
+            raise OSError("cannot read from timed out object")
+        while True:
+            try:
+&gt;               return self._sock.recv_into(b)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+E               TimeoutError: timed out
+
+..\..\..\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\socket.py:718: TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+self = &lt;sqlalchemy.engine.base.Connection object at 0x00000201E9AB87D0&gt;
+engine = Engine(mysql+pymysql://nova:***@127.0.0.1:13306/nova?charset=utf8mb4)
+connection = None, _has_events = None, _allow_revalidate = True
+_allow_autobegin = True
+
+    def __init__(
+        self,
+        engine: Engine,
+        connection: Optional[PoolProxiedConnection] = None,
+        _has_events: Optional[bool] = None,
+        _allow_revalidate: bool = True,
+        _allow_autobegin: bool = True,
+    ):
+        """Construct a new Connection."""
+        self.engine = engine
+        self.dialect = dialect = engine.dialect
+    
+        if connection is None:
+            try:
+&gt;               self._dbapi_connection = engine.raw_connection()
+                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3319: in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:1290: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:717: in checkout
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:715: in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:837: in get_connection
+    self.__connect()
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:900: in __connect
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:373: in __init__
+    self.connect()
+..\.venv\Lib\site-packages\pymysql\connections.py:701: in connect
+    self._get_server_information()
+..\.venv\Lib\site-packages\pymysql\connections.py:1186: in _get_server_information
+    packet = self._read_packet()
+             ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E9AB8050&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query (timed out)')
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+&gt;   request.addfinalizer(lambda: _purge(created, marker=marker))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\integration\order\conftest.py:206: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\integration\order\conftest.py:402: in _purge
+    session.execute(
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:2373: in execute
+    return self._execute_internal(
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:2261: in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:2113: in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1191: in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3295: in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:146: in __init__
+    Connection._handle_dbapi_exception_noconnection(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:2450: in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:144: in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3319: in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:1290: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:717: in checkout
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:715: in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:837: in get_connection
+    self.__connect()
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:900: in __connect
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:373: in __init__
+    self.connect()
+..\.venv\Lib\site-packages\pymysql\connections.py:701: in connect
+    self._get_server_information()
+..\.venv\Lib\site-packages\pymysql\connections.py:1186: in _get_server_information
+    packet = self._read_packet()
+             ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E9AB8050&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (timed out)')
+E               (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError</error></testcase><testcase classname="tests.integration.order.test_pending_actions" name="test_resume_rolls_back_failed_business_writes" time="60.016"><error message="failed on setup with &quot;sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (timed out)')&#10;(Background on this error at: https://sqlalche.me/e/20/e3q8)&quot;">self = &lt;pymysql.connections.Connection object at 0x00000201E7DE3890&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+&gt;               data = self._rfile.read(num_bytes)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\pymysql\connections.py:818: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;socket.SocketIO object at 0x00000201E855DF30&gt;
+b = &lt;memory at 0x00000201E7637400&gt;
+
+    def readinto(self, b):
+        """Read up to len(b) bytes into the writable buffer *b* and return
+        the number of bytes read.  If the socket is non-blocking and no bytes
+        are available, None is returned.
+    
+        If *b* is non-empty, a 0 return value indicates that the connection
+        was shutdown at the other end.
+        """
+        self._checkClosed()
+        self._checkReadable()
+        if self._timeout_occurred:
+            raise OSError("cannot read from timed out object")
+        while True:
+            try:
+&gt;               return self._sock.recv_into(b)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+E               TimeoutError: timed out
+
+..\..\..\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\socket.py:718: TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+self = &lt;sqlalchemy.engine.base.Connection object at 0x00000201E7DE3210&gt;
+engine = Engine(mysql+pymysql://nova:***@127.0.0.1:13306/nova?charset=utf8mb4)
+connection = None, _has_events = None, _allow_revalidate = True
+_allow_autobegin = True
+
+    def __init__(
+        self,
+        engine: Engine,
+        connection: Optional[PoolProxiedConnection] = None,
+        _has_events: Optional[bool] = None,
+        _allow_revalidate: bool = True,
+        _allow_autobegin: bool = True,
+    ):
+        """Construct a new Connection."""
+        self.engine = engine
+        self.dialect = dialect = engine.dialect
+    
+        if connection is None:
+            try:
+&gt;               self._dbapi_connection = engine.raw_connection()
+                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3319: in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:1290: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:717: in checkout
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:715: in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:837: in get_connection
+    self.__connect()
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:900: in __connect
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:373: in __init__
+    self.connect()
+..\.venv\Lib\site-packages\pymysql\connections.py:701: in connect
+    self._get_server_information()
+..\.venv\Lib\site-packages\pymysql\connections.py:1186: in _get_server_information
+    packet = self._read_packet()
+             ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E7DE3890&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query (timed out)')
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+fixturedef = &lt;FixtureDef argname='shop' scope='function' baseid='tests/integration/order'&gt;
+request = &lt;SubRequest 'shop' for &lt;Function test_resume_rolls_back_failed_business_writes&gt;&gt;
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -&gt; object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+                return (yield)
+            if not _is_coroutine_or_asyncgen(fixturedef.func):
+&gt;               return (yield)
+                        ^^^^^
+
+..\.venv\Lib\site-packages\pytest_asyncio\plugin.py:926: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\integration\order\conftest.py:211: in shop
+    session.flush()
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:4353: in flush
+    self._flush(objects)
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:4488: in _flush
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:4449: in _flush
+    flush_context.execute()
+..\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py:465: in execute
+    rec.execute(self)
+..\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py:641: in execute
+    util.preloaded.orm_persistence.save_obj(
+..\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py:61: in save_obj
+    for (
+..\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py:224: in _organize_states_for_save
+    for state, dict_, mapper, connection in _connections_for_states(
+..\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py:1760: in _connections_for_states
+    connection = uowtransaction.transaction.connection(base_mapper)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1041: in connection
+    return self._connection_for_bind(bind, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1177: in _connection_for_bind
+    conn = self._parent._connection_for_bind(
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1191: in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3295: in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:146: in __init__
+    Connection._handle_dbapi_exception_noconnection(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:2450: in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:144: in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3319: in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:1290: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:717: in checkout
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:715: in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:837: in get_connection
+    self.__connect()
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:900: in __connect
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:373: in __init__
+    self.connect()
+..\.venv\Lib\site-packages\pymysql\connections.py:701: in connect
+    self._get_server_information()
+..\.venv\Lib\site-packages\pymysql\connections.py:1186: in _get_server_information
+    packet = self._read_packet()
+             ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E7DE3890&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (timed out)')
+E               (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError</error><error message="failed on teardown with &quot;KeyError: 'merchant_id'&quot;">&gt;   request.addfinalizer(lambda: _purge(created, marker=marker))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\integration\order\conftest.py:206: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+created = {'created_warehouse': False}, marker = '8ed51680'
+
+    def _purge(created: dict[str, object], *, marker: str) -&gt; None:
+        """Delete everything the fixture and the tests created, in dependency order.
+    
+        Order matters and is not guesswork: most of these foreign keys are ``RESTRICT``
+        precisely so that history cannot be deleted out from under a live row, which means
+        the unwinding has to go children-first. Anything left behind would make the next run
+        behave differently from this one, and a suite whose second run differs from its
+        first is a suite nobody trusts.
+        """
+        from sqlalchemy import select
+    
+        factory = get_session_factory()
+        sku_ids = tuple(created.get("sku_ids") or ())
+        with factory() as session:
+            session.execute(
+&gt;               delete(CouponUsageRecord).where(CouponUsageRecord.merchant_id == created["merchant_id"])
+                                                                                 ^^^^^^^^^^^^^^^^^^^^^^
+            )
+E           KeyError: 'merchant_id'
+
+tests\integration\order\conftest.py:403: KeyError</error></testcase><testcase classname="tests.integration.order.test_pending_actions" name="test_critical_action_cannot_be_approved_or_resumed" time="60.039"><error message="failed on setup with &quot;sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (timed out)')&#10;(Background on this error at: https://sqlalche.me/e/20/e3q8)&quot;">self = &lt;pymysql.connections.Connection object at 0x00000201E82E4E50&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+&gt;               data = self._rfile.read(num_bytes)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\pymysql\connections.py:818: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;socket.SocketIO object at 0x00000201E9B5E5C0&gt;
+b = &lt;memory at 0x00000201E6F97F40&gt;
+
+    def readinto(self, b):
+        """Read up to len(b) bytes into the writable buffer *b* and return
+        the number of bytes read.  If the socket is non-blocking and no bytes
+        are available, None is returned.
+    
+        If *b* is non-empty, a 0 return value indicates that the connection
+        was shutdown at the other end.
+        """
+        self._checkClosed()
+        self._checkReadable()
+        if self._timeout_occurred:
+            raise OSError("cannot read from timed out object")
+        while True:
+            try:
+&gt;               return self._sock.recv_into(b)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+E               TimeoutError: timed out
+
+..\..\..\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\socket.py:718: TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+self = &lt;sqlalchemy.engine.base.Connection object at 0x00000201E82E5F10&gt;
+engine = Engine(mysql+pymysql://nova:***@127.0.0.1:13306/nova?charset=utf8mb4)
+connection = None, _has_events = None, _allow_revalidate = True
+_allow_autobegin = True
+
+    def __init__(
+        self,
+        engine: Engine,
+        connection: Optional[PoolProxiedConnection] = None,
+        _has_events: Optional[bool] = None,
+        _allow_revalidate: bool = True,
+        _allow_autobegin: bool = True,
+    ):
+        """Construct a new Connection."""
+        self.engine = engine
+        self.dialect = dialect = engine.dialect
+    
+        if connection is None:
+            try:
+&gt;               self._dbapi_connection = engine.raw_connection()
+                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3319: in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:1290: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:717: in checkout
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:715: in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:837: in get_connection
+    self.__connect()
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:900: in __connect
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:373: in __init__
+    self.connect()
+..\.venv\Lib\site-packages\pymysql\connections.py:701: in connect
+    self._get_server_information()
+..\.venv\Lib\site-packages\pymysql\connections.py:1186: in _get_server_information
+    packet = self._read_packet()
+             ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E82E4E50&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query (timed out)')
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+fixturedef = &lt;FixtureDef argname='shop' scope='function' baseid='tests/integration/order'&gt;
+request = &lt;SubRequest 'shop' for &lt;Function test_critical_action_cannot_be_approved_or_resumed&gt;&gt;
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -&gt; object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+                return (yield)
+            if not _is_coroutine_or_asyncgen(fixturedef.func):
+&gt;               return (yield)
+                        ^^^^^
+
+..\.venv\Lib\site-packages\pytest_asyncio\plugin.py:926: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\integration\order\conftest.py:211: in shop
+    session.flush()
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:4353: in flush
+    self._flush(objects)
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:4488: in _flush
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:4449: in _flush
+    flush_context.execute()
+..\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py:465: in execute
+    rec.execute(self)
+..\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py:641: in execute
+    util.preloaded.orm_persistence.save_obj(
+..\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py:61: in save_obj
+    for (
+..\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py:224: in _organize_states_for_save
+    for state, dict_, mapper, connection in _connections_for_states(
+..\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py:1760: in _connections_for_states
+    connection = uowtransaction.transaction.connection(base_mapper)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1041: in connection
+    return self._connection_for_bind(bind, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1177: in _connection_for_bind
+    conn = self._parent._connection_for_bind(
+..\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\orm\session.py:1191: in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3295: in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:146: in __init__
+    Connection._handle_dbapi_exception_noconnection(
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:2450: in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:144: in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\base.py:3319: in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:1290: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:717: in checkout
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:715: in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:837: in get_connection
+    self.__connect()
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:900: in __connect
+    with util.safe_reraise():
+..\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+..\.venv\Lib\site-packages\sqlalchemy\pool\base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\sqlalchemy\engine\default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:373: in __init__
+    self.connect()
+..\.venv\Lib\site-packages\pymysql\connections.py:701: in connect
+    self._get_server_information()
+..\.venv\Lib\site-packages\pymysql\connections.py:1186: in _get_server_information
+    packet = self._read_packet()
+             ^^^^^^^^^^^^^^^^^^^
+..\.venv\Lib\site-packages\pymysql\connections.py:779: in _read_packet
+    packet_header = self._read_bytes(4)
+                    ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;pymysql.connections.Connection object at 0x00000201E82E4E50&gt;
+num_bytes = 4
+
+    def _read_bytes(self, num_bytes):
+        # NOTE: caller should call self._sock.settimeout(self._read_timeout)
+        # before first read.
+        while True:
+            try:
+                data = self._rfile.read(num_bytes)
+                break
+            except OSError as e:
+                if e.errno == errno.EINTR:
+                    continue
+                self._force_close()
+&gt;               raise err.OperationalError(
+                    CR.CR_SERVER_LOST,
+                    f"Lost connection to MySQL server during query ({e})",
+                )
+E               sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (2013, 'Lost connection to MySQL server during query (timed out)')
+E               (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+..\.venv\Lib\site-packages\pymysql\connections.py:824: OperationalError</error><error message="failed on teardown with &quot;KeyError: 'merchant_id'&quot;">&gt;   request.addfinalizer(lambda: _purge(created, marker=marker))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\integration\order\conftest.py:206: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+created = {'created_warehouse': False}, marker = '17256fa1'
+
+    def _purge(created: dict[str, object], *, marker: str) -&gt; None:
+        """Delete everything the fixture and the tests created, in dependency order.
+    
+        Order matters and is not guesswork: most of these foreign keys are ``RESTRICT``
+        precisely so that history cannot be deleted out from under a live row, which means
+        the unwinding has to go children-first. Anything left behind would make the next run
+        behave differently from this one, and a suite whose second run differs from its
+        first is a suite nobody trusts.
+        """
+        from sqlalchemy import select
+    
+        factory = get_session_factory()
+        sku_ids = tuple(created.get("sku_ids") or ())
+        with factory() as session:
+            session.execute(
+&gt;               delete(CouponUsageRecord).where(CouponUsageRecord.merchant_id == created["merchant_id"])
+                                                                                 ^^^^^^^^^^^^^^^^^^^^^^
+            )
+E           KeyError: 'merchant_id'
+
+tests\integration\order\conftest.py:403: KeyError</error></testcase></testsuite></testsuites>

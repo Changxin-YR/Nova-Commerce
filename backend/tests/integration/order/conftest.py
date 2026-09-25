@@ -396,6 +396,9 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
     """
     from sqlalchemy import select
 
+    if "merchant_id" not in created:
+        return
+
     factory = get_session_factory()
     sku_ids = tuple(created.get("sku_ids") or ())
     with factory() as session:
