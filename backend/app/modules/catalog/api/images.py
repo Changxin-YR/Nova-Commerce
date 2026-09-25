@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import PayloadTooLargeError, envelope
-from app.modules.catalog.api.public import _image_url
 from app.modules.catalog.images import CatalogImageService
+from app.modules.catalog.public_service import image_url
 from app.modules.identity.dependencies import ConsolePrincipal
 from app.shared.db.session import get_session
 
@@ -42,7 +42,7 @@ def upload_product_image(
     )
     return envelope(data={
         "id": image.id,
-        "url": _image_url(image),
+        "url": image_url(image),
         "alt": image.alt_text,
         "role": image.role,
         "sort_order": image.sort_order,

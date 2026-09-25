@@ -19,6 +19,13 @@ are what explain them. A finance query that can read the movements next to the
 counters is the difference between "the total is wrong" and "this movement is wrong",
 which is the money-out form of INV-007: a balance no ledger explains is worse than no
 ledger.
+
+## Why this file has no query in it
+
+Both handlers call exactly one ``AfterSaleService`` method and shape its result. The
+merchant scope, the status vocabulary and the ``IN`` lookup that resolves each row's
+claim number all live in the service, so a non-HTTP caller (the Phase 9 tool gateway)
+gets the same scoping rather than a second, weaker implementation.
 """
 
 from __future__ import annotations
@@ -26,15 +33,12 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import RefundNotFoundError, ValidationError, envelope
-from app.modules.aftersales.enums import RefundStatus
-from app.modules.aftersales.models import AfterSale
-from app.modules.aftersales.repository import RefundRepository
+from app.core.errors import envelope
 from app.modules.aftersales.schemas import page_meta
 from app.modules.aftersales.serializers import to_refund
+from app.modules.aftersales.service import AfterSaleService
 from app.modules.identity.dependencies import ConsolePrincipal
 from app.shared.db.session import get_session
 
@@ -61,24 +65,24 @@ def list_admin_refunds(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> dict:
-    _validate_status_filter(status)
-    rows, total = RefundRepository(session).list_admin_refunds(
-        merchant_id=_merchant_filter(principal),
-        status=status,
+    page_of_refunds = AfterSaleService(session).list_admin_refunds(
+        principal=principal,
+        refund_status=status,
         order_no=order_no,
         page=page,
         page_size=page_size,
     )
-    # `refunds` holds `after_sale_id`; the wire shape needs the claim's public identifier. One
-    # query for the page's claims (by id, via the unique index) rather than one per row.
-    claim_numbers = _claim_numbers(session, rows)
     return envelope(
         data={
             "items": [
-                to_refund(row, after_sale_no=claim_numbers[row.after_sale_id]).model_dump(mode="json")
-                for row in rows
+                to_refund(
+                    row, after_sale_no=page_of_refunds.claim_numbers[row.after_sale_id]
+                ).model_dump(mode="json")
+                for row in page_of_refunds.rows
             ],
-            "meta": page_meta(page=page, page_size=page_size, total=total).model_dump(),
+            "meta": page_meta(
+                page=page, page_size=page_size, total=page_of_refunds.total
+            ).model_dump(),
         }
     )
 
@@ -89,54 +93,7 @@ def list_admin_refunds(
     description="Scoped by merchant in the query, so a foreign refund is `REFUND_NOT_FOUND (80003)`.",
 )
 def get_admin_refund(refund_no: str, principal: ConsolePrincipal, session: SessionDep) -> dict:
-    refund = RefundRepository(session).get_by_refund_no(
-        refund_no, merchant_id=_merchant_filter(principal)
+    refund, after_sale_no = AfterSaleService(session).get_admin_refund(
+        principal=principal, refund_no=refund_no
     )
-    if refund is None:
-        raise RefundNotFoundError("refund not found")
-    after_sale_no = session.execute(
-        select(AfterSale.after_sale_no).where(AfterSale.id == refund.after_sale_id)
-    ).scalar_one_or_none()
-    if after_sale_no is None:
-        raise RefundNotFoundError("refund claim not found")
     return envelope(data=to_refund(refund, after_sale_no=after_sale_no).model_dump(mode="json"))
-
-
-def _claim_numbers(session: Session, refunds: list) -> dict[int, str]:
-    """``after_sale_id -> after_sale_no`` for one page of refunds.
-
-    A single ``IN`` query for the page rather than one lookup per row: a refund list is the
-    kind of read where a per-row lookup quietly becomes fifty queries on a busy day.
-    """
-    ids = {row.after_sale_id for row in refunds}
-    if not ids:
-        return {}
-    rows = session.execute(
-        select(AfterSale.id, AfterSale.after_sale_no).where(AfterSale.id.in_(ids))
-    ).all()
-    return {int(row[0]): str(row[1]) for row in rows}
-
-
-def _merchant_filter(principal: object) -> int:
-    """The merchant scope for a console refund query.
-
-    ``None`` would make the query unscoped - the one direction a tenant filter must
-    never fail in - so a staff principal with no merchant is refused rather than
-    answered with every merchant's money movements.
-    """
-    merchant_id = getattr(principal, "merchant_id", None)
-    if merchant_id is None:
-        raise ValidationError("this staff account is not attached to a merchant")
-    return int(merchant_id)
-
-
-def _validate_status_filter(value: str | None) -> None:
-    """Refuse a refund-status filter that can never match (the order module's pattern)."""
-    if value is None:
-        return
-    allowed = tuple(member.value for member in RefundStatus)
-    if value not in allowed:
-        raise ValidationError(
-            f"status must be one of {list(allowed)}",
-            context={"status": value},
-        )

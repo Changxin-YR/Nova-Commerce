@@ -346,6 +346,28 @@ class PromotionService:
         self._session.commit()
         return promotion
 
+    def list_active(self) -> list[Promotion]:
+        """Promotions a shopper could use right now.
+
+        "Applicable" is four conditions, and all four belong in the query rather than
+        in a filter applied afterwards: the promotion is ``ACTIVE``, it has already
+        started, it has not ended, and it still has quota left. A promotion that has
+        run out of quota is *not* applicable - returning it would advertise a discount
+        the checkout then refuses, which is the same defect as overselling.
+        """
+        now = utc_now()
+        rows = self._session.execute(
+            select(Promotion)
+            .where(
+                Promotion.status == "ACTIVE",
+                Promotion.starts_at <= now,
+                Promotion.ends_at > now,
+                Promotion.used_quota < Promotion.total_quota,
+            )
+            .order_by(Promotion.priority.desc(), Promotion.id)
+        ).scalars()
+        return list(rows)
+
     def list_admin(
         self, *, principal: Principal, page: int = 1, page_size: int = 20
     ) -> tuple[list[Promotion], int]:

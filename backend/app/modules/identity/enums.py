@@ -141,6 +141,7 @@ class PermissionCode(StrEnum):
     KNOWLEDGE_WRITE = "knowledge:write"
     KNOWLEDGE_INGEST = "knowledge:ingest"
     # agent / AI
+    AGENT_READ = "agent:read"
     AGENT_CHAT = "agent:chat"
     AGENT_RUN_READ = "agent:run:read"
     # governance

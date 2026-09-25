@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import envelope
@@ -13,7 +12,6 @@ from app.modules.identity.dependencies import ConsolePrincipal
 from app.modules.marketing.models import Promotion
 from app.modules.marketing.schemas import PromotionCreate, PromotionDraft
 from app.modules.marketing.service import PromotionService
-from app.shared.db.base import utc_now
 from app.shared.db.session import get_session
 
 router = APIRouter()
@@ -44,17 +42,7 @@ def _data(promotion: Promotion) -> dict:
 
 @router.get("/promotions", summary="List currently applicable storefront promotions")
 def active_promotions(session: SessionDep) -> dict:
-    now = utc_now()
-    rows = session.execute(
-        select(Promotion)
-        .where(
-            Promotion.status == "ACTIVE",
-            Promotion.starts_at <= now,
-            Promotion.ends_at > now,
-            Promotion.used_quota < Promotion.total_quota,
-        )
-        .order_by(Promotion.priority.desc(), Promotion.id)
-    ).scalars()
+    rows = PromotionService(session).list_active()
     return envelope(data=[_data(row) for row in rows])
 
 

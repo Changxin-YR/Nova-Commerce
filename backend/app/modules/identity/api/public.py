@@ -1,29 +1,28 @@
-"""Cookie-backed authentication routes for the existing session service."""
+"""Cookie-backed authentication routes for the existing session service.
+
+Every handler here is transport only: validate the body, resolve the settings and
+the session, call **one** ``AuthService`` method, set or clear the refresh cookie.
+The transaction is committed by the service (section 49 - the service layer owns
+the boundary), so a router that forgot to commit is not a failure mode this file
+can have.
+"""
 
 from __future__ import annotations
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.core.errors import AuthenticationError, PermissionDeniedError, TokenInvalidError, envelope
-from app.modules.identity.api.users import profile_data
-from app.modules.identity.repository import UserRepository
+from app.core.errors import PermissionDeniedError, TokenInvalidError, envelope
+from app.modules.identity.schemas import LoginBody, profile_data
 from app.modules.identity.service import AuthService, IssuedSession
 from app.shared.db.session import get_session
 
 router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
-
-
-class LoginBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    username: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=1, max_length=1024)
 
 
 def _cookie(response: Response, settings: Settings, refresh_token: str) -> None:
@@ -47,15 +46,19 @@ def _check_cookie_origin(request: Request, settings: Settings) -> None:
         raise PermissionDeniedError("refresh cookie origin is not allowed")
 
 
-def _token_data(issued: IssuedSession, session: Session, settings: Settings) -> dict:
-    user = UserRepository(session).get_with_authorization(issued.session.user_id)
-    if user is None:
-        raise AuthenticationError("account no longer exists")
+def _token_data(issued: IssuedSession, settings: Settings) -> dict:
+    """The frozen token payload; the profile is resolved by the service.
+
+    ``issued.user`` is the account the service already loaded inside its own
+    transaction, so this function never issues a query of its own - an edge that
+    reads the database is an edge that can disagree with the service about what
+    was committed.
+    """
     return {
         "access_token": issued.access_token,
         "token_type": "Bearer",
         "expires_in": settings.ACCESS_TOKEN_TTL_SECONDS,
-        "user": profile_data(user),
+        "user": profile_data(issued.user),
     }
 
 
@@ -67,10 +70,8 @@ def login(body: LoginBody, request: Request, response: Response, session: Sessio
         client_ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
-    data = _token_data(issued, session, settings)
-    session.commit()
     _cookie(response, settings, issued.refresh_token)
-    return envelope(data=data)
+    return envelope(data=_token_data(issued, settings))
 
 
 @router.post("/refresh", summary="Rotate the refresh cookie")
@@ -89,10 +90,8 @@ def refresh(
         client_ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
-    data = _token_data(issued, session, settings)
-    session.commit()
     _cookie(response, settings, issued.refresh_token)
-    return envelope(data=data)
+    return envelope(data=_token_data(issued, settings))
 
 
 @router.post("/logout", summary="End the current refresh-token family")
@@ -100,7 +99,6 @@ def logout(request: Request, response: Response, session: SessionDep, settings: 
     _check_cookie_origin(request, settings)
     token = request.cookies.get(settings.REFRESH_COOKIE_NAME, "")
     revoked = AuthService(session, settings).logout(refresh_token=token)
-    session.commit()
     response.delete_cookie(
         settings.REFRESH_COOKIE_NAME,
         path=settings.REFRESH_COOKIE_PATH,

@@ -43,10 +43,17 @@ from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.modules.aftersales.models import AfterSale, AfterSaleItem, Refund
+from app.modules.agent.models import AgentRun
 from app.modules.catalog.models import Product, ProductImage, ProductSku
 from app.modules.fulfillment.models import Fulfillment, FulfillmentItem
+from app.modules.governance.models import PendingAction
 from app.modules.identity.models import Merchant, User, UserAddress
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
+from app.modules.knowledge.models import (
+    KnowledgeBase,
+    KnowledgeDocument,
+    KnowledgeEvaluation,
+)
 from app.modules.marketing.models import (
     CouponTemplate,
     CouponUsageRecord,
@@ -321,6 +328,39 @@ def report_residue(session: Session) -> ResidueReport:
     report.counts["products"] = count(Product, Product.id.in_(products))
     report.counts["warehouses"] = count(Warehouse, Warehouse.id.in_(warehouses))
     report.counts["user_addresses"] = count(UserAddress, UserAddress.user_id.in_(user_ids))
+    # Phase 6 governance/agent/knowledge rows. They are counted for the same reason
+    # as every other table here - a leak has to be *visible* - and they matter more
+    # than most, because each one is a RESTRICT FK into `users`/`merchants`. A sweep
+    # that did not know about them deleted the user first and died with errno 1451
+    # half-way through, which is a worse outcome than leaving the row: it left the
+    # purge half-applied as well.
+    report.counts["agent_runs"] = count(
+        AgentRun, or_(AgentRun.merchant_id.in_(merchant_ids), AgentRun.user_id.in_(user_ids))
+    )
+    report.counts["pending_actions"] = count(
+        PendingAction,
+        or_(
+            PendingAction.merchant_id.in_(merchant_ids),
+            PendingAction.requested_by.in_(user_ids),
+            PendingAction.decided_by.in_(user_ids),
+        ),
+    )
+    report.counts["knowledge_evaluations"] = count(
+        KnowledgeEvaluation,
+        KnowledgeEvaluation.knowledge_base_id.in_(
+            select(KnowledgeBase.id).where(KnowledgeBase.merchant_id.in_(merchant_ids))
+        ),
+    )
+    report.counts["knowledge_documents"] = count(
+        KnowledgeDocument,
+        or_(
+            KnowledgeDocument.merchant_id.in_(merchant_ids),
+            KnowledgeDocument.uploaded_by.in_(user_ids),
+        ),
+    )
+    report.counts["knowledge_bases"] = count(
+        KnowledgeBase, KnowledgeBase.merchant_id.in_(merchant_ids)
+    )
 
     patterns = _marker_like_patterns(report)
     if patterns:
@@ -434,6 +474,49 @@ def purge_test_residue(session: Session, *, dry_run: bool = True) -> ResidueRepo
     session.execute(delete(ProductImage).where(ProductImage.product_id.in_(products)))
     session.execute(delete(Product).where(Product.id.in_(products)))
     session.execute(delete(UserAddress).where(UserAddress.user_id.in_(user_ids)))
+
+    # --- Phase 6 governance / agent / knowledge ---------------------------
+    # Added after a real failure: the sweep used to reach `DELETE FROM users` with a
+    # `pending_actions` row still naming that user, and MySQL refused with errno 1451
+    # (`fk_pending_actions_decided_by_users`). Because the deletes above are not
+    # committed until the end, the failure rolled *all* of them back, so the merchant
+    # and users survived too and the next run inherited a marker root it never made.
+    #
+    # The clause is an OR over merchant and user ids rather than merchant alone: the
+    # rows are attributed by whichever root this sweep can actually prove - a marker
+    # merchant, or a marker user whose merchant is not itself marker-shaped.
+    session.execute(
+        delete(PendingAction).where(
+            or_(
+                PendingAction.merchant_id.in_(merchant_ids),
+                PendingAction.requested_by.in_(user_ids),
+                PendingAction.decided_by.in_(user_ids),
+            )
+        )
+    )
+    session.execute(
+        delete(AgentRun).where(
+            or_(AgentRun.merchant_id.in_(merchant_ids), AgentRun.user_id.in_(user_ids))
+        )
+    )
+    session.execute(
+        delete(KnowledgeEvaluation).where(
+            KnowledgeEvaluation.knowledge_base_id.in_(
+                select(KnowledgeBase.id).where(KnowledgeBase.merchant_id.in_(merchant_ids))
+            )
+        )
+    )
+    session.execute(
+        delete(KnowledgeDocument).where(
+            or_(
+                KnowledgeDocument.merchant_id.in_(merchant_ids),
+                KnowledgeDocument.uploaded_by.in_(user_ids),
+            )
+        )
+    )
+    session.execute(
+        delete(KnowledgeBase).where(KnowledgeBase.merchant_id.in_(merchant_ids))
+    )
 
     # --- identity last -----------------------------------------------------
     for mid in merchant_ids:

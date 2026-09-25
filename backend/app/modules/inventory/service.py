@@ -25,10 +25,17 @@ told yes is told no. Locking first makes the decision itself exclusive.
 
 ## Transaction ownership
 
-These services **do not commit**. The caller owns the transaction, because §49
-requires the business rows and the outbox row to commit together - an implicit
-commit here would break that. For order creation the caller's transaction *is*
-the short transaction of §27.
+The **stock-change** methods do not commit. The caller owns the transaction,
+because §49 requires the business rows and the outbox row to commit together -
+an implicit commit here would break that. For order creation the caller's
+transaction *is* the short transaction of §27.
+
+The console-facing *use cases* at the bottom of this class are the deliberate
+exception, and they are named so the boundary is visible at the call site: a use
+case that exists only to serve one HTTP request owns its commit (``adjust_and_commit``,
+``verify_ledger_for_sku``), while ``adjust`` and ``verify_ledger`` keep the primitive
+contract above. Splitting them this way is what lets the router stay a transport
+edge: it never opens a session query and never commits one.
 """
 
 from __future__ import annotations
@@ -45,6 +52,7 @@ from app.core.errors import (
     ValidationError,
 )
 from app.core.logging import get_logger
+from app.modules.catalog.models import Product, ProductSku
 from app.modules.inventory.enums import (
     MovementType,
     OperatorType,
@@ -52,6 +60,7 @@ from app.modules.inventory.enums import (
 )
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.inventory.repository import InventoryRepository, WarehouseRepository
+from app.modules.inventory.schemas import InventoryOut
 from app.shared.db.base import utc_now
 
 logger = get_logger(__name__)
@@ -626,6 +635,140 @@ class InventoryService:
         self._session.flush()
         return inventory
 
+    # -- console use cases (HTTP-facing; these own their transaction) ------
+    def console_row(self, inventory: Inventory) -> InventoryOut:
+        """Project a stock row into the frozen console shape (§§17/95).
+
+        ``sku_no`` / ``product_name`` / ``sku_name`` are joined in here rather than
+        stored on the inventory row, so the console can render a human-readable stock
+        list without a second request per row. The lookups use ``Session.get`` on the
+        primary key, which is why they cost no extra round trip for rows already in
+        the identity map; an unknown SKU leaves the label fields at their empty
+        defaults rather than failing the whole page.
+        """
+        out = InventoryOut.model_validate(inventory)
+        sku = self._session.get(ProductSku, inventory.sku_id)
+        if sku is not None:
+            out.sku_no = sku.sku_no
+            out.sku_name = sku.name
+            product = self._session.get(Product, sku.product_id)
+            if product is not None:
+                out.product_name = product.name
+        return out
+
+    def position_for_optional(
+        self, *, sku_id: int, warehouse_id: int | None = None
+    ) -> Inventory | None:
+        """One stock position, or ``None``.
+
+        The public availability endpoint needs "not stocked" and "out of stock" to be
+        indistinguishable to the caller (§§§26/28), so it asks for a row that may
+        legitimately not exist; the console form uses :meth:`position_for`, which
+        refuses instead.
+        """
+        return self._inventory.get_by_sku(sku_id=sku_id, warehouse_id=warehouse_id)
+
+    def console_position(self, *, sku_id: int) -> InventoryOut:
+        """The console's one-position read, already projected."""
+        return self.console_row(self.position_for(sku_id=sku_id))
+
+    def position_for(self, *, sku_id: int, warehouse_id: int | None = None) -> Inventory:
+        """One stock position, or the frozen not-found error."""
+        inventory = self._inventory.get_by_sku(sku_id=sku_id, warehouse_id=warehouse_id)
+        if inventory is None:
+            raise InventoryNotFoundError(f"no stock record for SKU {sku_id}")
+        return inventory
+
+    def positions_page(
+        self,
+        *,
+        merchant_id: int | None,
+        page: int,
+        page_size: int,
+        search: str | None = None,
+        low_stock_only: bool = False,
+    ) -> tuple[list[Inventory], int]:
+        """One console page of stock positions plus the unpaginated total.
+
+        Merchant scoping stays a parameter of the *query* here rather than a
+        post-load filter: ``None`` means "every merchant" to the repository, so the
+        router must pass the principal's merchant explicitly.
+        """
+        return self._inventory.list_inventory(
+            merchant_id=merchant_id,
+            search=search,
+            low_stock_only=low_stock_only,
+            offset=(page - 1) * page_size,
+            limit=page_size,
+        )
+
+    def movements_page(
+        self,
+        *,
+        sku_id: int,
+        page: int,
+        page_size: int,
+        movement_type: MovementType | None = None,
+    ) -> list[InventoryMovement]:
+        """One page of the ledger for a SKU, newest first.
+
+        The repository is asked for ``page_size * page`` rows and the caller's page
+        sliced out of them, which is the shape the console endpoint has always used;
+        it stays here so the paging arithmetic is not re-derived at the edge.
+        """
+        inventory = self.position_for(sku_id=sku_id)
+        rows = self._inventory.movements_for(
+            warehouse_id=inventory.warehouse_id,
+            sku_id=sku_id,
+            movement_type=movement_type,
+            limit=page_size * page,
+        )
+        return list(rows[:page_size])
+
+    def adjust_and_commit(
+        self,
+        *,
+        sku_id: int,
+        version: int,
+        delta_available: int,
+        warehouse_id: int | None,
+        reason: str,
+        movement_type: MovementType,
+        operator_type: OperatorType,
+        operator_id: int | None,
+        idempotency_key: str,
+    ) -> Inventory:
+        """Apply a console adjustment and commit it as one unit of work.
+
+        The permission check is the caller's (it belongs to the principal, not to
+        stock); everything after it - the optimistic-locked write and the movement
+        row that explains it (INV-007) - must be durable together or the ledger and
+        the balance disagree the moment the process dies.
+        """
+        inventory = self.adjust(
+            sku_id=sku_id,
+            version=version,
+            delta_available=delta_available,
+            warehouse_id=warehouse_id,
+            reason=reason,
+            movement_type=movement_type,
+            operator_type=operator_type,
+            operator_id=operator_id,
+            idempotency_key=idempotency_key,
+        )
+        self._session.commit()
+        return inventory
+
+    def verify_ledger_for_sku(self, *, sku_id: int) -> tuple[bool, dict[str, int]]:
+        """``verify_ledger`` resolved from a SKU alone (the console's form).
+
+        The warehouse is looked up from the SKU's own position rather than taken
+        from the request, so an operator cannot ask "is SKU 7 consistent in
+        warehouse 3" and be answered about a warehouse the SKU has no row in.
+        """
+        inventory = self.position_for(sku_id=sku_id)
+        return self.verify_ledger(warehouse_id=inventory.warehouse_id, sku_id=sku_id)
+
     # -- reconciliation ---------------------------------------------------
     def verify_ledger(self, *, warehouse_id: int, sku_id: int) -> tuple[bool, dict[str, int]]:
         """Check that the movement ledger explains the current balance (INV-007).
@@ -653,6 +796,42 @@ class InventoryService:
             net_available == inventory.available_qty and net_locked == inventory.locked_qty,
             detail,
         )
+
+    def list_positions(
+        self,
+        *,
+        merchant_id: int | None = None,
+        low_stock_only: bool = False,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[Inventory], int]:
+        """One page of stock positions, and how many exist in total.
+
+        The read path behind the MCP ``nova.inventory.get`` tool and the console's
+        stock list. It exists as a service method rather than letting callers reach
+        ``InventoryRepository.list_inventory`` directly because the merchant filter is
+        an *authorization* decision: a tool that passed no ``merchant_id`` would read
+        every merchant's stock, and nothing in the repository refuses that (the filter
+        is optional there precisely so platform-scoped console reads can omit it).
+
+        Returns ``(rows, total)`` rather than a page object so the two existing
+        consumers - which differ in what they do with the total - both stay simple.
+        """
+        from app.core.errors import PermissionDeniedError
+
+        if merchant_id is None:
+            # Fail closed. ``DataScope.ALL`` callers are the console, not the MCP
+            # surface, and they can pass an explicit scope decision at the call site.
+            raise PermissionDeniedError("inventory reads require an explicit merchant scope")
+        rows, total = self._inventory.list_inventory(
+            merchant_id=merchant_id,
+            search=search,
+            low_stock_only=low_stock_only,
+            offset=offset,
+            limit=limit,
+        )
+        return rows, total
 
     def low_stock_report(
         self, *, threshold_multiplier: float = 1.0, limit: int = 50

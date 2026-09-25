@@ -1,3 +1,10 @@
+"""Audit console reads.
+
+Transport only: principal, one ``AuditService`` call, then the frozen record shape via
+``app.modules.audit.schemas``. The projection used to be an inline comprehension here,
+which put the wire contract in the router; it is a schema decision, so it moved.
+"""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -6,6 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.errors import envelope
+from app.modules.audit.schemas import audit_page_meta, audit_record_data
 from app.modules.audit.service import AuditService
 from app.modules.identity.dependencies import ConsolePrincipal
 from app.shared.db.session import get_session
@@ -30,27 +38,7 @@ def list_audit_records(
     )
     return envelope(
         data={
-            "items": [
-                {
-                    "id": str(row.id),
-                    "actor_id": str(row.actor_id) if row.actor_id is not None else "system",
-                    "actor_type": row.actor_type,
-                    "action": row.action,
-                    "resource_type": row.resource_type,
-                    "resource_id": row.resource_id,
-                    "trace_id": row.trace_id or "",
-                    "before_snapshot": row.before_snapshot,
-                    "after_snapshot": row.after_snapshot,
-                    "result": row.result,
-                    "created_at": row.created_at,
-                }
-                for row in rows
-            ],
-            "meta": {
-                "page": page,
-                "page_size": page_size,
-                "total": total,
-                "total_pages": (total + page_size - 1) // page_size if total else 0,
-            },
+            "items": [audit_record_data(row) for row in rows],
+            "meta": audit_page_meta(page=page, page_size=page_size, total=total),
         }
     )

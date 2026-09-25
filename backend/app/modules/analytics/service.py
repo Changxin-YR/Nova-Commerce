@@ -15,30 +15,17 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import PermissionDeniedError, ValidationError
 from app.modules.aftersales.models import Refund
+from app.modules.analytics.schemas import METRIC_UNITS, Granularity, Metric
 from app.modules.identity.enums import PermissionCode
 from app.modules.identity.service import Principal
 from app.modules.inventory.models import Inventory, InventoryMovement
 from app.modules.order.models import Order, OrderItem
-
-Metric = Literal[
-    "sales.gmv", "sales.order_count", "inventory.turnover",
-    "product.performance", "refund.rate",
-]
-Granularity = Literal["day", "week", "month"]
-METRIC_UNITS: dict[str, str] = {
-    "sales.gmv": "minor_currency",
-    "sales.order_count": "count",
-    "inventory.turnover": "ratio",
-    "product.performance": "minor_currency",
-    "refund.rate": "ratio",
-}
 
 
 def _at_start(day: date) -> datetime:

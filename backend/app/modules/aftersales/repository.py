@@ -221,6 +221,20 @@ class AfterSaleRepository:
             stmt = stmt.with_for_update()
         return self._session.execute(stmt).scalars().first()
 
+    def claim_numbers_by_id(self, claim_ids: set[int]) -> dict[int, str]:
+        """``after_sale_id -> after_sale_no`` for a batch of refund rows.
+
+        A ``refund`` row stores ``after_sale_id``; the console wire shape needs the
+        claim's public identifier. One ``IN`` query for the page rather than a lookup
+        per refund, which is the difference between one round trip and fifty.
+        """
+        if not claim_ids:
+            return {}
+        rows = self._session.execute(
+            select(AfterSale.id, AfterSale.after_sale_no).where(AfterSale.id.in_(claim_ids))
+        ).all()
+        return {int(row[0]): str(row[1]) for row in rows}
+
     def list_for_order(self, order_id: int) -> list[AfterSale]:
         """Every claim on one order, oldest first.
 

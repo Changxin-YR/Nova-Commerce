@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.errors import envelope
-from app.modules.catalog.api.public import _image_url, _summary
 from app.modules.catalog.models import Product, ProductSku
+from app.modules.catalog.public_service import image_url, summary_data
 from app.modules.catalog.schemas import ProductCreate, ProductUpdate, SkuCreate
 from app.modules.catalog.service import CatalogService
 from app.modules.identity.dependencies import ConsolePrincipal
@@ -36,7 +36,7 @@ def sku_data(sku: ProductSku) -> dict:
 
 def product_data(product: Product) -> dict:
     return {
-        **_summary(product),
+        **summary_data(product),
         "subtitle": product.subtitle,
         "description": product.description,
         "category": {"id": product.category.id, "name": product.category.name} if product.category else None,
@@ -44,7 +44,7 @@ def product_data(product: Product) -> dict:
         "images": [
             {"id": image.id, "url": url, "alt": image.alt_text, "sort_order": image.sort_order}
             for image in sorted(product.images, key=lambda row: (row.sort_order, row.id))
-            if (url := _image_url(image))
+            if (url := image_url(image))
         ],
         "skus": [sku_data(sku) for sku in product.skus if sku.deleted_at is None],
         "max_price_amount": product.max_price,
@@ -66,7 +66,7 @@ def list_admin_products(
         principal=principal, page=page, page_size=page_size, keyword=keyword, status=status,
     )
     return envelope(data={
-        "items": [_summary(row) for row in rows],
+        "items": [summary_data(row) for row in rows],
         "meta": page_meta(page=page, page_size=page_size, total=total).model_dump(),
     })
 

@@ -1,4 +1,9 @@
-"""Authenticated profile and permission hints."""
+"""Authenticated profile and permission hints.
+
+Both handlers are reads with no transaction of their own: the account is loaded
+by ``AuthService.user_profile`` and the permission hints come straight off the
+already-resolved principal.
+"""
 
 from __future__ import annotations
 
@@ -7,34 +12,24 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.errors import AuthenticationError, envelope
-from app.core.redaction import mask_email, mask_phone
+from app.core.config import Settings, get_settings
+from app.core.errors import envelope
 from app.modules.identity.dependencies import CurrentPrincipal
-from app.modules.identity.models import User
-from app.modules.identity.repository import UserRepository
+from app.modules.identity.schemas import profile_data
+from app.modules.identity.service import AuthService
 from app.shared.db.session import get_session
 
 router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
-def profile_data(user: User) -> dict:
-    return {
-        "id": user.id,
-        "username": user.username,
-        "display_name": user.display_name,
-        "email": mask_email(user.email) if user.email else None,
-        "phone": mask_phone(user.phone) if user.phone else None,
-        "roles": list(user.role_codes),
-        "merchant_id": user.merchant_id,
-    }
-
-
 @router.get("/users/me", summary="Current account")
-def me(principal: CurrentPrincipal, session: SessionDep) -> dict:
-    user = UserRepository(session).get_with_authorization(principal.user_id)
-    if user is None:
-        raise AuthenticationError("account no longer exists")
+def me(
+    principal: CurrentPrincipal,
+    session: SessionDep,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
+    user = AuthService(session, settings).user_profile(principal.user_id)
     return envelope(data=profile_data(user))
 
 

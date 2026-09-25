@@ -105,6 +105,11 @@ class IssuedSession:
     access_claims: AccessTokenClaims
     refresh_token: str
     refresh_expires_at: datetime
+    #: The account the session was minted for, already loaded with its
+    #: authorisation graph. Carried on the result so the caller can render a
+    #: profile from *this* transaction instead of issuing a second read that
+    #: could disagree with what was just committed.
+    user: User
 
 
 @dataclass(slots=True)
@@ -370,13 +375,20 @@ class AuthService:
         )
         logger.info("login succeeded", user_id=user.id, session_id=auth_session.session_id)
 
-        return IssuedSession(
+        issued = IssuedSession(
             session=auth_session,
             access_token=access_token,
             access_claims=claims,
             refresh_token=refresh_token,
             refresh_expires_at=auth_session.expires_at,
+            user=user,
         )
+        # The service owns the transaction boundary (section 49): the account row
+        # (failed-attempt counters, ``last_login_at``) and the new session row are
+        # one unit of work, so a crash between them cannot leave a live session
+        # with an unrecorded login.
+        self._session.commit()
+        return issued
 
     # -- refresh (the rotation path) --------------------------------------
     def rotate(
@@ -477,13 +489,20 @@ class AuthService:
             previous_session_id=auth_session.session_id,
             new_session_id=successor.session_id,
         )
-        return IssuedSession(
+        issued = IssuedSession(
             session=successor,
             access_token=access_token,
             access_claims=claims,
             refresh_token=refresh_token,
             refresh_expires_at=successor.expires_at,
+            user=user,
         )
+        # One unit of work: the revocation of the presented row and the insertion of
+        # its successor must land together. Committing only the revocation would
+        # leave the caller logged out; committing only the successor would make
+        # INV-016 (a rotated token is dead) false in the durable state.
+        self._session.commit()
+        return issued
 
     def _handle_reuse(
         self,
@@ -610,6 +629,7 @@ class AuthService:
             access_claims=claims,
             refresh_token=refresh_token,
             refresh_expires_at=successor.expires_at,
+            user=user,
         )
 
     def _family_tip(self, auth_session: AuthSession) -> AuthSession:
@@ -650,6 +670,10 @@ class AuthService:
             auth_session, reason=SessionRevokeReason.LOGOUT.value
         )
         revoked = family_revoked + (1 if was_live else 0)
+        # Revocation is the effect: it must be durable even though the response is
+        # only a count, or a client that discards the response would leave the
+        # family alive on the server.
+        self._session.commit()
         logger.info("logout", session_id=auth_session.session_id, revoked_sessions=revoked)
         return revoked
 
@@ -683,6 +707,19 @@ class AuthService:
         if user is None:
             raise AuthenticationError("account no longer exists")
         return self._build_principal(user, session_id=session_id)
+
+    def user_profile(self, user_id: int) -> User:
+        """The account behind an authenticated principal, with its roles loaded.
+
+        Read-only, and deliberately on the service rather than in the router: the
+        account no longer existing is a *domain* outcome (401), not a routing
+        detail, and the alternative - a router that opens its own query - is the
+        coupling the architecture constraint exists to prevent.
+        """
+        user = self._users.get_with_authorization(user_id)
+        if user is None:
+            raise AuthenticationError("account no longer exists")
+        return user
 
     def change_password(self, *, user_id: int, current_password: str, new_password: str) -> None:
         """Change a password and revoke every other session.
@@ -769,7 +806,12 @@ class AddressService:
             tag=tag,
             is_default=make_default,
         )
-        return self._addresses.add(address)
+        created = self._addresses.add(address)
+        # The address book owns its own transaction: creating an address is a
+        # complete use case, not a step inside a larger one, so it commits here
+        # (the pattern every other module's write service follows).
+        self._session.commit()
+        return created
 
     def update(
         self,
@@ -807,7 +849,7 @@ class AddressService:
                 setattr(address, key, value.strip())
             else:
                 setattr(address, key, value)
-        self._session.flush()
+        self._session.commit()
         return address
 
     def delete(self, *, user_id: int, address_id: int) -> None:
@@ -820,13 +862,15 @@ class AddressService:
                 # Promote another address so checkout always has a default and
                 # never has to guess.
                 remaining[0].is_default = True
-                self._session.flush()
+        # Removal (and the possible promotion of a new default) is one unit of
+        # work: an address book with no default would make checkout guess.
+        self._session.commit()
 
     def set_default(self, *, user_id: int, address_id: int) -> UserAddress:
         address = self.get(user_id=user_id, address_id=address_id)
         self._addresses.clear_default(user_id, except_id=address.id)
         address.is_default = True
-        self._session.flush()
+        self._session.commit()
         return address
 
 

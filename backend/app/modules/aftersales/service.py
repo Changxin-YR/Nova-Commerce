@@ -57,12 +57,13 @@ from app.core.errors import (
     IdempotencyPayloadMismatchError,
     OrderNotFoundError,
     RefundAmountInvalidError,
+    RefundNotFoundError,
     ValidationError,
 )
 from app.core.logging import get_logger
-from app.modules.aftersales.enums import AfterSaleClaimStatus, AfterSaleType
-from app.modules.aftersales.models import AfterSale, AfterSaleItem
-from app.modules.aftersales.repository import AfterSaleRepository
+from app.modules.aftersales.enums import AfterSaleClaimStatus, AfterSaleType, RefundStatus
+from app.modules.aftersales.models import AfterSale, AfterSaleItem, Refund
+from app.modules.aftersales.repository import AfterSaleRepository, RefundRepository
 from app.modules.aftersales.schemas import (
     ApplyAfterSaleRequest,
     ApproveAfterSaleRequest,
@@ -85,6 +86,7 @@ __all__ = [
     "AfterSaleService",
     "ClaimEligibility",
     "ClaimPage",
+    "RefundPage",
     "after_sale_no_for",
     "request_hash_for_claim",
 ]
@@ -159,6 +161,21 @@ class ClaimPage:
     total: int
 
 
+@dataclass(frozen=True, slots=True)
+class RefundPage:
+    """One page of refund movements, plus the claim number each one paid.
+
+    ``claim_numbers`` is a mapping rather than a field on ``Refund`` because the
+    wire shape needs the claim's *public* identifier while the row only holds
+    ``after_sale_id``; resolving it in one ``IN`` query per page is what keeps a
+    fifty-row console list from becoming fifty lookups.
+    """
+
+    rows: tuple[Refund, ...]
+    total: int
+    claim_numbers: dict[int, str]
+
+
 def after_sale_no_for(*, claim_id: int, created_at: datetime) -> str:
     """``NVAS<YYYYMMDD><id:06d>`` (PHASE5_DESIGN section 5.5).
 
@@ -208,6 +225,7 @@ class AfterSaleService:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._claims = AfterSaleRepository(session)
+        self._refunds = RefundRepository(session)
         self._orders = OrderRepository(session)
         self._idempotency = IdempotencyRepository(session)
 
@@ -741,6 +759,70 @@ class AfterSaleService:
         )
         return ClaimPage(rows=tuple(rows), total=total)
 
+    # ------------------------------------------------------------------
+    # Refund movements (the read-only console list of design section 7)
+    # ------------------------------------------------------------------
+    def list_admin_refunds(
+        self,
+        *,
+        principal: Principal,
+        refund_status: str | None = None,
+        order_no: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> RefundPage:
+        """One page of refund movements for the caller's merchant.
+
+        A refund is a *money* fact, so the read is scoped by merchant exactly like the
+        claim queries: an unscoped console list would show one merchant another
+        merchant's payouts. The status filter is validated against the refund
+        vocabulary, because a filter that can never match reads as "no such movement"
+        to the operator who typed it.
+        """
+        principal.require_permission(PermissionCode.AFTER_SALE_READ.value)
+        _validate_status_filter(
+            refund_status, "status", allowed=tuple(m.value for m in RefundStatus)
+        )
+        rows, total = self._refunds.list_admin_refunds(
+            merchant_id=_merchant_filter(principal),
+            status=refund_status,
+            order_no=order_no,
+            page=page,
+            page_size=page_size,
+        )
+        return RefundPage(
+            rows=tuple(rows), total=total, claim_numbers=self.claim_numbers_for(rows)
+        )
+
+    def get_admin_refund(self, *, principal: Principal, refund_no: str) -> tuple[Refund, str]:
+        """One refund movement and the public number of the claim it paid.
+
+        Both rows are resolved inside the merchant scope, so a foreign refund is
+        indistinguishable from a missing one (the frozen 404).
+        """
+        principal.require_permission(PermissionCode.AFTER_SALE_READ.value)
+        merchant_id = _merchant_filter(principal)
+        refund = self._refunds.get_by_refund_no(refund_no, merchant_id=merchant_id)
+        if refund is None:
+            raise RefundNotFoundError("refund not found")
+        claim_numbers = self.claim_numbers_for([refund])
+        after_sale_no = claim_numbers.get(refund.after_sale_id)
+        if after_sale_no is None:
+            raise RefundNotFoundError("refund claim not found")
+        return refund, after_sale_no
+
+    def claim_numbers_for(self, refunds: list[Refund]) -> dict[int, str]:
+        """``after_sale_id -> after_sale_no`` for a batch of refunds.
+
+        A single ``IN`` query for the page rather than one lookup per row: a refund
+        list is the kind of read where a per-row lookup quietly becomes fifty queries
+        on a busy day.
+        """
+        ids = {row.after_sale_id for row in refunds}
+        if not ids:
+            return {}
+        return self._claims.claim_numbers_by_id(ids)
+
     def items_of(self, claim: AfterSale) -> list[AfterSaleItem]:
         """The claim's lines, in ``order_item_id`` order (the split's read order)."""
         return self._claims.items_for(claim.id)
@@ -788,11 +870,19 @@ def _merchant_filter(principal: Principal) -> int:
     return principal.merchant_id
 
 
-def _validate_status_filter(value: str | None, field: str) -> None:
-    """Refuse a claim-status filter that can never match (the order module's pattern)."""
+def _validate_status_filter(
+    value: str | None, field: str, *, allowed: tuple[str, ...] | None = None
+) -> None:
+    """Refuse a status filter that can never match (the order module's pattern).
+
+    ``allowed`` defaults to the claim vocabulary; the refund list passes its own, so
+    one validator covers both without the refund statuses being quietly accepted on a
+    claim query (or the reverse).
+    """
     if value is None:
         return
-    allowed = tuple(member.value for member in AfterSaleClaimStatus)
+    if allowed is None:
+        allowed = tuple(member.value for member in AfterSaleClaimStatus)
     if value not in allowed:
         raise ValidationError(
             f"{field} must be one of {list(allowed)}",

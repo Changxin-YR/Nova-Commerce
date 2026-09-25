@@ -1,0 +1,45 @@
+# Keep the Docker build context to the files the image actually needs.
+#
+# `ops/docker-compose.yml` uses `context: ..` (the repository root), so without
+# this file the daemon would receive `.venv/`, `frontend/node_modules/` and the
+# generated `artifacts/` tree - several gigabytes of local tooling and run
+# output that no image stage reads. That is not only slow: `artifacts/` holds a
+# multi-hundred-megabyte sqlite history file, and `.env` holds real credentials.
+#
+# `.env` is excluded deliberately (spec section 134): configuration is injected
+# at run time via `env_file:`, never baked into a layer.
+
+# --- version control / tooling -------------------------------------------
+.git
+.gitignore
+.github
+.agent-teams
+
+# --- local Python environment --------------------------------------------
+.venv
+**/__pycache__
+**/*.py[cod]
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# --- local Node environment ----------------------------------------------
+node_modules
+**/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+frontend/e2e/.artifacts
+
+# --- run output / secrets -------------------------------------------------
+artifacts
+*.sqlite
+*.sqlite3
+*.log
+.env
+.env.*
+!.env.example
+docs
+evals

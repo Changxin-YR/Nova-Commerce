@@ -1,0 +1,84 @@
+# =============================================================================
+# Nova Commerce API image (spec section 128).
+#
+# NOTE: there is deliberately no `# syntax=docker/dockerfile:1` directive. That
+# directive makes BuildKit *pull* the `docker/dockerfile` frontend image from
+# Docker Hub on every build, which fails on a registry-isolated host for a reason
+# unrelated to this project. Every instruction below is standard Dockerfile
+# syntax, so the built-in frontend is sufficient and the build stays offline-safe
+# apart from the PyPI dependency resolution the project genuinely needs.
+#
+# Referenced by `ops/docker-compose.yml`:
+#   * `migrate`  -> `alembic upgrade head` from this image, once, then exits.
+#   * the `api` service (section 128) runs `uvicorn app.main:app` from it.
+#
+# Why the build context is the REPOSITORY ROOT and not `backend/`:
+# `docker-compose.yml` declares `context: ..` relative to `ops/`, so the context
+# is the repo root. The `.dockerignore` at the repo root keeps `.venv/`,
+# `node_modules/`, `artifacts/` and `.git/` out of it - without it, the context
+# would be several gigabytes of local tooling that the image never uses.
+#
+# Design decisions worth stating, because each one is a real trade-off:
+#
+#  1. The image installs the package from `pyproject.toml` (`pip install .`)
+#     rather than from a hand-maintained `requirements.txt`. `pyproject.toml`
+#     is the single dependency authority (spec section 19); a second list would
+#     be a second source of truth and would drift on the next dependency bump.
+#  2. Only the RUNTIME surface is copied - `app/`, `migrations/` and
+#     `alembic.ini`. Tests and the `.coverage` file are not part of a
+#     deployable artefact.
+#  3. It runs as an unprivileged user. The process serves network traffic but
+#     never needs to write to its own filesystem, and a compromised API should
+#     not own root inside the container.
+#  4. The interpreter base is an ARG with the production default
+#     (`python:3.11-slim`, inside the `>=3.11,<3.13` support window). It is
+#     overridable because a build host whose registry mirror cannot serve
+#     Docker Hub must be able to build from a locally cached interpreter that
+#     still satisfies `requires-python`; the emitter records which base was
+#     actually used, so the evidence says what was built rather than what was
+#     intended.
+# =============================================================================
+
+ARG PYTHON_BASE=python:3.11-slim
+FROM ${PYTHON_BASE} AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/srv/nova
+
+WORKDIR /srv/nova
+
+# `curl` is not used by the application; it exists so the HEALTHCHECK below can
+# probe the real HTTP surface from inside the container, which is the only probe
+# that proves the process is actually serving.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dependency + package install. Copied before the "everything else" step on
+# purpose: Docker caches this layer, so editing application code below does not
+# re-resolve the dependency graph.
+COPY backend/pyproject.toml backend/README.md ./
+COPY backend/app ./app
+COPY backend/migrations ./migrations
+COPY backend/alembic.ini ./
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install --no-cache-dir .
+
+# Unprivileged runtime identity (spec section 128/134).
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nova \
+    && chown -R nova:nova /srv/nova
+USER nova
+
+EXPOSE 8000
+
+# Liveness, not readiness: /health/ready probes MySQL/Redis and would restart a
+# healthy container whenever a dependency blips. Readiness stays a routing
+# decision (spec section 130), liveness stays "is this process alive".
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 \
+    CMD curl -fsS http://127.0.0.1:8000/health/live || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -83,11 +83,22 @@ keycloak 18080 · api (dev) 18001 · vite (dev) 5173
 ### Credentials (dev only, all in `.env` which is gitignored)
 
 ```
-MySQL:    user=nova  password=nova_dev_password  db=nova  root=rootpw
-MinIO:    novaadmin / novasecret
-Keycloak: admin / admin  (realm `nova`)
-JWT:      dev-only-secret-not-for-production-use-0123456789abcdef
+MySQL:    user=nova  password=<set-in-.env>  db=nova  root=<set-in-.env>
+MinIO:    S3_ACCESS_KEY / S3_SECRET_KEY=<set-in-.env>
+Keycloak: KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD=<set-in-.env>  (realm `nova`)
+JWT:      JWT_SECRET_KEY=<generated>  (64 bytes of entropy; see the snippet above)
 ```
+
+The values themselves live only in `.env` - read them from there instead of from
+this document, so a rotated credential never leaves a stale copy behind here:
+
+```
+grep -E "^(MYSQL_PASSWORD|MYSQL_ROOT_PASSWORD|S3_ACCESS_KEY|S3_SECRET_KEY|JWT_SECRET_KEY)=" .env
+```
+
+They are development-only defaults and must not be reused outside the local stack.
+The FG-24 secret scan fails the build when a value the working `.env` is using is
+repeated in any tracked file, which is why no credential value is quoted above.
 
 `.env.example` is the documented template. **`tests/unit/core/test_settings_contract.py`
 fails the build if a settings field is undocumented or a documented key does

@@ -28,8 +28,10 @@ import pytest
 from sqlalchemy import delete, text
 from sqlalchemy.orm import Session
 
+from app.modules.agent.models import AgentRun
 from app.modules.catalog.models import Product, ProductImage, ProductSku
 from app.modules.fulfillment.models import Fulfillment, FulfillmentItem
+from app.modules.governance.models import PendingAction
 from app.modules.identity.enums import DataScope, PermissionCode, UserType
 from app.modules.identity.models import (
     Merchant,
@@ -44,6 +46,11 @@ from app.modules.identity.service import Principal
 from app.modules.inventory.enums import MovementType, OperatorType, ReferenceType
 from app.modules.inventory.models import Inventory, InventoryMovement, Warehouse
 from app.modules.inventory.service import InventoryService
+from app.modules.knowledge.models import (
+    KnowledgeBase,
+    KnowledgeDocument,
+    KnowledgeEvaluation,
+)
 from app.modules.marketing.models import (
     CouponTemplate,
     CouponUsageRecord,
@@ -478,6 +485,40 @@ def _purge(created: dict[str, object], *, marker: str) -> None:
         # ran first. A global vocabulary row created on demand and never removed is
         # the same choice the catalog and identity fixtures already make for their
         # lookup rows.
+        # Phase 6 rows that FK-RESTRICT into `users` and `merchants`, and which the
+        # earlier phases had no reason to know about. Each of these blocks the
+        # `DELETE FROM users` below with errno 1451:
+        #
+        #   * `pending_actions.requested_by` / `decided_by` -> users (RESTRICT)
+        #   * `agent_runs.user_id`                          -> users (RESTRICT)
+        #   * `knowledge_documents.uploaded_by`             -> users (RESTRICT)
+        #
+        # When that happened the whole `_purge` aborted before `commit()`, so the
+        # merchant, the users and every row already deleted-but-uncommitted came
+        # back - which is how a *later* suite inherited a marker merchant it never
+        # created and failed in `purge_test_residue` instead of in the test that
+        # leaked. Deleting them here, children-first, is the fixture-level fix that
+        # design section 13.5 asks for; `residue.purge_test_residue` is the net.
+        session.execute(
+            delete(PendingAction).where(PendingAction.merchant_id == created["merchant_id"])
+        )
+        session.execute(delete(AgentRun).where(AgentRun.merchant_id == created["merchant_id"]))
+        knowledge_base_ids = select(KnowledgeBase.id).where(
+            KnowledgeBase.merchant_id == created["merchant_id"]
+        )
+        session.execute(
+            delete(KnowledgeEvaluation).where(
+                KnowledgeEvaluation.knowledge_base_id.in_(knowledge_base_ids)
+            )
+        )
+        session.execute(
+            delete(KnowledgeDocument).where(
+                KnowledgeDocument.merchant_id == created["merchant_id"]
+            )
+        )
+        session.execute(
+            delete(KnowledgeBase).where(KnowledgeBase.merchant_id == created["merchant_id"])
+        )
         for key in ("consumer_id", "staff_id"):
             session.execute(text("DELETE FROM users WHERE id = :id"), {"id": created[key]})
         if created.get("created_warehouse") and created.get("warehouse_id"):

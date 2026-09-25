@@ -66,6 +66,22 @@ def _split_csv(value: object) -> object:
     return value
 
 
+#: Default endpoints of the MCP resource server. Named constants rather than literals so
+#: ``app/mcp/config.py`` can re-export them: a deployment that changes one of these
+#: changes it in one place, and the RFC 8707 audience the bearer middleware compares
+#: against cannot drift from the audience the verifier expects.
+DEFAULT_MCP_RESOURCE_SERVER_URL = "http://127.0.0.1:8020/mcp"
+DEFAULT_MCP_ISSUER_URL = "http://127.0.0.1:18080/realms/nova"
+
+#: Signature algorithms the MCP resource server may accept. A ``Literal`` rather than a
+#: free string because the value decides which PyJWT algorithm family is permitted: a
+#: typo would otherwise reach PyJWT at the first request instead of failing at startup,
+#: and a value like ``none`` must be unrepresentable.
+SignatureAlgorithm = Literal[
+    "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"
+]
+
+
 class Settings(BaseSettings):
     """Resolved application configuration."""
 
@@ -315,7 +331,21 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # MCP server (§86-§93) - baseline verified in ADR-013
     # ------------------------------------------------------------------
+    # ONE source of truth for MCP configuration. This model owns the environment
+    # contract; ``app/mcp/config.py`` is a *projection* of it that re-exposes these
+    # values under the lowercase attribute names the resource server reads. Two models
+    # that each parsed ``MCP_*`` was the earlier arrangement, and it drifted exactly as
+    # the settings-contract test predicts: a key could be documented in ``.env.example``
+    # while the model that "owned" it never read it (the ``MCP_MAX_REQUEST_BODY_SIZE`` /
+    # ``..._BYTES`` split), which is the "a silently ignored setting looks configured"
+    # failure mode.
+    #
+    # ``_assert_production_hardening`` refuses to start a production profile with
+    # ``MCP_ENABLE_DNS_REBINDING_PROTECTION`` off (§88).
+    MCP_ENABLED: bool = False
     MCP_SERVER_NAME: str = "nova-commerce-mcp"
+    MCP_SERVER_TITLE: str = "Nova Commerce MCP"
+    MCP_SERVER_VERSION: str = "1.0.0"
     MCP_HTTP_PATH: str = "/mcp"
     MCP_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     MCP_ALLOWED_HOSTS: list[str] = Field(
@@ -325,8 +355,35 @@ class Settings(BaseSettings):
     MCP_REQUIRED_SCOPES: list[str] = Field(default_factory=lambda: ["nova.read"])
     MCP_REQUEST_TIMEOUT_SECONDS: int = Field(default=30, ge=1)
     MCP_MAX_REQUEST_BODY_BYTES: int = 1_048_576
-    MCP_SESSION_IDLE_TIMEOUT_SECONDS: int = 1800
-    MCP_MAX_SESSIONS: int = 200
+    MCP_SESSION_IDLE_TIMEOUT_SECONDS: int = Field(default=1800, gt=0)
+    MCP_MAX_SESSIONS: int = Field(default=200, ge=1)
+
+    # -- resource-server identity and key material (§87) ----------------
+    # ``MCP_RESOURCE_SERVER_URL`` is the RFC 8707 audience every accepted token must
+    # carry; ``AuthSettings.validate_token_resource=True`` makes the bearer middleware
+    # compare the token's resource indicator against it, so a token minted for the REST
+    # API (``JWT_AUDIENCE``) cannot be replayed against the MCP surface.
+    MCP_RESOURCE_SERVER_URL: str = DEFAULT_MCP_RESOURCE_SERVER_URL
+    MCP_ISSUER_URL: str = DEFAULT_MCP_ISSUER_URL
+    # Exactly one of the three verification keys is needed. All three default to unset,
+    # and the verifier refuses every token when none is configured: "not configured"
+    # must never mean "trusted".
+    #   HS256 (tests)        -> MCP_HMAC_SECRET
+    #   RS*/ES* (production) -> MCP_PUBLIC_KEY_PEM or MCP_JWKS_URL
+    MCP_HMAC_SECRET: SecretStr = SecretStr("")
+    MCP_PUBLIC_KEY_PEM: SecretStr = SecretStr("")
+    MCP_JWKS_URL: str = ""
+    MCP_ALGORITHM: SignatureAlgorithm = "HS256"
+    MCP_LEEWAY_SECONDS: int = Field(default=5, ge=0, le=300)
+
+    # -- authorization ---------------------------------------------------
+    # ``MCP_WRITE_SCOPE`` is required *in addition* to a tool's own scope for every tool
+    # that is not read-only, so a read-only integration cannot propose writes even when
+    # its RBAC grants them (spec §90's intersection).
+    MCP_WRITE_SCOPE: str = "nova.write"
+    #: TTL of the ``pending_actions`` row ``nova.promotion.propose`` files. The tool
+    #: files an approval request and never creates a promotion (REQ-MCP-008).
+    MCP_PROPOSAL_TTL_SECONDS: int = Field(default=900, ge=30)
 
     OIDC_ISSUER_URL: str = ""
     OIDC_JWKS_URL: str = ""
@@ -365,6 +422,26 @@ class Settings(BaseSettings):
     @classmethod
     def _parse_csv(cls, value: object) -> object:
         return _split_csv(value)
+
+    @field_validator("MCP_RESOURCE_SERVER_URL", "MCP_ISSUER_URL")
+    @classmethod
+    def _absolute_mcp_url(cls, value: str) -> str:
+        """RFC 8707 resource indicators and OIDC issuers are *URLs*, not names.
+
+        Checked at startup because the failure it prevents is silent: an issuer compared
+        as a bare string ("nova") against a URL-shaped ``iss`` claim never matches, so
+        every token is refused and the deployment looks like an authentication outage
+        rather than a typo. A trailing slash is stripped for the same reason - RFC
+        8414/9207 issuer comparison is exact, and both spellings are one issuer to a
+        human but not to a string compare.
+        """
+        if not value.startswith(("http://", "https://")):
+            msg = (
+                "must be an absolute http(s) URL (RFC 8707 resource indicators and OIDC "
+                f"issuers are URLs), got {value!r}"
+            )
+            raise ValueError(msg)
+        return value.rstrip("/") if value != "/" else value
 
     @field_validator("LOG_LEVEL")
     @classmethod
@@ -425,6 +502,26 @@ class Settings(BaseSettings):
 
         return self
 
+    @property
+    def mcp_has_key_material(self) -> bool:
+        """Whether any MCP verification key is configured.
+
+        A *derived* fact rather than a field, so it cannot be set independently of the
+        three keys it summarises - and so the MCP projection re-exposes it instead of
+        recomputing it. The token verifier asks the same question to fail closed when
+        nothing is configured (see ``NovaTokenVerifier.verify_token``).
+        """
+        return bool(
+            self.MCP_HMAC_SECRET.get_secret_value()
+            or self.MCP_PUBLIC_KEY_PEM.get_secret_value()
+            or self.MCP_JWKS_URL
+        )
+
+    @property
+    def mcp_verified_algorithms(self) -> tuple[str, ...]:
+        """The pinned algorithm list handed to PyJWT: always exactly one algorithm."""
+        return (self.MCP_ALGORITHM,)
+
     def _assert_production_hardening(self) -> None:
         problems: list[str] = []
         if self.JWT_SECRET_KEY.get_secret_value() in _PLACEHOLDER_SECRETS:
@@ -437,6 +534,14 @@ class Settings(BaseSettings):
             problems.append("AI_USE_FAKE_PROVIDERS must be false when APP_ENV=prod")
         if self.MCP_ENABLE_DNS_REBINDING_PROTECTION is False:
             problems.append("MCP_ENABLE_DNS_REBINDING_PROTECTION must stay enabled (§88)")
+        if self.MCP_ENABLED and not self.mcp_has_key_material:
+            # Enabling the surface with no verification key produces a server that
+            # refuses every token: it *looks* configured and answers 401 to everything.
+            # That is a support ticket shaped like an outage, so it is refused at startup.
+            problems.append(
+                "MCP_ENABLED is true but no verification key is configured "
+                "(set MCP_HMAC_SECRET, MCP_PUBLIC_KEY_PEM or MCP_JWKS_URL)"
+            )
         if problems:
             msg = (
                 f"unsafe configuration for APP_ENV={self.APP_ENV}: " + "; ".join(problems)
