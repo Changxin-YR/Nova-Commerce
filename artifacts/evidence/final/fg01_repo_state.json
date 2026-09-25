@@ -1,0 +1,124 @@
+{
+  "gate_id": "FG-01",
+  "name": "Repository State Audit",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe scripts/emit_fg01_evidence.py  [runs: git rev-parse --abbrev-ref HEAD; git rev-parse HEAD; git log -1 --format=%s; git status --porcelain=v1 --untracked-files=all]",
+  "cwd": "C:\\Users\\27363\\Desktop\\store",
+  "timestamp": "2026-09-25T05:48:42.147343+00:00",
+  "duration_ms": 179,
+  "exit_code": 0,
+  "git": {
+    "revision": "cfbca58d2cb810cf14b3dc4fec580c6393aa2926\n",
+    "subject": "test: rebuild phase6 gate evidence\n",
+    "relevant_paths": [
+      "scripts/emit_fg01_evidence.py",
+      "scripts/gate_evidence.py",
+      "PROJECT_BASELINE.yaml",
+      "ops/docker-compose.yml",
+      ".env.example",
+      "backend/pyproject.toml",
+      "backend/alembic.ini",
+      "frontend/package.json"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "repository": {
+    "branch": "main",
+    "branch_command_exit_code": 0,
+    "head": "cfbca58d2cb810cf14b3dc4fec580c6393aa2926",
+    "head_command_exit_code": 0,
+    "head_subject": "test: rebuild phase6 gate evidence",
+    "subject_command_exit_code": 0
+  },
+  "workspace_check": {
+    "scope": [
+      "backend",
+      "frontend",
+      "ops",
+      "scripts",
+      "docs",
+      ".env.example",
+      ".gitignore",
+      "PROJECT_BASELINE.yaml",
+      "FINAL_GATE.md",
+      "README.md",
+      "AGENTS.md"
+    ],
+    "artifacts_excluded": true,
+    "artifacts_excluded_reason": "artifacts/ is written by the gate run itself; counting it would make the clean-tree assertion unpassable during a run.",
+    "modified_file_count": 0,
+    "untracked_file_count": 0,
+    "modified_files": [],
+    "untracked_files": [],
+    "unclassified_files": [],
+    "artifacts_untracked": 45,
+    "artifacts_tracked": 0
+  },
+  "key_files": {
+    "required": [
+      "PROJECT_BASELINE.yaml",
+      "FINAL_GATE.md",
+      "ops/docker-compose.yml",
+      ".env.example",
+      "backend/pyproject.toml",
+      "backend/alembic.ini",
+      "frontend/package.json"
+    ],
+    "missing": [],
+    "present_count": 7
+  },
+  "assertions": [
+    {
+      "name": "current branch is main",
+      "expected": "main",
+      "actual": "main",
+      "pass": true
+    },
+    {
+      "name": "HEAD resolves to a commit object",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "HEAD commit subject is readable",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "key config files present",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "name": "no modified tracked files outside artifacts/",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "no untracked files outside artifacts/",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "no unclassifiable git status entries",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "artifacts/ tree is not version-controlled",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    }
+  ],
+  "fail_reasons": [],
+  "verdict": "PASS"
+}
