@@ -1,0 +1,134 @@
+{
+  "gate_id": "FG-06",
+  "name": "Seed Idempotency",
+  "mandatory": false,
+  "spec": "two consecutive seeds succeed, produce an identical shape, and do not duplicate the global permission vocabulary",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe scripts/emit_fg06_evidence.py",
+  "cwd": "C:\\Users\\27363\\Desktop\\store",
+  "timestamp": "2026-09-25T05:33:50.239410+00:00",
+  "duration_ms": 2145,
+  "exit_code": 0,
+  "environment": {
+    "APP_ENV": "test",
+    "APP_DEBUG": "false",
+    "LOG_JSON": "false",
+    "LOG_LEVEL": "WARNING",
+    "AI_USE_FAKE_PROVIDERS": "true",
+    "RATE_LIMIT_ENABLED": "false",
+    "SEED_DETERMINISTIC": "true"
+  },
+  "seed_under_test": "tests/integration/payment/conftest.py::_seed (the only programmatic seeder in the repository)",
+  "observations": {
+    "baseline": {
+      "merchants_total": 23,
+      "permissions_total": 23
+    },
+    "runs": [
+      {
+        "label": "1",
+        "marker": "7E1BF6E4",
+        "merchant_id": 59602,
+        "scoped": {
+          "merchants_total": 24,
+          "permissions_total": 23,
+          "products": 1,
+          "product_skus": 2,
+          "warehouses": 1,
+          "inventories": 2,
+          "orders": 1,
+          "order_items": 2,
+          "payments": 1,
+          "fulfillments": 0,
+          "outbox_messages": 0,
+          "users_marker": 2
+        },
+        "global_with_merchant": {
+          "merchants_total": 24,
+          "permissions_total": 23
+        },
+        "global_after_cleanup": {
+          "merchants_total": 23,
+          "permissions_total": 23
+        }
+      },
+      {
+        "label": "2",
+        "marker": "2D42F775",
+        "merchant_id": 59603,
+        "scoped": {
+          "merchants_total": 24,
+          "permissions_total": 23,
+          "products": 1,
+          "product_skus": 2,
+          "warehouses": 1,
+          "inventories": 2,
+          "orders": 1,
+          "order_items": 2,
+          "payments": 1,
+          "fulfillments": 0,
+          "outbox_messages": 0,
+          "users_marker": 2
+        },
+        "global_with_merchant": {
+          "merchants_total": 24,
+          "permissions_total": 23
+        },
+        "global_after_cleanup": {
+          "merchants_total": 23,
+          "permissions_total": 23
+        }
+      }
+    ]
+  },
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "backend/tests/integration/payment/conftest.py",
+      "backend/tests/integration/commerce/seed.py",
+      "backend/app",
+      "backend/migrations",
+      "scripts/emit_fg06_evidence.py",
+      "scripts/gate_evidence.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "assertions": [
+    {
+      "name": "the seed driver ran two consecutive seeds without error",
+      "expected": "PASSED",
+      "actual": "exit_code=0 parsed=yes",
+      "pass": true
+    },
+    {
+      "name": "both seeds produced an identical merchant-scoped data shape",
+      "expected": "PASSED",
+      "actual": "{\"products\": [1, 1], \"product_skus\": [2, 2], \"warehouses\": [1, 1], \"inventories\": [2, 2], \"orders\": [1, 1], \"order_items\": [2, 2], \"payments\": [1, 1], \"fulfillments\": [0, 0], \"outbox_messages\": [0, 0], \"users_marker\": [2, 2]}",
+      "pass": true
+    },
+    {
+      "name": "the second seed did not duplicate the global permission vocabulary",
+      "expected": "PASSED",
+      "actual": "after_run1=23 after_run2=23",
+      "pass": true
+    },
+    {
+      "name": "each seed created exactly one merchant",
+      "expected": "PASSED",
+      "actual": "baseline=23 run1=24 run2=24",
+      "pass": true
+    },
+    {
+      "name": "each seed cleaned up after itself (no merchant left behind)",
+      "expected": "PASSED",
+      "actual": "baseline=23 after1=23 after2=23",
+      "pass": true
+    }
+  ],
+  "junit_report": null,
+  "transcript_tail": "# seed driver exit=0\n2026-09-25 13:33:51 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\nSEED_JSON {\"baseline\": {\"merchants_total\": 23, \"permissions_total\": 23}, \"runs\": [{\"label\": \"1\", \"marker\": \"7E1BF6E4\", \"merchant_id\": 59602, \"scoped\": {\"merchants_total\": 24, \"permissions_total\": 23, \"products\": 1, \"product_skus\": 2, \"warehouses\": 1, \"inventories\": 2, \"orders\": 1, \"order_items\": 2, \"payments\": 1, \"fulfillments\": 0, \"outbox_messages\": 0, \"users_marker\": 2}, \"global_with_merchant\": {\"merchants_total\": 24, \"permissions_total\": 23}, \"global_after_cleanup\": {\"merchants_total\": 23, \"permissions_total\": 23}}, {\"label\": \"2\", \"marker\": \"2D42F775\", \"merchant_id\": 59603, \"scoped\": {\"merchants_total\": 24, \"permissions_total\": 23, \"products\": 1, \"product_skus\": 2, \"warehouses\": 1, \"inventories\": 2, \"orders\": 1, \"order_items\": 2, \"payments\": 1, \"fulfillments\": 0, \"outbox_messages\": 0, \"users_marker\": 2}, \"global_with_merchant\": {\"merchants_total\": 24, \"permissions_total\": 23}, \"global_after_cleanup\": {\"merchants_total\": 23, \"permissions_total\": 23}}]}\n",
+  "verdict": "PASS"
+}

@@ -1,0 +1,564 @@
+{
+  "gate_id": "FG-23",
+  "name": "Health Checks",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe scripts/emit_fg23_evidence.py  [runs: docker compose --env-file .env -f ops/docker-compose.yml ps --all --format json, then TCP probes on 13306/16379/19000/16333/18080 and HTTP GETs on the MinIO, Qdrant and Keycloak health endpoints]",
+  "cwd": "C:\\Users\\27363\\Desktop\\store",
+  "timestamp": "2026-09-25T05:38:25.681833+00:00",
+  "duration_ms": 3553,
+  "exit_code": 0,
+  "observed_exit_codes": {
+    "docker_compose_ps": 0,
+    "nx-mysql_tcp": 0,
+    "nx-redis_tcp": 0,
+    "nx-minio_tcp": 0,
+    "nx-minio_http": 0,
+    "nx-qdrant_tcp": 0,
+    "nx-qdrant_http": 0,
+    "nx-keycloak_tcp": 0,
+    "nx-keycloak_http": 0
+  },
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "scripts/emit_fg23_evidence.py",
+      "scripts/gate_evidence.py",
+      "ops/docker-compose.yml",
+      ".env.example"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "compose_ps": {
+    "command": [
+      "docker",
+      "compose",
+      "--env-file",
+      "C:\\Users\\27363\\Desktop\\store\\.env",
+      "-f",
+      "C:\\Users\\27363\\Desktop\\store\\ops\\docker-compose.yml",
+      "ps",
+      "--all",
+      "--format",
+      "json"
+    ],
+    "attempts": 1,
+    "exit_codes": [
+      0
+    ],
+    "stdout_tail": "nment_file=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\.env,com.docker.compose.service=mysql,com.docker.compose.config-hash=bba393a210808bc5a343dc41c206b2b42b08584b04eac771fb6c4967dd30702d\",\"LocalVolumes\":\"1\",\"Mounts\":\"/run/desktop/m…,nova_nx-mysql-…\",\"Name\":\"nx-mysql\",\"Names\":\"nx-mysql\",\"Networks\":\"nova_nova-net\",\"Ports\":\"0.0.0.0:13306-\\u003e3306/tcp, [::]:13306-\\u003e3306/tcp\",\"Project\":\"nova\",\"Publishers\":[{\"URL\":\"0.0.0.0\",\"TargetPort\":3306,\"PublishedPort\":13306,\"Protocol\":\"tcp\"},{\"URL\":\"::\",\"TargetPort\":3306,\"PublishedPort\":13306,\"Protocol\":\"tcp\"}],\"RunningFor\":\"2 days ago\",\"Service\":\"mysql\",\"Size\":\"0B\",\"State\":\"running\",\"Status\":\"Up 20 minutes (healthy)\"}\n{\"Command\":\"\\\"./entrypoint.sh\\\"\",\"CreatedAt\":\"2026-09-23 07:52:56 +0800 CST\",\"Engine\":\"\",\"ExitCode\":0,\"Health\":\"healthy\",\"ID\":\"368440f7aa0f\",\"Image\":\"qdrant/qdrant:latest\",\"Labels\":\"com.docker.compose.project=nova,org.opencontainers.image.title=Qdrant,org.opencontainers.image.vendor=Qdrant,com.docker.compose.config-hash=54c01d3686f0f8d25cfe9d4a9fdccb3e03d66e88f4bd25a07ea1f7418220a65c,com.docker.compose.project.config_files=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\ops\\\\docker-compose.yml,desktop.docker.io/ports/6333/tcp=:16333,org.opencontainers.image.description=Official Qdrant image,org.opencontainers.image.source=https://github.com/qdrant/qdrant,com.docker.compose.depends_on=,com.docker.compose.project.environment_file=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\.env,com.docker.compose.version=5.4.0,org.opencontainers.image.version=v1.19.1,com.docker.compose.image=sha256:0699e7733a6fa7fa7f6b95dcbed84ebb04584110da525cdfdef9f305c4f57738,com.docker.compose.oneoff=False,com.docker.compose.project.working_dir=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\ops,com.docker.compose.service=qdrant,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/6334/tcp=:16334,org.opencontainers.image.documentation=https://qdrant.com/docs,org.opencontainers.image.url=https://qdrant.com/,com.docker.compose.container-number=1\",\"LocalVolumes\":\"1\",\"Mounts\":\"nova_nx-qdrant…\",\"Name\":\"nx-qdrant\",\"Names\":\"nx-qdrant\",\"Networks\":\"nova_nova-net\",\"Ports\":\"0.0.0.0:16333-\\u003e6333/tcp, [::]:16333-\\u003e6333/tcp, 0.0.0.0:16334-\\u003e6334/tcp, [::]:16334-\\u003e6334/tcp\",\"Project\":\"nova\",\"Publishers\":[{\"URL\":\"0.0.0.0\",\"TargetPort\":6333,\"PublishedPort\":16333,\"Protocol\":\"tcp\"},{\"URL\":\"::\",\"TargetPort\":6333,\"PublishedPort\":16333,\"Protocol\":\"tcp\"},{\"URL\":\"0.0.0.0\",\"TargetPort\":6334,\"PublishedPort\":16334,\"Protocol\":\"tcp\"},{\"URL\":\"::\",\"TargetPort\":6334,\"PublishedPort\":16334,\"Protocol\":\"tcp\"}],\"RunningFor\":\"2 days ago\",\"Service\":\"qdrant\",\"Size\":\"0B\",\"State\":\"running\",\"Status\":\"Up 20 minutes (healthy)\"}\n{\"Command\":\"\\\"docker-entrypoint.s…\\\"\",\"CreatedAt\":\"2026-09-23 07:52:56 +0800 CST\",\"Engine\":\"\",\"ExitCode\":0,\"Health\":\"healthy\",\"ID\":\"96c41f2e6479\",\"Image\":\"redis:7.4-alpine\",\"Labels\":\"com.docker.compose.project.environment_file=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\.env,com.docker.compose.service=redis,com.docker.compose.version=5.4.0,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.project.working_dir=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\ops,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/6379/tcp=:16379,com.docker.compose.config-hash=dc8948e1dc7d029d01850de448d56d4a93ceb76f5bd06dcfedf66ffd93154e29,com.docker.compose.image=sha256:ca0acbb137c1dc3339c8b147a58fd6f42775d4599327b50e7b116c23de501af2,com.docker.compose.oneoff=False,com.docker.compose.project=nova,com.docker.compose.project.config_files=C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\ops\\\\docker-compose.yml\",\"LocalVolumes\":\"1\",\"Mounts\":\"nova_nx-redis-…\",\"Name\":\"nx-redis\",\"Names\":\"nx-redis\",\"Networks\":\"nova_nova-net\",\"Ports\":\"0.0.0.0:16379-\\u003e6379/tcp, [::]:16379-\\u003e6379/tcp\",\"Project\":\"nova\",\"Publishers\":[{\"URL\":\"0.0.0.0\",\"TargetPort\":6379,\"PublishedPort\":16379,\"Protocol\":\"tcp\"},{\"URL\":\"::\",\"TargetPort\":6379,\"PublishedPort\":16379,\"Protocol\":\"tcp\"}],\"RunningFor\":\"2 days ago\",\"Service\":\"redis\",\"Size\":\"0B\",\"State\":\"running\",\"Status\":\"Up 20 minutes (healthy)\"}\n",
+    "stderr_tail": "",
+    "containers": [
+      {
+        "name": "nx-keycloak",
+        "service": "oauth-provider",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 8080,
+            "PublishedPort": 18080,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 8080,
+            "PublishedPort": 18080,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      {
+        "name": "nx-minio",
+        "service": "minio",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 9000,
+            "PublishedPort": 19000,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 9000,
+            "PublishedPort": 19000,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 9001,
+            "PublishedPort": 19001,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 9001,
+            "PublishedPort": 19001,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      {
+        "name": "nx-mysql",
+        "service": "mysql",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 3306,
+            "PublishedPort": 13306,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 3306,
+            "PublishedPort": 13306,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      {
+        "name": "nx-qdrant",
+        "service": "qdrant",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 6333,
+            "PublishedPort": 16333,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 6333,
+            "PublishedPort": 16333,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 6334,
+            "PublishedPort": 16334,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 6334,
+            "PublishedPort": 16334,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      {
+        "name": "nx-redis",
+        "service": "redis",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 6379,
+            "PublishedPort": 16379,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 6379,
+            "PublishedPort": 16379,
+            "Protocol": "tcp"
+          }
+        ]
+      }
+    ],
+    "parsed": true,
+    "parse_error": null
+  },
+  "probes": [
+    {
+      "name": "MySQL",
+      "container": "nx-mysql",
+      "service": "mysql",
+      "compose_entry": {
+        "name": "nx-mysql",
+        "service": "mysql",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 3306,
+            "PublishedPort": 13306,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 3306,
+            "PublishedPort": 13306,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      "tcp": {
+        "host": "127.0.0.1",
+        "port": 13306,
+        "connect_ex": 0,
+        "open": true,
+        "duration_ms": 3
+      },
+      "http": null
+    },
+    {
+      "name": "Redis",
+      "container": "nx-redis",
+      "service": "redis",
+      "compose_entry": {
+        "name": "nx-redis",
+        "service": "redis",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 6379,
+            "PublishedPort": 16379,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 6379,
+            "PublishedPort": 16379,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      "tcp": {
+        "host": "127.0.0.1",
+        "port": 16379,
+        "connect_ex": 0,
+        "open": true,
+        "duration_ms": 0
+      },
+      "http": null
+    },
+    {
+      "name": "MinIO",
+      "container": "nx-minio",
+      "service": "minio",
+      "compose_entry": {
+        "name": "nx-minio",
+        "service": "minio",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 9000,
+            "PublishedPort": 19000,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 9000,
+            "PublishedPort": 19000,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 9001,
+            "PublishedPort": 19001,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 9001,
+            "PublishedPort": 19001,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      "tcp": {
+        "host": "127.0.0.1",
+        "port": 19000,
+        "connect_ex": 0,
+        "open": true,
+        "duration_ms": 15
+      },
+      "http": {
+        "url": "http://127.0.0.1:19000/minio/health/live",
+        "status": 200,
+        "body_head": "",
+        "error": null,
+        "duration_ms": 32
+      }
+    },
+    {
+      "name": "Qdrant",
+      "container": "nx-qdrant",
+      "service": "qdrant",
+      "compose_entry": {
+        "name": "nx-qdrant",
+        "service": "qdrant",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 6333,
+            "PublishedPort": 16333,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 6333,
+            "PublishedPort": 16333,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 6334,
+            "PublishedPort": 16334,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 6334,
+            "PublishedPort": 16334,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      "tcp": {
+        "host": "127.0.0.1",
+        "port": 16333,
+        "connect_ex": 0,
+        "open": true,
+        "duration_ms": 15
+      },
+      "http": {
+        "url": "http://127.0.0.1:16333/healthz",
+        "status": 200,
+        "body_head": "healthz check passed",
+        "error": null,
+        "duration_ms": 66
+      }
+    },
+    {
+      "name": "Keycloak",
+      "container": "nx-keycloak",
+      "service": "oauth-provider",
+      "compose_entry": {
+        "name": "nx-keycloak",
+        "service": "oauth-provider",
+        "state": "running",
+        "health": "healthy",
+        "status": "Up 20 minutes (healthy)",
+        "exit_code": 0,
+        "publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 8080,
+            "PublishedPort": 18080,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 8080,
+            "PublishedPort": 18080,
+            "Protocol": "tcp"
+          }
+        ]
+      },
+      "tcp": {
+        "host": "127.0.0.1",
+        "port": 18080,
+        "connect_ex": 0,
+        "open": true,
+        "duration_ms": 11
+      },
+      "http": {
+        "url": "http://127.0.0.1:18080/realms/master/.well-known/openid-configuration",
+        "status": 200,
+        "body_head": "{\"issuer\":\"http://127.0.0.1:18080/realms/master\",\"authorization_endpoint\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/auth\",\"token_endpoint\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/token\",\"introspection_endpoint\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/token/introspect\",\"userinfo_endpoint\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/userinfo\",\"end_session_endpoint\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/logout\",\"frontchannel_logout_session_supported\":true,\"frontchannel_logout_supported\":true,\"jwks_uri\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/certs\",\"check_session_iframe\":\"http://127.0.0.1:18080/realms/master/protocol/openid-connect/login-status-iframe.html\",\"grant_types_supported\":[\"authorization_code\",\"client_credentials\",\"implicit\",\"password\",\"refresh_token\",\"urn:ietf:params:oauth:grant-type:device_code\",\"urn:ietf:params:oauth:grant-type:jwt-bearer\",\"urn:ietf:params:oauth:grant-type:token-exchange\",\"urn:ietf:params:oauth:grant-type:uma-ticket\",\"urn:openid:params:grant-type:ciba\"],\"acr_values_supported\":[\"0\",\"1\"],\"response_types_supported\":[\"code\",\"none\",\"id_token\",\"token\",\"id_token token\",\"code id_token\",\"code token\",\"code id_token token\"],\"subject_types_supported\":[\"public\",\"pairwise\"],\"prompt_values_supported\":[\"none\",\"login\",\"consent\"],\"id_token_signing_alg_values_supported\":[\"PS384\",\"RS384\",\"EdDSA\",\"ES384\",\"HS256\",\"HS512\",\"ES256\",\"RS256\",\"HS384\",\"ES512\",\"PS256\",\"PS512\",\"RS512\"],\"id_token_encryption_alg_values_supported\":[\"ECDH-ES+A256KW\",\"ECDH-ES+A192KW\",\"ECDH-ES+A128KW\",\"RSA-OAEP\",\"RSA-OAEP-256\",\"RSA1_5\",\"ECDH-ES\"],\"id_token_encryption_enc_values_supported\":[\"A256GCM\",\"A192GCM\",\"A128GCM\",\"A128CBC-HS256\",\"A192CBC-HS384\",\"A256CBC-HS512\"],\"userinfo_signing_alg_values_supported\":[\"PS384\",\"RS384\",\"EdDSA\",\"ES384\",\"HS256\",\"HS512\",\"ES256\",\"RS256\",\"HS384\",\"ES512\",\"PS256\",\"PS512\",\"RS512\",\"none\"],\"userinfo_encryption_alg_values_supported\":[\"ECDH-E",
+        "error": null,
+        "duration_ms": 2960
+      }
+    }
+  ],
+  "optional_profiles": {
+    "note": "ops/docker-compose.yml declares optional 'tools' (nx-migrate) and 'observability' (nx-otel, nx-prometheus, nx-grafana) profiles. They are not started by default and are reported here for completeness only.",
+    "expected_default_containers": [
+      "nx-mysql",
+      "nx-redis",
+      "nx-minio",
+      "nx-qdrant",
+      "nx-keycloak"
+    ],
+    "observed_containers": [
+      "nx-keycloak",
+      "nx-minio",
+      "nx-mysql",
+      "nx-qdrant",
+      "nx-redis"
+    ]
+  },
+  "assertions": [
+    {
+      "name": "docker compose ps returned parsable JSON",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "docker compose ps reported every service declared in ops/docker-compose.yml",
+      "expected": [
+        "nx-keycloak",
+        "nx-minio",
+        "nx-mysql",
+        "nx-qdrant",
+        "nx-redis"
+      ],
+      "actual": [
+        "nx-keycloak",
+        "nx-minio",
+        "nx-mysql",
+        "nx-qdrant",
+        "nx-redis"
+      ],
+      "pass": true
+    },
+    {
+      "name": "nx-mysql reports healthy",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-mysql is running",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-redis reports healthy",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-redis is running",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-minio reports healthy",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-minio is running",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-qdrant reports healthy",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-qdrant is running",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-keycloak reports healthy",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "nx-keycloak is running",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "MySQL port 13306 accepts TCP connections",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "Redis port 16379 accepts TCP connections",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "MinIO port 19000 accepts TCP connections",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "MinIO HTTP health endpoint returns 200",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "Qdrant port 16333 accepts TCP connections",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "Qdrant HTTP health endpoint returns 200",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "Keycloak port 18080 accepts TCP connections",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "Keycloak HTTP health endpoint returns 200",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    }
+  ],
+  "fail_reasons": [],
+  "verdict": "PASS"
+}

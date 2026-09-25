@@ -18,7 +18,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 7
+      "actualWorkers": 8
     },
     "preserveOutput": "always",
     "projects": [
@@ -27,7 +27,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 7
+          "actualWorkers": 8
         },
         "id": "chromium",
         "name": "chromium",
@@ -85,12 +85,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3355,
+                  "duration": 3628,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-09-24T23:34:43.887Z",
+                  "startTime": "2026-09-25T05:46:07.801Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -101,6 +101,66 @@
           "id": "25ab1bfc84c57e3e3a45-aa07ac120480d31c3dd5",
           "file": "checkout.spec.ts",
           "line": 11,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "flagship-agent.spec.ts",
+      "file": "flagship-agent.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "flagship journey: real browser order + payment, then agent approval in the console",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "C:\\Users\\27363\\Desktop\\store\\frontend\\e2e\\flagship-agent.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 31191,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-25T05:46:07.801Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "C:\\Users\\27363\\Desktop\\store\\frontend\\e2e\\flagship-agent.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5231e78de96be0322f9f-b28ea2aae97e80b5422f",
+          "file": "flagship-agent.spec.ts",
+          "line": 83,
           "column": 1
         }
       ]
@@ -124,15 +184,15 @@
               "projectName": "chromium",
               "results": [
                 {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
+                  "workerIndex": 2,
+                  "parallelIndex": 2,
                   "status": "passed",
-                  "duration": 11734,
+                  "duration": 14059,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-09-24T23:34:43.836Z",
+                  "startTime": "2026-09-25T05:46:07.820Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -173,15 +233,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 3188,
+                      "duration": 2953,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T23:34:43.926Z",
+                      "startTime": "2026-09-25T05:46:07.880Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -207,15 +267,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
                       "status": "passed",
-                      "duration": 3321,
+                      "duration": 3349,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T23:34:43.954Z",
+                      "startTime": "2026-09-25T05:46:07.861Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -241,15 +301,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
+                      "workerIndex": 5,
+                      "parallelIndex": 5,
                       "status": "passed",
-                      "duration": 2620,
+                      "duration": 2330,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T23:34:43.806Z",
+                      "startTime": "2026-09-25T05:46:07.882Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -275,15 +335,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 5,
+                      "workerIndex": 6,
+                      "parallelIndex": 6,
                       "status": "passed",
-                      "duration": 2575,
+                      "duration": 2977,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T23:34:43.830Z",
+                      "startTime": "2026-09-25T05:46:07.862Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -309,15 +369,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
-                      "parallelIndex": 6,
+                      "workerIndex": 7,
+                      "parallelIndex": 7,
                       "status": "passed",
-                      "duration": 3183,
+                      "duration": 3038,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-09-24T23:34:44.011Z",
+                      "startTime": "2026-09-25T05:46:07.859Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -337,9 +397,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-09-24T23:34:39.003Z",
-    "duration": 18702.459,
-    "expected": 7,
+    "startTime": "2026-09-25T05:46:05.336Z",
+    "duration": 34312.412000000004,
+    "expected": 8,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

@@ -1,0 +1,733 @@
+{
+  "gate_id": "FG-18",
+  "name": "MCP Authorization / Compatibility",
+  "mandatory": true,
+  "spec": "sections 86-93, 121, 138 (ADR-013), 147 - the official MCP SDK is used natively; every external tool call is authorised by the four-way intersection of OAuth scope, RBAC permission, DataScope and tool policy; token verification is real cryptography; no capability outside the frozen sixteen is reachable; the one write tool files an approval request instead of creating business state",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/mcp -v --no-header -p no:cacheprovider -m integration or not integration --junit-xml=artifacts\\evidence\\mcp\\fg18_mcp.xml",
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-25T05:37:04.691607+00:00",
+  "duration_ms": 10363,
+  "exit_code": 0,
+  "summary": "67 passed in 6.60s",
+  "verdict": "PASS",
+  "fail_reasons": [],
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "backend/app/mcp",
+      "backend/app/core/errors.py",
+      "backend/app/core/redaction.py",
+      "backend/app/modules/agent",
+      "backend/app/modules/aftersales",
+      "backend/app/modules/analytics",
+      "backend/app/modules/catalog",
+      "backend/app/modules/fulfillment",
+      "backend/app/modules/governance",
+      "backend/app/modules/identity",
+      "backend/app/modules/inventory",
+      "backend/app/modules/knowledge",
+      "backend/app/modules/marketing",
+      "backend/app/modules/order",
+      "backend/app/shared/db",
+      "backend/tests/mcp",
+      "backend/pyproject.toml",
+      "scripts/emit_fg18_evidence.py",
+      "scripts/gate_evidence.py",
+      ".env.example"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "infrastructure": {
+    "sdk": "mcp==2.2.0 (official Python SDK, ADR-013)",
+    "transports": "in-memory (Client(MCPServer)) and real Streamable HTTP (uvicorn + mcp.Client over http://127.0.0.1:PORT/mcp)",
+    "crypto": "PyJWT 2.14.0 - signature, issuer, audience/resource, exp and nbf all verified; HS256 in tests, RS*/ES* supported for production",
+    "database": "real MySQL for the tool tests that read or write rows (shared instance; run serially)",
+    "why_real": "section 113 forbids a mocked authorization path. An OAuth check that is mocked cannot fail, so it proves nothing about the deployment - and the failure mode this gate exists to prevent is precisely an authorized-looking tool surface that is not actually authorized."
+  },
+  "junit_report": {
+    "path": "artifacts\\evidence\\mcp\\fg18_mcp.xml",
+    "exists": true,
+    "parses": true,
+    "testcase_count": 67,
+    "outcomes": [
+      {
+        "name": "test_valid_token_reaches_the_tool_and_lists_an_authorized_subset",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_unauthorized_tool_is_refused_over_http",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_a_token_without_a_tool_scope_is_refused_at_the_call",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_bearer_middleware_answers_403_insufficient_scope",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_required_scope_mismatch_produces_403",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_invalid_tokens_are_refused_over_http[wrong-issuer-<lambda>]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_invalid_tokens_are_refused_over_http[wrong-audience-<lambda>]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_invalid_tokens_are_refused_over_http[expired-<lambda>]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_invalid_tokens_are_refused_over_http[tampered-<lambda>]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_invalid_tokens_are_refused_over_http[other-signing-key-<lambda>]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_capability_that_must_not_exist_is_not_callable_over_http",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_disallowed_origin_is_rejected_by_transport_security",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_disallowed_host_is_rejected_by_transport_security",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_allowed_origin_and_host_still_pass",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_missing_bearer_token_is_refused",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_the_verifier_used_by_the_running_server_is_the_production_one",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_consumer_token_sees_only_self_scoped_tools_over_http",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_valid_token_is_accepted_and_carries_a_principal",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_wrong_issuer_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_tampered_signature_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_token_signed_with_another_key_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_expired_token_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_not_yet_valid_token_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_wrong_audience_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_audience_list_containing_another_service_only_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_algorithm_substitution_is_rejected",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_missing_base_scope_is_rejected_at_verification",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_verifier_without_key_material_refuses_everything",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_empty_and_garbage_tokens_return_none_rather_than_raising",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_unknown_data_scope_claim_is_refused_not_defaulted",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_scope_claim_spellings_are_both_understood",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_typescript_staff_without_merchant_is_still_staff_but_unscoped",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_full_surface_is_visible_to_a_fully_privileged_staff_token",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_missing_rbac_permission_hides_exactly_that_tool",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_missing_token_scope_hides_tools_even_when_rbac_allows_them",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_consumer_scope_sees_only_the_self_scoped_tools",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_data_scope_none_authorizes_nothing",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_write_tool_needs_the_write_scope_even_with_the_permission",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_write_tool_denied_without_promotion_write_permission",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_unknown_and_forbidden_names_are_not_exposed",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_cross_tenant_scope_is_refused_in_both_directions",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_every_spec_declares_scope_permission_risk_and_a_forbidding_input_model",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_the_frozen_sixteen_names_are_exactly_these",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_input_models_reject_identity_fields",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_the_verifier_refuses_a_token_whose_resource_is_another_server",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_test_settings_are_wired_explicitly",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_live_server_exposes_exactly_the_frozen_sixteen",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_every_tool_has_a_non_empty_input_schema_and_declared_semantics",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_every_frozen_tool_has_a_handler",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_forbidden_capabilities_are_absent_from_the_live_listing",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_forbidden_capability_call_is_refused[execute_sql]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_forbidden_capability_call_is_refused[nova.refund.execute]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_forbidden_capability_call_is_refused[raw_sql]",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_refused_call_carries_a_stable_error_code",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_identity_fields_are_not_part_of_any_tool_input",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_identity_fields_cannot_change_the_verified_principal",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_product_get_reads_the_seeded_product",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_product_search_finds_the_seeded_product",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_sku_get_resolves_by_id_and_by_code",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_inventory_get_reports_the_seeded_position",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_a_consumer_scope_cannot_read_a_merchants_product",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_tools_call_reauthorises_rather_than_trusting_a_listing",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_a_self_scoped_token_cannot_call_a_merchant_tool_it_can_see_is_absent",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_promotion_propose_creates_a_pending_action_and_no_promotion",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_promotion_propose_is_refused_without_the_write_permission",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_promotion_preview_creates_nothing",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_the_output_models_are_the_declared_ones",
+        "actual": "PASSED"
+      }
+    ],
+    "error": null
+  },
+  "assertions": [
+    {
+      "name": "test_valid_token_reaches_the_tool_and_lists_an_authorized_subset",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_unauthorized_tool_is_refused_over_http",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_token_without_a_tool_scope_is_refused_at_the_call",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_bearer_middleware_answers_403_insufficient_scope",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_required_scope_mismatch_produces_403",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_invalid_tokens_are_refused_over_http[wrong-issuer-<lambda>]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_invalid_tokens_are_refused_over_http[wrong-audience-<lambda>]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_invalid_tokens_are_refused_over_http[expired-<lambda>]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_invalid_tokens_are_refused_over_http[tampered-<lambda>]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_invalid_tokens_are_refused_over_http[other-signing-key-<lambda>]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_capability_that_must_not_exist_is_not_callable_over_http",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_disallowed_origin_is_rejected_by_transport_security",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_disallowed_host_is_rejected_by_transport_security",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_allowed_origin_and_host_still_pass",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_missing_bearer_token_is_refused",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_verifier_used_by_the_running_server_is_the_production_one",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_consumer_token_sees_only_self_scoped_tools_over_http",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_valid_token_is_accepted_and_carries_a_principal",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_wrong_issuer_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_tampered_signature_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_token_signed_with_another_key_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_expired_token_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_not_yet_valid_token_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_wrong_audience_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_audience_list_containing_another_service_only_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_algorithm_substitution_is_rejected",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_missing_base_scope_is_rejected_at_verification",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_verifier_without_key_material_refuses_everything",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_empty_and_garbage_tokens_return_none_rather_than_raising",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_unknown_data_scope_claim_is_refused_not_defaulted",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_scope_claim_spellings_are_both_understood",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_typescript_staff_without_merchant_is_still_staff_but_unscoped",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_full_surface_is_visible_to_a_fully_privileged_staff_token",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_missing_rbac_permission_hides_exactly_that_tool",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_missing_token_scope_hides_tools_even_when_rbac_allows_them",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_consumer_scope_sees_only_the_self_scoped_tools",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_data_scope_none_authorizes_nothing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_write_tool_needs_the_write_scope_even_with_the_permission",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_write_tool_denied_without_promotion_write_permission",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_unknown_and_forbidden_names_are_not_exposed",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_cross_tenant_scope_is_refused_in_both_directions",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_every_spec_declares_scope_permission_risk_and_a_forbidding_input_model",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_frozen_sixteen_names_are_exactly_these",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_input_models_reject_identity_fields",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_verifier_refuses_a_token_whose_resource_is_another_server",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_test_settings_are_wired_explicitly",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_live_server_exposes_exactly_the_frozen_sixteen",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_every_tool_has_a_non_empty_input_schema_and_declared_semantics",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_every_frozen_tool_has_a_handler",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_forbidden_capabilities_are_absent_from_the_live_listing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_forbidden_capability_call_is_refused[execute_sql]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_forbidden_capability_call_is_refused[nova.refund.execute]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_forbidden_capability_call_is_refused[raw_sql]",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_refused_call_carries_a_stable_error_code",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_identity_fields_are_not_part_of_any_tool_input",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_identity_fields_cannot_change_the_verified_principal",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_product_get_reads_the_seeded_product",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_product_search_finds_the_seeded_product",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_sku_get_resolves_by_id_and_by_code",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_inventory_get_reports_the_seeded_position",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_consumer_scope_cannot_read_a_merchants_product",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_tools_call_reauthorises_rather_than_trusting_a_listing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_a_self_scoped_token_cannot_call_a_merchant_tool_it_can_see_is_absent",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_promotion_propose_creates_a_pending_action_and_no_promotion",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_promotion_propose_is_refused_without_the_write_permission",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_promotion_preview_creates_nothing",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_the_output_models_are_the_declared_ones",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    }
+  ],
+  "stderr_tail": ""
+}

@@ -9,7 +9,7 @@
     "--junit-xml=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\security\\fg26_critical_block.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-25T00:18:56.205284+00:00",
+  "timestamp": "2026-09-25T05:38:56.605546+00:00",
   "exit_code": 0,
   "assertions": [
     {
@@ -25,7 +25,7 @@
     "testcase_count": 1
   },
   "git": {
-    "revision": "25f371b0a856ce74ca16d6f7cac00262dc3a2043",
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0",
     "relevant_paths_dirty": false,
     "relevant_paths": [
       "backend/app",
@@ -35,6 +35,6 @@
     ]
   },
   "verdict": "PASS",
-  "stdout_tail": "2026-09-25 08:18:58 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\n2026-09-25 08:18:58 [info     ] redis configured               host=127.0.0.1 port=16379\n.                                                                        [100%]\n1 passed in 0.83s\n",
+  "stdout_tail": "2026-09-25 13:38:59 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\n2026-09-25 13:38:59 [info     ] redis configured               host=127.0.0.1 port=16379\n.                                                                        [100%]\n1 passed in 0.91s\n",
   "stderr_tail": ""
 }

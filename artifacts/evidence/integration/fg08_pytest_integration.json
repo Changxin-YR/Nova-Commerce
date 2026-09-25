@@ -5,15 +5,15 @@
   "spec": "Spec §146: backend integration tests pass against real infrastructure",
   "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m pytest tests/integration -v --no-header -p no:cacheprovider -m integration --junit-xml=artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-24T23:31:57.495817+00:00",
-  "duration_ms": 105418,
+  "timestamp": "2026-09-25T05:33:58.826962+00:00",
+  "duration_ms": 106642,
   "exit_code": 0,
-  "summary": "385 passed, 1 warning in 101.23s (0:01:41)",
+  "summary": "386 passed, 1 warning in 103.33s (0:01:43)",
   "verdict": "PASS",
   "fail_reasons": [],
   "git": {
-    "revision": "2b595a4f5430f16ab6e930f9ea6ec61260157cff\n",
-    "subject": "feat: complete phase6 commerce agent and governance flows\n",
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
     "relevant_paths": [
       "backend/app",
       "backend/migrations",
@@ -32,7 +32,7 @@
     "path": "artifacts\\evidence\\integration\\fg08_pytest_integration.xml",
     "exists": true,
     "parses": true,
-    "testcase_count": 385,
+    "testcase_count": 386,
     "outcomes": [
       {
         "name": "test_refund_rate_uses_successful_refund_money",
@@ -1140,6 +1140,10 @@
       },
       {
         "name": "test_agent_permissions_scope_and_thread_ownership",
+        "actual": "PASSED"
+      },
+      {
+        "name": "test_knowledge_retrieval_treats_instructions_as_data",
         "actual": "PASSED"
       },
       {
@@ -3236,6 +3240,12 @@
     },
     {
       "name": "test_agent_permissions_scope_and_thread_ownership",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "test_knowledge_retrieval_treats_instructions_as_data",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true

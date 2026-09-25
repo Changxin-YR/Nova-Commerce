@@ -1,0 +1,65 @@
+# FG-04 project Docker build
+# command: docker build --file ops/docker/Dockerfile.api --build-arg PYTHON_BASE=python:3.12-slim --tag nova-commerce-api:fg04 .
+# cwd: C:\Users\27363\Desktop\store
+# started: 2026-09-25T05:33:36.803386+00:00
+# python base image: python:3.12-slim
+# exit_code: 0
+# image: nova-commerce-api:fg04
+# image inspect: sha256:730bee6d75c06ca98199e2b9f4586b3890155cffd1e0a72627893ffa11a296c1 676510031
+
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.api
+#1 transferring dockerfile: 4.10kB 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim
+#2 DONE 2.5s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 1.27kB 0.0s done
+#3 DONE 0.1s
+
+#4 [1/9] FROM docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+#4 resolve docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 14.38kB 0.0s done
+#5 DONE 0.0s
+
+#6 [3/9] RUN apt-get update     && apt-get install -y --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#6 CACHED
+
+#7 [5/9] COPY backend/app ./app
+#7 CACHED
+
+#8 [8/9] RUN python -m pip install --upgrade pip     && python -m pip install --no-cache-dir .
+#8 CACHED
+
+#9 [2/9] WORKDIR /srv/nova
+#9 CACHED
+
+#10 [4/9] COPY backend/pyproject.toml backend/README.md ./
+#10 CACHED
+
+#11 [6/9] COPY backend/migrations ./migrations
+#11 CACHED
+
+#12 [7/9] COPY backend/alembic.ini ./
+#12 CACHED
+
+#13 [9/9] RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nova     && chown -R nova:nova /srv/nova
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers done
+#14 exporting manifest sha256:ce840b7870d3c2fa4ab3d1bf76ba3d3247848b271953974a55f368e0bd49e687 done
+#14 exporting config sha256:c03b3b8f2fdcffbfbe7209b032aaa4f62f0d33a4a825a3a187b13fc6262c1831 done
+#14 exporting attestation manifest sha256:ce96113b8ae2bb1370c7a0558036bc15965efdb8856c8a618fd267a65e8a9115 0.0s done
+#14 exporting manifest list sha256:730bee6d75c06ca98199e2b9f4586b3890155cffd1e0a72627893ffa11a296c1 done
+#14 naming to docker.io/library/nova-commerce-api:fg04 done
+#14 unpacking to docker.io/library/nova-commerce-api:fg04 0.0s done
+#14 DONE 0.1s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/r5qr9m1gu0swnivx739256o1a

@@ -1,0 +1,341 @@
+{
+  "gate_id": "FG-22",
+  "name": "Flagship Agent E2E",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe scripts/emit_fg22_evidence.py  [starts `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`, waits for /health/live, runs `playwright test e2e/flagship-agent.spec.ts --reporter=json` on E2E_PORT=4174, runs scripts/fg22_journey.py (fixture modes seed/http/service/interrupt/decision/resume/verify/cleanup), then stops the server]",
+  "cwd": "C:\\Users\\27363\\Desktop\\store",
+  "timestamp": "2026-09-25T05:37:16.595906+00:00",
+  "duration_ms": 68655,
+  "exit_code": 0,
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "scripts/emit_fg22_evidence.py",
+      "scripts/fg22_journey.py",
+      "scripts/gate_evidence.py",
+      "backend/tests/e2e/flagship_e2e_fixture.py",
+      "backend/tests/integration/payment/conftest.py",
+      "backend/app/modules/agent",
+      "backend/app/modules/governance",
+      "backend/app/modules/identity",
+      "backend/app/modules/inventory",
+      "backend/app/api/v1/router.py",
+      "frontend/e2e/flagship-agent.spec.ts",
+      "frontend/playwright.config.ts",
+      "frontend/src/views/console/AiWorkspaceView.vue",
+      "frontend/src/components/agent/ActionApprovalCard.vue"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "specification": "Real HTTP/Browser. Agent request, tool call, permission/DataScope, PendingAction, DB-locked approval, expiry blocking, no non-repeatable side effect before interrupt, Resume re-validation, duplicate Resume idempotency. Seven fact classes verified by querying MySQL (Order, Payment, InventoryMovement, PaymentCallback, Fulfillment, Audit, Outbox). Page text does not substitute for database facts.",
+  "transport_notes": {
+    "real_http": [
+      "POST /api/v1/auth/login",
+      "POST /api/v1/agent/chat (twice with the same client_request_id)",
+      "GET /api/v1/agent/runs (owner scope)",
+      "GET /api/v1/agent/admin/tools (console permission)",
+      "POST /api/v1/pending-actions/{id}/approve (approved, re-decided, expired, and as a consumer)",
+      "GET /api/v1/pending-actions"
+    ],
+    "real_browser": "playwright test e2e/flagship-agent.spec.ts --reporter=json",
+    "service_layer_with_no_http_endpoint": [
+      "PendingAction creation: the frozen HTTP surface only lists, reads, approves and rejects - no endpoint creates a PendingAction, so the fixture creates the row through the real PendingActionService/model and drives every decision through HTTP or the locked service.",
+      "reject, CRITICAL-risk block and payload-hash mismatch: no HTTP endpoint exists for these, so they are driven through PendingActionService, whose approve/reject the endpoint calls.",
+      "LangGraph interrupt/resume: the HITL graph is not exposed over HTTP; it is built with build_approval_graph and a real checkpointer while re-reading the same database rows."
+    ]
+  },
+  "shared_database_check": {
+    "queried": true,
+    "busy": [],
+    "session_count": 1
+  },
+  "backend_server": {
+    "started": true,
+    "pid": 15860,
+    "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+    "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+    "answered_after_seconds": 3.05,
+    "log": "artifacts\\reports\\fg22_backend.log",
+    "error_log": "artifacts\\reports\\fg22_backend.err.log",
+    "environment_overrides": {
+      "PAYMENT_MOCK_ENABLED": "true",
+      "APP_ENV": "dev"
+    },
+    "environment_note": "The shared .env does not define PAYMENT_MOCK_ENABLED, and the code default is False, which disables the mock-pay surface (the settlement click answers 60006). .env.example documents it as true for the dev profile, so this run starts its own server with that documented value instead of editing a file owned by another member. Any other gate that drives mock payment must do the same.",
+    "health_status": 200,
+    "port_free_after_shutdown": true
+  },
+  "browser": {
+    "ran": true,
+    "command": "C:\\Users\\27363\\Desktop\\store\\frontend\\node_modules\\.bin\\playwright.cmd test e2e/flagship-agent.spec.ts --reporter=json",
+    "exit_code": 0,
+    "duration_ms": 39160,
+    "spec": "e2e/flagship-agent.spec.ts",
+    "e2e_port": 4174,
+    "json_report": "artifacts\\reports\\fg22_playwright.json",
+    "stdout_tail": "nt.spec.ts\",\n      \"column\": 0,\n      \"line\": 0,\n      \"specs\": [\n        {\n          \"title\": \"flagship journey: real browser order + payment, then agent approval in the console\",\n          \"ok\": true,\n          \"tags\": [],\n          \"tests\": [\n            {\n              \"timeout\": 30000,\n              \"annotations\": [\n                {\n                  \"type\": \"serial\",\n                  \"location\": {\n                    \"file\": \"C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\frontend\\\\e2e\\\\flagship-agent.spec.ts\",\n                    \"line\": 0,\n                    \"column\": 0\n                  }\n                }\n              ],\n              \"expectedStatus\": \"passed\",\n              \"projectId\": \"chromium\",\n              \"projectName\": \"chromium\",\n              \"results\": [\n                {\n                  \"workerIndex\": 0,\n                  \"parallelIndex\": 0,\n                  \"status\": \"passed\",\n                  \"duration\": 29521,\n                  \"errors\": [],\n                  \"stdout\": [],\n                  \"stderr\": [],\n                  \"retry\": 0,\n                  \"startTime\": \"2026-09-25T05:37:29.836Z\",\n                  \"annotations\": [\n                    {\n                      \"type\": \"serial\",\n                      \"location\": {\n                        \"file\": \"C:\\\\Users\\\\27363\\\\Desktop\\\\store\\\\frontend\\\\e2e\\\\flagship-agent.spec.ts\",\n                        \"line\": 0,\n                        \"column\": 0\n                      }\n                    }\n                  ],\n                  \"attachments\": []\n                }\n              ],\n              \"status\": \"expected\"\n            }\n          ],\n          \"id\": \"5231e78de96be0322f9f-b28ea2aae97e80b5422f\",\n          \"file\": \"flagship-agent.spec.ts\",\n          \"line\": 83,\n          \"column\": 1\n        }\n      ]\n    }\n  ],\n  \"errors\": [],\n  \"stats\": {\n    \"startTime\": \"2026-09-25T05:37:23.503Z\",\n    \"duration\": 37367.017,\n    \"expected\": 1,\n    \"skipped\": 0,\n    \"unexpected\": 0,\n    \"flaky\": 0\n  }\n}\n",
+    "stderr_tail": "",
+    "tests": [
+      {
+        "title": "flagship journey: real browser order + payment, then agent approval in the console",
+        "ok": true,
+        "statuses": [
+          "expected"
+        ],
+        "passed": true
+      }
+    ],
+    "stats": {
+      "startTime": "2026-09-25T05:37:23.503Z",
+      "duration": 37367.017,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "journey": {
+    "marker": "F2D90CE7",
+    "checklist": [
+      {
+        "name": "http fixture completed against real database",
+        "expected": 0,
+        "actual": 0,
+        "pass": true
+      },
+      {
+        "name": "service fixture completed against real database",
+        "expected": 0,
+        "actual": 0,
+        "pass": true
+      },
+      {
+        "name": "interrupt fixture completed against real database",
+        "expected": 0,
+        "actual": 0,
+        "pass": true
+      },
+      {
+        "name": "decision fixture completed against real database",
+        "expected": 0,
+        "actual": 0,
+        "pass": true
+      },
+      {
+        "name": "resume fixture completed against real database",
+        "expected": 0,
+        "actual": 0,
+        "pass": true
+      },
+      {
+        "name": "verify fixture completed against real database",
+        "expected": 0,
+        "actual": 0,
+        "pass": true
+      },
+      {
+        "name": "real HTTP agent and governance observations completed",
+        "expected": true,
+        "actual": true,
+        "pass": true
+      },
+      {
+        "name": "seven database fact classes were read from MySQL",
+        "expected": [
+          "Order",
+          "Payment",
+          "PaymentCallback",
+          "InventoryMovement",
+          "Fulfillment",
+          "Audit",
+          "Outbox"
+        ],
+        "actual": [
+          "Order",
+          "Payment",
+          "PaymentCallback",
+          "InventoryMovement",
+          "Fulfillment",
+          "Audit",
+          "Outbox"
+        ],
+        "pass": true
+      },
+      {
+        "name": "fixture cleanup completed with no merchant residue",
+        "expected": {
+          "pending_actions": 0,
+          "agent_runs": 0,
+          "audit": 0
+        },
+        "actual": {
+          "pending_actions": 0,
+          "agent_runs": 0,
+          "audit": 0
+        },
+        "pass": true
+      }
+    ],
+    "ran": true,
+    "exit_code": 0,
+    "stderr_tail": ""
+  },
+  "junit_report": {
+    "path": "artifacts\\evidence\\agent\\fg22_flagship_e2e.xml",
+    "parses": true,
+    "testcase_count": 17,
+    "source": "real Playwright JSON report, converted"
+  },
+  "assertions": [
+    {
+      "name": "shared MySQL has no other live query before the journey starts (serial access)",
+      "expected": "no live foreign session",
+      "actual": {
+        "queried": true,
+        "busy": [],
+        "session_count": 1
+      },
+      "pass": true
+    },
+    {
+      "name": "port 8000 is free before starting the backend",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "the Playwright browser spec ran",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "every Playwright test passed",
+      "expected": true,
+      "actual": [
+        {
+          "title": "flagship journey: real browser order + payment, then agent approval in the console",
+          "ok": true,
+          "statuses": [
+            "expected"
+          ],
+          "passed": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "name": "the Playwright process exited 0",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "the journey driver ran and produced its checklist",
+      "expected": true,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "http fixture completed against real database",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "service fixture completed against real database",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "interrupt fixture completed against real database",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "decision fixture completed against real database",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "resume fixture completed against real database",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "verify fixture completed against real database",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "real HTTP agent and governance observations completed",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "seven database fact classes were read from MySQL",
+      "expected": [
+        "Order",
+        "Payment",
+        "PaymentCallback",
+        "InventoryMovement",
+        "Fulfillment",
+        "Audit",
+        "Outbox"
+      ],
+      "actual": [
+        "Order",
+        "Payment",
+        "PaymentCallback",
+        "InventoryMovement",
+        "Fulfillment",
+        "Audit",
+        "Outbox"
+      ],
+      "pass": true
+    },
+    {
+      "name": "fixture cleanup completed with no merchant residue",
+      "expected": {
+        "pending_actions": 0,
+        "agent_runs": 0,
+        "audit": 0
+      },
+      "actual": {
+        "pending_actions": 0,
+        "agent_runs": 0,
+        "audit": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "[10] a real browser (Playwright) drove the journey and its result is reported separately from the DB facts",
+      "expected": true,
+      "actual": {
+        "tests": [
+          "flagship journey: real browser order + payment, then agent approval in the console"
+        ],
+        "passed": true,
+        "exit_code": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "the backend this run started was shut down",
+      "expected": false,
+      "actual": false,
+      "pass": true
+    }
+  ],
+  "fail_reasons": [],
+  "verdict": "PASS"
+}

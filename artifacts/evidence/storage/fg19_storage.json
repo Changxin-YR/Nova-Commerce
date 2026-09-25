@@ -1,0 +1,147 @@
+{
+  "gate_id": "FG-19",
+  "name": "Object Storage",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe scripts/emit_fg19_evidence.py  [real minio client round-trip: bucket_exists/make_bucket, put_object, stat_object, get_object, remove_object, stat_object]",
+  "cwd": "C:\\Users\\27363\\Desktop\\store",
+  "timestamp": "2026-09-25T05:37:15.771011+00:00",
+  "duration_ms": 364,
+  "exit_code": 0,
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "scripts/emit_fg19_evidence.py",
+      "scripts/gate_evidence.py",
+      "backend/app/shared/storage",
+      ".env.example",
+      "ops/docker-compose.yml"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "infrastructure": {
+    "engine": "MinIO (real container nx-minio on 127.0.0.1:19000, not mocked)",
+    "why_real": "Checksum, ETag and delete-visibility semantics are server behaviour. A memory-backed fake would prove only that this script can call itself."
+  },
+  "observations": {
+    "endpoint": "http://127.0.0.1:19000",
+    "access_key": "novaadmin",
+    "bucket": "nova-fg19-evidence",
+    "object_key": "final-gate/fg19/1790314635-2794ac0c/roundtrip.bin",
+    "payload_size": 353,
+    "expected_sha256": "655b0173bf8e23d09fe3a79c340a52ec83a95fa1e1c1b584d5aabf10a8a17613",
+    "expected_md5": "3aedd01aabf994949f57ba008a3c6903",
+    "tcp_reachable": true,
+    "bucket_existed": false,
+    "bucket_created": true,
+    "bucket_removed": true,
+    "put_succeeded": true,
+    "stat_size": 353,
+    "stat_etag": "3aedd01aabf994949f57ba008a3c6903",
+    "stat_content_type": "application/octet-stream",
+    "readback_size": 353,
+    "readback_sha256": "655b0173bf8e23d09fe3a79c340a52ec83a95fa1e1c1b584d5aabf10a8a17613",
+    "readback_md5": "3aedd01aabf994949f57ba008a3c6903",
+    "remove_succeeded": true,
+    "stat_after_remove_raised": true,
+    "stat_after_remove_error": "NoSuchKey",
+    "errors": [],
+    "tcp_detail": "tcp 127.0.0.1:19000 connect_ex=0",
+    "bucket_existed_after_create": true,
+    "readback_matches_payload": true,
+    "objects_left_in_created_bucket": 0,
+    "call_exit_codes": {
+      "tcp_connect": 0,
+      "bucket_setup": 0,
+      "put_object": 0,
+      "stat_object": 0,
+      "get_object": 0,
+      "remove_object": 0,
+      "stat_after_remove": 0
+    }
+  },
+  "assertions": [
+    {
+      "name": "S3 endpoint declared in .env",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "S3 endpoint accepts TCP connections",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "test bucket available (existing or created)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "put_object succeeded",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "stat_object reported the uploaded size",
+      "expected": 353,
+      "actual": 353,
+      "pass": true
+    },
+    {
+      "name": "stat_object ETag equals the payload MD5",
+      "expected": "3aedd01aabf994949f57ba008a3c6903",
+      "actual": "3aedd01aabf994949f57ba008a3c6903",
+      "pass": true
+    },
+    {
+      "name": "get_object returned the same number of bytes",
+      "expected": 353,
+      "actual": 353,
+      "pass": true
+    },
+    {
+      "name": "readback SHA-256 equals the pre-upload checksum",
+      "expected": "655b0173bf8e23d09fe3a79c340a52ec83a95fa1e1c1b584d5aabf10a8a17613",
+      "actual": "655b0173bf8e23d09fe3a79c340a52ec83a95fa1e1c1b584d5aabf10a8a17613",
+      "pass": true
+    },
+    {
+      "name": "readback MD5 equals the pre-upload checksum",
+      "expected": "3aedd01aabf994949f57ba008a3c6903",
+      "actual": "3aedd01aabf994949f57ba008a3c6903",
+      "pass": true
+    },
+    {
+      "name": "readback bytes are identical to the uploaded payload",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "remove_object succeeded",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "object is gone after removal (stat_object raised S3Error)",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "test bucket created by this run was cleaned up or left empty",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    }
+  ],
+  "fail_reasons": [],
+  "verdict": "PASS"
+}

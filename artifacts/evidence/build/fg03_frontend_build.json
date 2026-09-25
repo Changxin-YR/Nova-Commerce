@@ -6,12 +6,12 @@
     "build"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T23:31:01.760326+00:00",
-  "duration_ms": 11406,
+  "timestamp": "2026-09-25T05:39:00.797271+00:00",
+  "duration_ms": 13998,
   "exit_code": 0,
   "git": {
-    "revision": "2b595a4f5430f16ab6e930f9ea6ec61260157cff\n",
-    "subject": "feat: complete phase6 commerce agent and governance flows\n",
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -38,6 +38,6 @@
       "pass": true
     }
   ],
-  "stderr_tail": "",
+  "stderr_tail": "\u001b[33m[PLUGIN_TIMINGS] \u001b[0mPlugin hooks ran for 1.4s of this 5.3s build (27%).\n2 hooks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:\n  - vite:css transform (39 calls)\n  - unplugin-vue-components transform (2388 calls)\nSee https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.\n\n",
   "verdict": "PASS"
 }

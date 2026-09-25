@@ -1,0 +1,69 @@
+{
+  "gate_id": "FG-05",
+  "name": "Alembic Migration",
+  "mandatory": false,
+  "spec": "section 129 - Alembic is the sole schema authority; models and migrations do not drift",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m alembic check && C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m alembic upgrade head && C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe -m alembic current",
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-25T05:33:42.234833+00:00",
+  "duration_ms": 7691,
+  "exit_code": 0,
+  "heads": [
+    "20260924"
+  ],
+  "current": [
+    "20260924"
+  ],
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "backend/alembic.ini",
+      "backend/migrations",
+      "backend/app/shared/db",
+      "backend/app/modules",
+      "scripts/emit_fg05_evidence.py",
+      "scripts/gate_evidence.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "assertions": [
+    {
+      "name": "alembic check exits 0 (no autogenerate drift)",
+      "expected": "PASSED",
+      "actual": "exit_code=0",
+      "pass": true
+    },
+    {
+      "name": "alembic check reports 'No new upgrade operations detected'",
+      "expected": "PASSED",
+      "actual": "reported",
+      "pass": true
+    },
+    {
+      "name": "alembic upgrade head exits 0",
+      "expected": "PASSED",
+      "actual": "exit_code=0",
+      "pass": true
+    },
+    {
+      "name": "alembic heads reports exactly one head",
+      "expected": "PASSED",
+      "actual": "heads=['20260924']",
+      "pass": true
+    },
+    {
+      "name": "database current revision equals the head revision",
+      "expected": "PASSED",
+      "actual": "current=['20260924'] head=['20260924']",
+      "pass": true
+    }
+  ],
+  "junit_report": null,
+  "summary": "no autogenerate drift; database at head",
+  "stderr_tail": "No new upgrade operations detected.\nINFO  [alembic.runtime.migration] Context impl MySQLImpl.\nINFO  [alembic.runtime.migration] Will assume non-transactional DDL.\nINFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas\nINFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables\nINFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types\nINFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints\nINFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults\nINFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments\nINFO  [alembic.runtime.migration] Context impl MySQLImpl.\nINFO  [alembic.runtime.migration] Will assume non-transactional DDL.\n20260924_1600 (head)\nINFO  [alembic.runtime.migration] Context impl MySQLImpl.\nINFO  [alembic.runtime.migration] Will assume non-transactional DDL.\n",
+  "verdict": "PASS"
+}

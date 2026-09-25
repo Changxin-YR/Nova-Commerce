@@ -1,0 +1,71 @@
+{
+  "gate_id": "FG-04",
+  "name": "Docker Build",
+  "mandatory": false,
+  "spec": "section 128/144 - the application image builds from the frozen Dockerfile and the real engine confirms it",
+  "command": "docker build --file ops/docker/Dockerfile.api --build-arg PYTHON_BASE=python:3.12-slim --tag nova-commerce-api:fg04 .",
+  "cwd": "C:\\Users\\27363\\Desktop\\store",
+  "timestamp": "2026-09-25T05:33:36.803386+00:00",
+  "duration_ms": 5026,
+  "exit_code": 0,
+  "python_base_image": "python:3.12-slim",
+  "image": {
+    "tag": "nova-commerce-api:fg04",
+    "inspect": "sha256:730bee6d75c06ca98199e2b9f4586b3890155cffd1e0a72627893ffa11a296c1 676510031"
+  },
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "ops/docker/Dockerfile.api",
+      ".dockerignore",
+      "backend/pyproject.toml",
+      "backend/app",
+      "backend/alembic.ini",
+      "backend/migrations",
+      "ops/docker-compose.yml",
+      "scripts/emit_fg04_evidence.py",
+      "scripts/gate_evidence.py"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "assertions": [
+    {
+      "name": "ops/docker/Dockerfile.api exists",
+      "expected": "PASSED",
+      "actual": "present",
+      "pass": true
+    },
+    {
+      "name": ".dockerignore exists (keeps the build context small)",
+      "expected": "PASSED",
+      "actual": "present",
+      "pass": true
+    },
+    {
+      "name": "an allowed Python base image is available to the engine without a registry pull",
+      "expected": "PASSED",
+      "actual": "python:3.12-slim",
+      "pass": true
+    },
+    {
+      "name": "docker build exits 0",
+      "expected": "PASSED",
+      "actual": "exit_code=0",
+      "pass": true
+    },
+    {
+      "name": "built image is present in the local engine",
+      "expected": "PASSED",
+      "actual": "sha256:730bee6d75c06ca98199e2b9f4586b3890155cffd1e0a72627893ffa11a296c1 676510031",
+      "pass": true
+    }
+  ],
+  "junit_report": null,
+  "summary": "View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/r5qr9m1gu0swnivx739256o1a",
+  "stderr_tail": "sing docker driver\n\n#1 [internal] load build definition from Dockerfile.api\n#1 transferring dockerfile: 4.10kB 0.1s done\n#1 DONE 0.1s\n\n#2 [internal] load metadata for docker.io/library/python:3.12-slim\n#2 DONE 2.5s\n\n#3 [internal] load .dockerignore\n#3 transferring context: 1.27kB 0.0s done\n#3 DONE 0.1s\n\n#4 [1/9] FROM docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea\n#4 resolve docker.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea 0.0s done\n#4 DONE 0.0s\n\n#5 [internal] load build context\n#5 transferring context: 14.38kB 0.0s done\n#5 DONE 0.0s\n\n#6 [3/9] RUN apt-get update     && apt-get install -y --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*\n#6 CACHED\n\n#7 [5/9] COPY backend/app ./app\n#7 CACHED\n\n#8 [8/9] RUN python -m pip install --upgrade pip     && python -m pip install --no-cache-dir .\n#8 CACHED\n\n#9 [2/9] WORKDIR /srv/nova\n#9 CACHED\n\n#10 [4/9] COPY backend/pyproject.toml backend/README.md ./\n#10 CACHED\n\n#11 [6/9] COPY backend/migrations ./migrations\n#11 CACHED\n\n#12 [7/9] COPY backend/alembic.ini ./\n#12 CACHED\n\n#13 [9/9] RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin nova     && chown -R nova:nova /srv/nova\n#13 CACHED\n\n#14 exporting to image\n#14 exporting layers done\n#14 exporting manifest sha256:ce840b7870d3c2fa4ab3d1bf76ba3d3247848b271953974a55f368e0bd49e687 done\n#14 exporting config sha256:c03b3b8f2fdcffbfbe7209b032aaa4f62f0d33a4a825a3a187b13fc6262c1831 done\n#14 exporting attestation manifest sha256:ce96113b8ae2bb1370c7a0558036bc15965efdb8856c8a618fd267a65e8a9115 0.0s done\n#14 exporting manifest list sha256:730bee6d75c06ca98199e2b9f4586b3890155cffd1e0a72627893ffa11a296c1 done\n#14 naming to docker.io/library/nova-commerce-api:fg04 done\n#14 unpacking to docker.io/library/nova-commerce-api:fg04 0.0s done\n#14 DONE 0.1s\n\nView build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/r5qr9m1gu0swnivx739256o1a\n",
+  "verdict": "PASS"
+}

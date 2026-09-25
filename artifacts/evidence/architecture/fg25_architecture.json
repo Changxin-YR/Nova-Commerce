@@ -1,0 +1,819 @@
+{
+  "gate_id": "FG-25",
+  "name": "Architecture Constraint Check",
+  "command": "C:\\Users\\27363\\Desktop\\store\\.venv\\Scripts\\python.exe scripts/emit_fg25_evidence.py  [parses backend/app with ast: module completeness, router/data-layer separation, aggregate router mounting, error mapping registration, console principal usage]",
+  "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
+  "timestamp": "2026-09-25T05:38:36.082210+00:00",
+  "duration_ms": 1458,
+  "exit_code": 0,
+  "parse_failures": [],
+  "git": {
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
+    "relevant_paths": [
+      "scripts/emit_fg25_evidence.py",
+      "scripts/gate_evidence.py",
+      "backend/app/api/v1/router.py",
+      "backend/app/core/errors.py",
+      "backend/app/main.py",
+      "backend/app/modules"
+    ],
+    "relevant_paths_dirty": false,
+    "relevant_paths_dirty_files": [],
+    "other_paths_dirty": false,
+    "other_paths_dirty_files": []
+  },
+  "checks": {
+    "a_module_completeness": {
+      "modules_with_api_package": 13,
+      "modules_checked": [
+        {
+          "module": "aftersales",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "enums",
+            "models",
+            "refunds",
+            "repository",
+            "schemas",
+            "serializers",
+            "service",
+            "views",
+            "workflow"
+          ]
+        },
+        {
+          "module": "agent",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "models",
+            "read_tools",
+            "repository",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "analytics",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "audit",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "repository",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "catalog",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "images",
+            "models",
+            "public_service",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "fulfillment",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "enums",
+            "models",
+            "repository",
+            "schemas",
+            "serializers",
+            "service"
+          ]
+        },
+        {
+          "module": "governance",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "approval_graph",
+            "models",
+            "repository",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "identity",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "dependencies",
+            "enums",
+            "models",
+            "repository",
+            "schemas",
+            "security",
+            "service"
+          ]
+        },
+        {
+          "module": "inventory",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "enums",
+            "models",
+            "repository",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "knowledge",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "models",
+            "repository",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "marketing",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "coupon_schemas",
+            "coupon_service",
+            "models",
+            "preview_token",
+            "reconciliation",
+            "schemas",
+            "service"
+          ]
+        },
+        {
+          "module": "order",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "enums",
+            "models",
+            "reconciliation",
+            "repository",
+            "schemas",
+            "serializers",
+            "service",
+            "state_machine",
+            "workflow"
+          ]
+        },
+        {
+          "module": "payment",
+          "has_api_package": true,
+          "has_service_layer": true,
+          "has_schemas": true,
+          "top_level_python_modules": [
+            "__init__",
+            "compensation",
+            "enums",
+            "models",
+            "providers",
+            "repository",
+            "schemas",
+            "serializers",
+            "service",
+            "workflow"
+          ]
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    },
+    "b_routers_do_not_touch_data_layer": {
+      "router_files_scanned": 29,
+      "violation_count": 0,
+      "violations": []
+    },
+    "c_router_mounting": {
+      "router_file": "backend/app/api/v1/router.py",
+      "exists": true,
+      "declares_router_object": true,
+      "declared_prefixes": [
+        {
+          "module_prefix": "app.modules.identity.api",
+          "prefix": "/auth",
+          "submodules": [
+            "public",
+            "users",
+            "addresses",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.catalog.api",
+          "prefix": "/catalog",
+          "submodules": [
+            "public",
+            "admin",
+            "images"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.inventory.api",
+          "prefix": "/inventory",
+          "submodules": [
+            "customer",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.cart.api",
+          "prefix": "/cart",
+          "submodules": [
+            "customer"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.order.api",
+          "prefix": "/orders",
+          "submodules": [
+            "admin",
+            "customer"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.payment.api",
+          "prefix": "/payments",
+          "submodules": [
+            "customer",
+            "callbacks",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.fulfillment.api",
+          "prefix": "/fulfillments",
+          "submodules": [
+            "customer",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.aftersales.api",
+          "prefix": "/after-sales",
+          "submodules": [
+            "customer",
+            "admin",
+            "refunds"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.marketing.api",
+          "prefix": "/marketing",
+          "submodules": [
+            "coupons",
+            "promotions",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.analytics.api",
+          "prefix": "/analytics",
+          "submodules": [
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.knowledge.api",
+          "prefix": "/knowledge",
+          "submodules": [
+            "admin",
+            "retrieval"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.agent.api",
+          "prefix": "/agent",
+          "submodules": [
+            "chat",
+            "runs",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.governance.api",
+          "prefix": "/governance",
+          "submodules": [
+            "pending_actions",
+            "tools",
+            "admin"
+          ]
+        },
+        {
+          "module_prefix": "app.modules.audit.api",
+          "prefix": "/audit",
+          "submodules": [
+            "admin"
+          ]
+        }
+      ],
+      "directly_imported_routers": [
+        "app.modules.catalog.api.tasks.router",
+        "app.modules.governance.api.pending_actions.task_router",
+        "app.modules.knowledge.api.admin.task_router"
+      ],
+      "modules_exposing_api_subrouters": [
+        "aftersales.admin",
+        "aftersales.customer",
+        "aftersales.refunds",
+        "agent.admin",
+        "agent.chat",
+        "agent.runs",
+        "analytics.admin",
+        "audit.admin",
+        "catalog.admin",
+        "catalog.images",
+        "catalog.public",
+        "catalog.tasks",
+        "fulfillment.admin",
+        "fulfillment.customer",
+        "governance.pending_actions",
+        "identity.addresses",
+        "identity.public",
+        "identity.users",
+        "inventory.admin",
+        "knowledge.admin",
+        "knowledge.retrieval",
+        "marketing.admin",
+        "marketing.coupons",
+        "marketing.promotions",
+        "order.admin",
+        "order.customer",
+        "payment.admin",
+        "payment.callbacks",
+        "payment.customer"
+      ],
+      "modules_declared_in_aggregate": [
+        "aftersales",
+        "agent",
+        "analytics",
+        "audit",
+        "cart",
+        "catalog",
+        "fulfillment",
+        "governance",
+        "identity",
+        "inventory",
+        "knowledge",
+        "marketing",
+        "order",
+        "payment"
+      ],
+      "unmounted_modules": [],
+      "declared_but_no_api_package": [],
+      "declared_but_defensively_absent": [
+        "cart"
+      ],
+      "defensive_import_tolerates_missing_modules": true,
+      "violation_count": 0,
+      "violations": []
+    },
+    "d_error_mapping": {
+      "errors_module": "backend/app/core/errors.py",
+      "main_module": "backend/app/main.py",
+      "defines_error_code_enum": true,
+      "error_code_count": 130,
+      "defines_app_error_base": true,
+      "app_error_subclasses": 0,
+      "defines_http_status_mapping": true,
+      "defines_handler_registration": true,
+      "main_registers_handlers": true,
+      "violation_count": 0,
+      "violations": []
+    },
+    "e_scope_dependencies": {
+      "router_files_examined": 29,
+      "console_router_files": 11,
+      "console_router_files_without_principal": [],
+      "router_files_without_any_principal": 3,
+      "principal_files": [
+        "backend/app/modules/aftersales/api/admin.py",
+        "backend/app/modules/aftersales/api/customer.py",
+        "backend/app/modules/aftersales/api/refunds.py",
+        "backend/app/modules/agent/api/admin.py",
+        "backend/app/modules/agent/api/chat.py",
+        "backend/app/modules/agent/api/runs.py",
+        "backend/app/modules/analytics/api/admin.py",
+        "backend/app/modules/audit/api/admin.py",
+        "backend/app/modules/catalog/api/admin.py",
+        "backend/app/modules/catalog/api/images.py",
+        "backend/app/modules/catalog/api/tasks.py",
+        "backend/app/modules/fulfillment/api/admin.py",
+        "backend/app/modules/fulfillment/api/customer.py",
+        "backend/app/modules/governance/api/pending_actions.py",
+        "backend/app/modules/identity/api/addresses.py",
+        "backend/app/modules/identity/api/users.py",
+        "backend/app/modules/inventory/api/admin.py",
+        "backend/app/modules/knowledge/api/admin.py",
+        "backend/app/modules/knowledge/api/retrieval.py",
+        "backend/app/modules/marketing/api/admin.py",
+        "backend/app/modules/marketing/api/coupons.py",
+        "backend/app/modules/marketing/api/promotions.py",
+        "backend/app/modules/order/api/admin.py",
+        "backend/app/modules/order/api/customer.py",
+        "backend/app/modules/payment/api/admin.py",
+        "backend/app/modules/payment/api/customer.py"
+      ],
+      "per_file": [
+        {
+          "file": "backend/app/modules/aftersales/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 5
+        },
+        {
+          "file": "backend/app/modules/aftersales/api/customer.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 4
+        },
+        {
+          "file": "backend/app/modules/aftersales/api/refunds.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 2
+        },
+        {
+          "file": "backend/app/modules/agent/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/agent/api/chat.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 3
+        },
+        {
+          "file": "backend/app/modules/agent/api/runs.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 3
+        },
+        {
+          "file": "backend/app/modules/analytics/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/audit/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/catalog/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 5
+        },
+        {
+          "file": "backend/app/modules/catalog/api/images.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/catalog/api/public.py",
+          "is_console_router": false,
+          "principals": [],
+          "uses_permission_code": false,
+          "endpoint_count": 4
+        },
+        {
+          "file": "backend/app/modules/catalog/api/tasks.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 2
+        },
+        {
+          "file": "backend/app/modules/fulfillment/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 2
+        },
+        {
+          "file": "backend/app/modules/fulfillment/api/customer.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/governance/api/pending_actions.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 4
+        },
+        {
+          "file": "backend/app/modules/identity/api/addresses.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 5
+        },
+        {
+          "file": "backend/app/modules/identity/api/public.py",
+          "is_console_router": false,
+          "principals": [],
+          "uses_permission_code": false,
+          "endpoint_count": 3
+        },
+        {
+          "file": "backend/app/modules/identity/api/users.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 2
+        },
+        {
+          "file": "backend/app/modules/inventory/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal",
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": true,
+          "endpoint_count": 7
+        },
+        {
+          "file": "backend/app/modules/knowledge/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 8
+        },
+        {
+          "file": "backend/app/modules/knowledge/api/retrieval.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/marketing/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 2
+        },
+        {
+          "file": "backend/app/modules/marketing/api/coupons.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal",
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 7
+        },
+        {
+          "file": "backend/app/modules/marketing/api/promotions.py",
+          "is_console_router": false,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 5
+        },
+        {
+          "file": "backend/app/modules/order/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 2
+        },
+        {
+          "file": "backend/app/modules/order/api/customer.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 6
+        },
+        {
+          "file": "backend/app/modules/payment/api/admin.py",
+          "is_console_router": true,
+          "principals": [
+            "ConsolePrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/payment/api/callbacks.py",
+          "is_console_router": false,
+          "principals": [],
+          "uses_permission_code": false,
+          "endpoint_count": 1
+        },
+        {
+          "file": "backend/app/modules/payment/api/customer.py",
+          "is_console_router": false,
+          "principals": [
+            "CurrentPrincipal"
+          ],
+          "uses_permission_code": false,
+          "endpoint_count": 4
+        }
+      ],
+      "violation_count": 0,
+      "violations": []
+    }
+  },
+  "assertions": [
+    {
+      "name": "(a) modules with an api/ package also expose a service layer",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(a) modules with an api/ package also expose schemas",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(a) api modules were found at all",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(b) no router file imports a repository module",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(b) no router file drives a SQLAlchemy session directly",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(b) router files were scanned at all",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(c) app/api/v1/router.py exists",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(c) every module exposing an api/ package is mounted",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(c) no aggregate prefix points at a module with no api/ package",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(d) ErrorCode enum declares business codes",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(d) AppError base class exists",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(d) errors.py maps exceptions to HTTP status/business codes",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(d) main.py registers the exception handlers",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "(e) every console router carries a principal or permission dependency",
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "name": "(e) console routers were identified at all",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    }
+  ],
+  "fail_reasons": [],
+  "verdict": "PASS"
+}

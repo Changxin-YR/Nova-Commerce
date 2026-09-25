@@ -7,12 +7,12 @@
     "--outputFile=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\unit\\fg20_vitest.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T23:34:38.357348+00:00",
-  "duration_ms": 7597,
+  "timestamp": "2026-09-25T05:39:15.233976+00:00",
+  "duration_ms": 24262,
   "exit_code": 0,
   "git": {
-    "revision": "2b595a4f5430f16ab6e930f9ea6ec61260157cff\n",
-    "subject": "feat: complete phase6 commerce agent and governance flows\n",
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",

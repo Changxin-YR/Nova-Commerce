@@ -6,12 +6,12 @@
     "--reporter=json"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\frontend",
-  "timestamp": "2026-09-24T23:34:38.558603+00:00",
-  "duration_ms": 19167,
+  "timestamp": "2026-09-25T05:46:04.927082+00:00",
+  "duration_ms": 34742,
   "exit_code": 0,
   "git": {
-    "revision": "2b595a4f5430f16ab6e930f9ea6ec61260157cff\n",
-    "subject": "feat: complete phase6 commerce agent and governance flows\n",
+    "revision": "0079a423ce55812ef17e20125f89ddd4fc7e6ee0\n",
+    "subject": "fix: keep flagship junit evidence complete\n",
     "relevant_paths": [
       "frontend/src",
       "frontend/tests",
@@ -32,9 +32,9 @@
   "browser_report": {
     "path": "artifacts\\evidence\\e2e\\fg21_playwright.report.json",
     "stats": {
-      "startTime": "2026-09-24T23:34:39.003Z",
-      "duration": 18702.459,
-      "expected": 7,
+      "startTime": "2026-09-25T05:46:05.336Z",
+      "duration": 34312.412000000004,
+      "expected": 8,
       "skipped": 0,
       "unexpected": 0,
       "flaky": 0
@@ -44,6 +44,12 @@
   "assertions": [
     {
       "name": "checkout previews the server total and sends one order to payment",
+      "expected": "PASSED",
+      "actual": "PASSED",
+      "pass": true
+    },
+    {
+      "name": "flagship journey: real browser order + payment, then agent approval in the console",
       "expected": "PASSED",
       "actual": "PASSED",
       "pass": true
