@@ -9,8 +9,8 @@
     "--junit-xml=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\agent\\fg15_hitl_resume.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-24T23:51:58.231861+00:00",
-  "exit_code": 1,
+  "timestamp": "2026-09-25T00:18:43.646093+00:00",
+  "exit_code": 0,
   "assertions": [
     {
       "name": "test_expired_approval_is_persisted_and_cannot_resume",
@@ -45,20 +45,20 @@
     {
       "name": "test_langgraph_checkpoint_resume_revalidates_database[True]",
       "expected": "PASSED",
-      "actual": "FAILED",
-      "pass": false
+      "actual": "PASSED",
+      "pass": true
     },
     {
       "name": "test_resume_rolls_back_failed_business_writes",
       "expected": "PASSED",
-      "actual": "FAILED",
-      "pass": false
+      "actual": "PASSED",
+      "pass": true
     },
     {
       "name": "test_critical_action_cannot_be_approved_or_resumed",
       "expected": "PASSED",
-      "actual": "FAILED",
-      "pass": false
+      "actual": "PASSED",
+      "pass": true
     }
   ],
   "junit_report": {
@@ -67,7 +67,7 @@
     "testcase_count": 8
   },
   "git": {
-    "revision": "59bc18d2c06b2c97851ff59483f0e8d898089675",
+    "revision": "25f371b0a856ce74ca16d6f7cac00262dc3a2043",
     "relevant_paths_dirty": false,
     "relevant_paths": [
       "backend/app",
@@ -76,7 +76,7 @@
       "scripts/emit_phase6_agent_gates.py"
     ]
   },
-  "verdict": "FAIL",
-  "stdout_tail": "est.py:206: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _\n\ncreated = {'created_warehouse': False}, marker = '17256fa1'\n\n    def _purge(created: dict[str, object], *, marker: str) -> None:\n        \"\"\"Delete everything the fixture and the tests created, in dependency order.\n    \n        Order matters and is not guesswork: most of these foreign keys are ``RESTRICT``\n        precisely so that history cannot be deleted out from under a live row, which means\n        the unwinding has to go children-first. Anything left behind would make the next run\n        behave differently from this one, and a suite whose second run differs from its\n        first is a suite nobody trusts.\n        \"\"\"\n        from sqlalchemy import select\n    \n        factory = get_session_factory()\n        sku_ids = tuple(created.get(\"sku_ids\") or ())\n        with factory() as session:\n            session.execute(\n>               delete(CouponUsageRecord).where(CouponUsageRecord.merchant_id == created[\"merchant_id\"])\n                                                                                 ^^^^^^^^^^^^^^^^^^^^^^\n            )\nE           KeyError: 'merchant_id'\n\ntests\\integration\\order\\conftest.py:403: KeyError\n=========================== short test summary info ===========================\nERROR tests/integration/order/test_pending_actions.py::test_langgraph_checkpoint_resume_revalidates_database[True]\nERROR tests/integration/order/test_pending_actions.py::test_langgraph_checkpoint_resume_revalidates_database[True]\nERROR tests/integration/order/test_pending_actions.py::test_resume_rolls_back_failed_business_writes\nERROR tests/integration/order/test_pending_actions.py::test_resume_rolls_back_failed_business_writes\nERROR tests/integration/order/test_pending_actions.py::test_critical_action_cannot_be_approved_or_resumed\nERROR tests/integration/order/test_pending_actions.py::test_critical_action_cannot_be_approved_or_resumed\n5 passed, 6 errors in 253.52s (0:04:13)\n",
+  "verdict": "PASS",
+  "stdout_tail": "2026-09-25 08:18:46 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\n2026-09-25 08:18:46 [info     ] redis configured               host=127.0.0.1 port=16379\n........                                                                 [100%]\n8 passed in 2.32s\n",
   "stderr_tail": ""
 }

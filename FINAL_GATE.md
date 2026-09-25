@@ -3,7 +3,7 @@
 This is an index of run artifacts. A gate passes only when its recorded tests
 passed and its watched paths still match the tested revision.
 
-**PROJECT STATUS: FAIL**
+**PROJECT STATUS: IN PROGRESS**
 
 | Gate | Name | Mandatory | Artifact | Status | Evidence check |
 |---|---|---|---|---|---|
@@ -13,17 +13,17 @@ passed and its watched paths still match the tested revision.
 | FG-04 | Docker Build |  | [artifacts/evidence/docker/fg04_docker_build.txt](artifacts/evidence/docker/fg04_docker_build.txt) | MISSING | No proof artifact |
 | FG-05 | Alembic Migration |  | [artifacts/evidence/migration/fg05_alembic.txt](artifacts/evidence/migration/fg05_alembic.txt) | MISSING | No proof artifact |
 | FG-06 | Seed Idempotency |  | [artifacts/evidence/migration/fg06_seed_idempotency.json](artifacts/evidence/migration/fg06_seed_idempotency.json) | MISSING | No proof artifact |
-| FG-07 | Unit Tests |  | [artifacts/evidence/unit/fg07_pytest_unit.xml](artifacts/evidence/unit/fg07_pytest_unit.xml) | STALE | Watched paths changed since the run |
+| FG-07 | Unit Tests |  | [artifacts/evidence/unit/fg07_pytest_unit.xml](artifacts/evidence/unit/fg07_pytest_unit.xml) | PASS | 780 assertions at 25f371b |
 | FG-08 | Integration Tests |  | [artifacts/evidence/integration/fg08_pytest_integration.xml](artifacts/evidence/integration/fg08_pytest_integration.xml) | STALE | Watched paths changed since the run |
 | FG-09 | Inventory Concurrency | Yes | [artifacts/evidence/concurrency/fg09_inventory_over_sell.json](artifacts/evidence/concurrency/fg09_inventory_over_sell.json) | PASS | 6 assertions at 2b595a4 |
 | FG-10 | Workflow Tests | Yes | [artifacts/evidence/integration/fg10_workflow.xml](artifacts/evidence/integration/fg10_workflow.xml) | STALE | Watched paths changed since the run |
 | FG-11 | Payment Idempotency | Yes | [artifacts/evidence/concurrency/fg11_payment_idempotency.json](artifacts/evidence/concurrency/fg11_payment_idempotency.json) | STALE | Watched paths changed since the run |
 | FG-12 | Refund Invariants | Yes | [artifacts/evidence/integration/fg12_refund_invariants.json](artifacts/evidence/integration/fg12_refund_invariants.json) | PASS | 13 assertions at 2b595a4 |
-| FG-13 | Auth Session / Refresh Rotation | Yes | [artifacts/evidence/auth/fg13_refresh_rotation.json](artifacts/evidence/auth/fg13_refresh_rotation.json) | PASS | 30 assertions at 2b595a4 |
-| FG-14 | Agent Authorization | Yes | [artifacts/evidence/agent/fg14_agent_authorization.json](artifacts/evidence/agent/fg14_agent_authorization.json) | PASS | 1 assertions at 59bc18d |
-| FG-15 | LangGraph HITL Resume / No Duplicate Side Effect | Yes | [artifacts/evidence/agent/fg15_hitl_resume.json](artifacts/evidence/agent/fg15_hitl_resume.json) | FAIL | A recorded assertion or process failed |
-| FG-16 | RAG Eval |  | [artifacts/evidence/rag/fg16_rag_eval.json](artifacts/evidence/rag/fg16_rag_eval.json) | STALE | Watched paths changed since the run |
-| FG-17 | RAG Prompt Injection | Yes | [artifacts/evidence/rag/fg17_rag_injection.json](artifacts/evidence/rag/fg17_rag_injection.json) | STALE | Watched paths changed since the run |
+| FG-13 | Auth Session / Refresh Rotation | Yes | [artifacts/evidence/auth/fg13_refresh_rotation.json](artifacts/evidence/auth/fg13_refresh_rotation.json) | STALE | Watched paths changed since the run |
+| FG-14 | Agent Authorization | Yes | [artifacts/evidence/agent/fg14_agent_authorization.json](artifacts/evidence/agent/fg14_agent_authorization.json) | PASS | 1 assertions at 25f371b |
+| FG-15 | LangGraph HITL Resume / No Duplicate Side Effect | Yes | [artifacts/evidence/agent/fg15_hitl_resume.json](artifacts/evidence/agent/fg15_hitl_resume.json) | PASS | 8 assertions at 25f371b |
+| FG-16 | RAG Eval |  | [artifacts/evidence/rag/fg16_rag_eval.json](artifacts/evidence/rag/fg16_rag_eval.json) | PASS | 1 assertions at 25f371b |
+| FG-17 | RAG Prompt Injection | Yes | [artifacts/evidence/rag/fg17_rag_injection.json](artifacts/evidence/rag/fg17_rag_injection.json) | PASS | 1 assertions at 25f371b |
 | FG-18 | MCP Authorization / Compatibility | Yes | [artifacts/evidence/mcp/fg18_mcp.json](artifacts/evidence/mcp/fg18_mcp.json) | MISSING | No proof artifact |
 | FG-19 | Object Storage |  | [artifacts/evidence/storage/fg19_storage.json](artifacts/evidence/storage/fg19_storage.json) | MISSING | No proof artifact |
 | FG-20 | Vitest |  | [artifacts/evidence/unit/fg20_vitest.xml](artifacts/evidence/unit/fg20_vitest.xml) | PASS | 301 assertions at 2b595a4 |
@@ -32,4 +32,4 @@ passed and its watched paths still match the tested revision.
 | FG-23 | Health Checks |  | [artifacts/evidence/docker/fg23_health.json](artifacts/evidence/docker/fg23_health.json) | MISSING | No proof artifact |
 | FG-24 | Secret Scan |  | [artifacts/evidence/security/fg24_secret_scan.json](artifacts/evidence/security/fg24_secret_scan.json) | MISSING | No proof artifact |
 | FG-25 | Architecture Constraint Check |  | [artifacts/evidence/architecture/fg25_architecture.json](artifacts/evidence/architecture/fg25_architecture.json) | MISSING | No proof artifact |
-| FG-26 | Critical Security Demo | Yes | [artifacts/evidence/security/fg26_critical_block.json](artifacts/evidence/security/fg26_critical_block.json) | STALE | Watched paths changed since the run |
+| FG-26 | Critical Security Demo | Yes | [artifacts/evidence/security/fg26_critical_block.json](artifacts/evidence/security/fg26_critical_block.json) | PASS | 1 assertions at 25f371b |

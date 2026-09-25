@@ -9,7 +9,7 @@
     "--junit-xml=C:\\Users\\27363\\Desktop\\store\\artifacts\\evidence\\rag\\fg17_rag_injection.xml"
   ],
   "cwd": "C:\\Users\\27363\\Desktop\\store\\backend",
-  "timestamp": "2026-09-24T23:50:14.708409+00:00",
+  "timestamp": "2026-09-25T00:18:52.567916+00:00",
   "exit_code": 0,
   "assertions": [
     {
@@ -25,7 +25,7 @@
     "testcase_count": 1
   },
   "git": {
-    "revision": "b16e0f9828963de5800fa7f43a28e23188a297cf",
+    "revision": "25f371b0a856ce74ca16d6f7cac00262dc3a2043",
     "relevant_paths_dirty": false,
     "relevant_paths": [
       "backend/app",
@@ -35,6 +35,6 @@
     ]
   },
   "verdict": "PASS",
-  "stdout_tail": "2026-09-25 07:50:17 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\n2026-09-25 07:50:17 [info     ] redis configured               host=127.0.0.1 port=16379\n.                                                                        [100%]\n============================== warnings summary ===============================\ntests/integration/order/test_phase6_routers.py::test_knowledge_retrieval_treats_instructions_as_data\n  C:\\Users\\27363\\Desktop\\store\\.venv\\Lib\\site-packages\\starlette\\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.\n    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n1 passed, 1 warning in 2.77s\n",
+  "stdout_tail": "2026-09-25 08:18:54 [info     ] database configured            max_overflow=20 pool_size=10 require_mysql=True\n2026-09-25 08:18:54 [info     ] redis configured               host=127.0.0.1 port=16379\n.                                                                        [100%]\n============================== warnings summary ===============================\ntests/integration/order/test_phase6_routers.py::test_knowledge_retrieval_treats_instructions_as_data\n  C:\\Users\\27363\\Desktop\\store\\.venv\\Lib\\site-packages\\starlette\\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.\n    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n1 passed, 1 warning in 0.95s\n",
   "stderr_tail": ""
 }
