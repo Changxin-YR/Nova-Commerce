@@ -389,13 +389,13 @@ def main() -> int:
 
     # JUnit: written from the real Playwright report so it cannot disagree with the
     # browser assertion above. ``parses`` reflects whether a document really exists.
-    testcase_count = len(browser.get("tests") or [])
+    testcase_count = len(assertions)
     XML_OUT.parent.mkdir(parents=True, exist_ok=True)
-    cases = "".join(_testcase_xml(test) for test in (browser.get("tests") or []))
+    cases = "".join(_assertion_testcase_xml(item) for item in assertions)
     XML_OUT.write_text(
         f'<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<testsuite name="fg22-flagship-agent" tests="{testcase_count}" '
-        f'failures="{sum(1 for test in (browser.get("tests") or []) if not test["passed"])}">'
+        f'failures="{sum(1 for item in assertions if not item["pass"])}">'
         f"{cases}</testsuite>\n",
         encoding="utf-8",
     )
@@ -504,6 +504,16 @@ def _testcase_xml(test: dict[str, object]) -> str:
     if test["passed"]:
         return f'<testcase classname="fg22.browser" name="{name}" />'
     return f'<testcase classname="fg22.browser" name="{name}"><failure /></testcase>'
+
+
+def _assertion_testcase_xml(assertion: dict[str, object]) -> str:
+    name = _xml_escape(str(assertion.get("name", "unnamed assertion")))
+    if assertion.get("pass") is True:
+        return f'<testcase classname="fg22" name="{name}" />'
+    detail = _xml_escape(
+        f'expected={assertion.get("expected")!r}; actual={assertion.get("actual")!r}'
+    )
+    return f'<testcase classname="fg22" name="{name}"><failure message="{detail}" /></testcase>'
 
 
 def _xml_escape(text: str) -> str:
