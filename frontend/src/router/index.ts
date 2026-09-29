@@ -110,7 +110,10 @@ const routes: RouteRecordRaw[] = [
         path: 'assistant',
         name: 'ai-assistant',
         component: () => import('@/views/consumer/AssistantView.vue'),
-        meta: { title: 'AI 助手' },
+        // The agent API requires an authenticated principal with agent:chat;
+        // guard the surface up front so users never reach a composer that can
+        // only fail with a transport-level 401 after submitting a message.
+        meta: { title: 'AI 助手', requiresAuth: true },
       },
     ],
   },
